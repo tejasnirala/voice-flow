@@ -12,7 +12,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 CONFIG="${1:-release}"
-APP="build/VoiceFlow.app"
+# The bundle is assembled in a ".noindex" folder so Spotlight doesn't list development builds next to the installed app;
+# build/VoiceFlow.app is a symlink to it, so `open build/VoiceFlow.app` and the measurement scripts keep working.
+APP="build/Products.noindex/VoiceFlow.app"
+LINK="build/VoiceFlow.app"
 IDENTITY="${VOICEFLOW_SIGN_IDENTITY:-VoiceFlow Dev}"
 
 swift build -c "$CONFIG" --product VoiceFlow
@@ -20,6 +23,7 @@ swift build -c "$CONFIG" --product voiceflow-stt
 BIN_DIR="$(swift build -c "$CONFIG" --show-bin-path)"
 
 rm -rf "$APP"
+[[ -L "$LINK" ]] || rm -rf "$LINK"   # an older build left a real bundle here
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp "$BIN_DIR/VoiceFlow" "$APP/Contents/MacOS/VoiceFlow"
 cp "$BIN_DIR/voiceflow-stt" "$APP/Contents/MacOS/voiceflow-stt"
@@ -53,4 +57,5 @@ else
   echo "Signed ad-hoc (create a 'VoiceFlow Dev' identity to keep permission grants; see docs/development.md)"
 fi
 
+ln -sfn "Products.noindex/VoiceFlow.app" "$LINK"
 du -sh "$APP" "$APP/Contents/MacOS/VoiceFlow"

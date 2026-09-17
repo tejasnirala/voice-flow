@@ -305,6 +305,8 @@ per 30–60 s, GPU 0, footprint 13 MB.
       draggable non-activating pill (level bars, finish/cancel, Transcribing/Rewriting/Pasted/errors) with saved position
 - [x] Verified: screenshots of all window sections and the pill while recording/after; idle unchanged (13 MB, 0 CPU); window
       open 0.23 % CPU / 31 MB; 147 core + 5 app tests pass (incl. saved-position fallback)
+- [x] Installed to ~/Applications/VoiceFlow.app (2026-09-17, owner request after seeing two Spotlight results): development builds
+      now go to `build/Products.noindex/` (not indexed) with a `build/VoiceFlow.app` symlink; build copy unregistered
 - [ ] **Owner:** try the window and the pill (drag it, dictate again: it should reappear there), then `scripts/install.sh`
       (moves VoiceFlow to ~/Applications; macOS may ask for permissions again); approve Phase 12
 

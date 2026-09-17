@@ -39,8 +39,12 @@ mkdir -p "$DEST_DIR"
 DEST="$DEST_DIR/VoiceFlow.app"
 SUDO=""; [[ -w "$DEST_DIR" ]] || SUDO="sudo"
 $SUDO rm -rf "$DEST"
-$SUDO ditto build/VoiceFlow.app "$DEST"
+$SUDO ditto build/Products.noindex/VoiceFlow.app "$DEST"
 echo "✓ installed $DEST ($(du -sh "$DEST" | cut -f1))"
+# Keep Spotlight/Launch Services to the installed copy: forget development builds.
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+[[ -x "$LSREGISTER" ]] && "$LSREGISTER" -u "$PWD/build/Products.noindex/VoiceFlow.app" >/dev/null 2>&1 || true
+mdimport "$DEST" >/dev/null 2>&1 || true
 
 MODEL="$HOME/Library/Application Support/VoiceFlow/models/whisper/ggml-medium.en-q8_0.bin"
 [[ -e "$MODEL" ]] || echo "! speech model not installed yet — run: scripts/install.sh --with-models (or scripts/fetch-models.sh whisper medium.en-q8_0)"
