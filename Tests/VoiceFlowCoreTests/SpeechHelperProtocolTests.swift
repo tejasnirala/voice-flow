@@ -3,6 +3,8 @@ import Testing
 @testable import VoiceFlowCore
 
 @Suite struct SpeechHelperProtocolTests {
+    static let options = SpeechHelperMessage.Transcribe(modelPath: "/m/x.bin", modelFileName: "x.bin", language: "hi", prompt: "यह एक developer")
+
     /// Decodes from an in-memory stream.
     func roundTrip(_ messages: [SpeechHelperMessage]) throws -> [SpeechHelperMessage] {
         var stream = Data()
@@ -23,8 +25,10 @@ import Testing
             .prepare(.init(modelPath: "/m/ggml-medium.en-q8_0.bin", modelFileName: "ggml-medium.en-q8_0.bin", language: "en",
                            prompt: "Next.js, PostgreSQL")),
             .prepare(.init(modelPath: "/m/x.bin", modelFileName: "x.bin", language: "en", prompt: nil)),
-            .transcribe([0, 0.5, -1, 1e-6, .pi]),
-            .transcribe([]),
+            .transcribe(Self.options, [0, 0.5, -1, 1e-6, .pi]),
+            .transcribe(Self.options, []),
+            .detectLanguage(.init(modelPath: "/m/t.bin", modelFileName: "t.bin", candidates: ["en", "de", "hi"]), [0.25, -0.5]),
+            .detection(.init(probabilities: ["en": 0.97, "de": 0.02, "hi": 0.01], seconds: 0.21)),
             .ready(.init(loadSeconds: 0.31, encoder: "Core ML")),
             .transcription(.init(text: "Run npm run dev — ✓", audioSeconds: 5.2, transcribeSeconds: 0.61, chunkCount: 1,
                                  transcribedAudioSeconds: 5.2)),
@@ -36,11 +40,11 @@ import Testing
 
     @Test func largeAudioSurvivesFraming() throws {
         let samples = (0..<(16_000 * 60)).map { Float(sin(Double($0) / 7)) }
-        #expect(try roundTrip([.transcribe(samples)]) == [.transcribe(samples)])
+        #expect(try roundTrip([.transcribe(Self.options, samples)]) == [.transcribe(Self.options, samples)])
     }
 
     @Test func truncatedStreamReportsEndOfStream() throws {
-        let frame = try SpeechHelperWire.encode(.transcribe([1, 2, 3]))
+        let frame = try SpeechHelperWire.encode(.transcribe(Self.options, [1, 2, 3]))
         let cut = frame.prefix(frame.count - 2)
         var offset = cut.startIndex
         #expect(throws: SpeechHelperWire.WireError.endOfStream) {

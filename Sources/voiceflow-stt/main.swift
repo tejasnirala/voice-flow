@@ -26,7 +26,8 @@ if CommandLine.arguments.contains("--transcribe-benchmark") {
 
 let input = FileHandle.standardInput
 let output = FileHandle.standardOutput
-var engine: WhisperEngine?
+/// Loaded models by file path. Auto language uses a detector and a transcription model at the same time.
+var engines: [String: WhisperEngine] = [:]
 
 func reply(_ message: SpeechHelperMessage) -> Bool {
     do {
@@ -48,37 +49,42 @@ serve: while true {
     }
     switch message {
     case .prepare(let request):
-        if let current = engine,
-           current.modelPath != request.modelPath || current.prompt != request.prompt || current.language != request.language {
-            current.unload()
-            engine = nil
-        }
-        let active = engine ?? WhisperEngine(request)
-        engine = active
+        let active = engines[request.modelPath] ?? WhisperEngine(request)
+        engines[request.modelPath] = active
         do {
             let seconds = try active.prepare()
             guard reply(.ready(.init(loadSeconds: seconds, encoder: active.encoderName))) else { break serve }
         } catch {
+            engines[request.modelPath] = nil
             guard reply(.failure(error.localizedDescription)) else { break serve }
         }
-    case .transcribe(let samples):
-        guard let active = engine else {
-            guard reply(.failure("The speech model isn't loaded")) else { break serve }
-            continue
-        }
+    case .transcribe(let options, let samples):
+        let active = engines[options.modelPath]
+            ?? WhisperEngine(modelPath: options.modelPath, modelFileName: options.modelFileName, language: options.language, prompt: options.prompt)
+        engines[options.modelPath] = active
         do {
-            let r = try active.transcribe(samples)
+            let r = try active.transcribe(samples, language: options.language, prompt: options.prompt)
             guard reply(.transcription(.init(text: r.text, audioSeconds: r.audioSeconds, transcribeSeconds: r.transcribeSeconds,
                                              chunkCount: r.chunkCount, transcribedAudioSeconds: r.transcribedAudioSeconds))) else { break serve }
         } catch {
             guard reply(.failure(error.localizedDescription)) else { break serve }
         }
+    case .detectLanguage(let options, let samples):
+        let active = engines[options.modelPath]
+            ?? WhisperEngine(modelPath: options.modelPath, modelFileName: options.modelFileName, language: "en", prompt: nil)
+        engines[options.modelPath] = active
+        do {
+            let (probabilities, seconds) = try active.detectLanguage(samples, candidates: options.candidates)
+            guard reply(.detection(.init(probabilities: probabilities, seconds: seconds))) else { break serve }
+        } catch {
+            guard reply(.failure(error.localizedDescription)) else { break serve }
+        }
     case .shutdown:
         break serve
-    case .ready, .transcription, .failure:
+    case .ready, .transcription, .detection, .failure:
         guard reply(.failure("Unexpected message")) else { break serve }
     }
 }
-engine?.unload()
+for engine in engines.values { engine.unload() }
 log.notice("helper exiting, footprint \(ResourceUsage.footprintMB, format: .fixed(precision: 0), privacy: .public) MB")
 exit(0)

@@ -16,6 +16,15 @@ public struct RewritePrompt: Codable, Equatable, Sendable {
         try JSONDecoder().decode(RewritePrompt.self, from: Data(contentsOf: url))
     }
 
+    /// The prompt for a non-English transcript: one added rule so the model keeps the language (Phase 14). English
+    /// prompts are unchanged.
+    public func forLanguage(_ language: OutputLanguage) -> RewritePrompt {
+        guard language == .german else { return self }
+        var prompt = self
+        prompt.system += "\nThe transcript is in German. Write the result in German, in the same words; never translate it into English."
+        return prompt
+    }
+
     /// Instructions for a model that takes one instruction string (examples appended in a fixed format).
     public var instructions: String {
         system + "\n\nExamples:\n" + examples.map { "Transcript: \($0.input)\nRewritten: \($0.output)" }.joined(separator: "\n\n")

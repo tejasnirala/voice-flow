@@ -31,6 +31,8 @@ public struct Settings: Codable, Equatable, Sendable {
 
         /// ⌥ Space: kVK_Space (49) with optionKey (0x0800).
         public static let optionSpace = Hotkey(keyCode: 49, carbonModifiers: 0x0800)
+        /// ⌃⇧L: kVK_ANSI_L (37) with controlKey (0x1000) + shiftKey (0x0200). No ⌥, so it can't collide with the ⌥ trigger.
+        public static let controlShiftL = Hotkey(keyCode: 37, carbonModifiers: 0x1200)
 
         /// Human-readable form, e.g. "⌥Space". Modifier order follows macOS convention (⌃⌥⇧⌘).
         public var displayName: String {
@@ -39,7 +41,7 @@ public struct Settings: Codable, Equatable, Sendable {
             if carbonModifiers & 0x0800 != 0 { name += "⌥" }
             if carbonModifiers & 0x0200 != 0 { name += "⇧" }
             if carbonModifiers & 0x0100 != 0 { name += "⌘" }
-            let keys: [UInt32: String] = [49: "Space", 53: "Esc", 36: "Return", 48: "Tab"]
+            let keys: [UInt32: String] = [49: "Space", 53: "Esc", 36: "Return", 48: "Tab", 37: "L"]
             return name + (keys[keyCode] ?? "Key \(keyCode)")
         }
     }
@@ -70,6 +72,14 @@ public struct Settings: Codable, Equatable, Sendable {
     public var modeByApp: Bool
     /// The owner's per-app modes by bundle ID; they override the built-in defaults.
     public var appModes: [String: TextMode]
+    /// Dictation language (Phase 14): auto-detect English/German/Hindi, or a fixed language.
+    public var language: DictationLanguage
+    /// Script for Hindi when Auto detects it.
+    public var hindiScript: HindiScript
+    /// Shortcut that cycles the language (default ⌃⇧L).
+    public var languageHotkey: Hotkey
+    /// Model used for German and Hindi (`STTModel.id`).
+    public var multilingualModelID: String
     /// Show the floating pill while dictating.
     public var showIndicator: Bool
     /// Where the owner dragged the pill (window origin in screen coordinates); nil = bottom center of the main screen.
@@ -88,7 +98,13 @@ public struct Settings: Codable, Equatable, Sendable {
                 useVocabularyPrompt: Bool = true, sttUnloadAfterSeconds: Double = 60,
                 pasteInto: InsertionPolicy.PasteTarget = .currentApp, dictationTrigger: DictationTrigger = .option,
                 textMode: TextMode = .clean, modeByApp: Bool = true, appModes: [String: TextMode] = [:],
-                showIndicator: Bool = true, indicatorPosition: IndicatorPosition? = nil) {
+                showIndicator: Bool = true, indicatorPosition: IndicatorPosition? = nil,
+                language: DictationLanguage = .auto, hindiScript: HindiScript = .devanagari,
+                languageHotkey: Hotkey = .controlShiftL, multilingualModelID: String = STTModel.largeV3Q5.id) {
+        self.language = language
+        self.hindiScript = hindiScript
+        self.languageHotkey = languageHotkey
+        self.multilingualModelID = multilingualModelID
         self.showIndicator = showIndicator
         self.indicatorPosition = indicatorPosition
         self.pasteInto = pasteInto
@@ -106,6 +122,8 @@ public struct Settings: Codable, Equatable, Sendable {
     }
 
     /// The configured model, or the default if the configured id isn't in the catalog.
+    public var multilingualModel: STTModel { STTModel.model(id: multilingualModelID) ?? .largeV3Q5 }
+
     public var sttModel: STTModel { STTModel.model(id: sttModelID) ?? .mediumEnQ8 }
 
     private enum LegacyKeys: String, CodingKey { case cleanupTranscripts }
@@ -133,6 +151,11 @@ public struct Settings: Codable, Equatable, Sendable {
         let rawAppModes = (try? c.decodeIfPresent([String: String].self, forKey: .appModes)) ?? [:]
         appModes = rawAppModes.compactMapValues(TextMode.init(rawValue:))
         showIndicator = (try? c.decodeIfPresent(Bool.self, forKey: .showIndicator)) ?? d.showIndicator
+        language = (try? c.decodeIfPresent(DictationLanguage.self, forKey: .language)) ?? d.language
+        hindiScript = (try? c.decodeIfPresent(HindiScript.self, forKey: .hindiScript)) ?? d.hindiScript
+        languageHotkey = (try? c.decodeIfPresent(Hotkey.self, forKey: .languageHotkey)) ?? d.languageHotkey
+        let multilingualID = (try? c.decodeIfPresent(String.self, forKey: .multilingualModelID)) ?? d.multilingualModelID
+        multilingualModelID = STTModel.multilingual.contains { $0.id == multilingualID } ? multilingualID : d.multilingualModelID
         indicatorPosition = (try? c.decodeIfPresent(IndicatorPosition.self, forKey: .indicatorPosition)) ?? nil
     }
 }

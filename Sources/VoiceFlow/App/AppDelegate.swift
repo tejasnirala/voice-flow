@@ -1,3 +1,4 @@
+import AVFoundation
 import AppKit
 import VoiceFlowCore
 
@@ -33,6 +34,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 appState.pipelineState = state
                 indicator?.pipelineChanged(to: state)
             }
+        }
+        coordinator.onLanguageResolved = { [weak appState] language in appState?.dictationLanguage = language }
+        coordinator.onCycleLanguage = { [weak appState, weak indicator] in
+            guard let appState else { return }
+            appState.update { $0.language = $0.language.next }
+            Log.settings.notice("language switched to \(appState.settings.language.rawValue, privacy: .public)")
+            indicator?.showNotice("Language: \(appState.settings.language.displayName)")
         }
         coordinator.onAudioFlowing = { [weak menuBar, weak appState] in
             menuBar?.markAudioFlowing()
@@ -80,7 +88,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let coordinator, coordinator.triggerWarning != nil, ModifierKeyMonitor.hasPermission else { return }
             coordinator.activateTrigger()
         }
-        coordinator.onSpeechInfoChange = { [weak menuBar, weak appState] status, transcript in
+        coordinator.onSpeechInfoChange = { [weak menuBar, weak appState, weak coordinator] status, transcript in
+            menuBar?.modelInstallCommand = coordinator?.modelNeedingInstall?.installCommand
+            appState?.modelNeedingInstall = coordinator?.modelNeedingInstall
             menuBar?.update(modelStatus: status, lastTranscript: transcript)
             appState?.modelStatus = status
             appState?.lastTranscript = transcript
@@ -123,8 +133,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         func value(_ flag: String) -> Double? {
             args.firstIndex(of: flag).flatMap { $0 + 1 < args.count ? Double(args[$0 + 1]) : nil }
         }
-        guard let seconds = value("--measure-recording"), seconds > 0 else { return }
-        let runs = max(1, Int(value("--runs") ?? 1))
+        // `--measure-files a.wav,b.wav [--measure-output out.txt]`: each file is dictated in turn instead of the microphone
+        // (tests language routing without speakers); final texts are appended to the output file if given.
+        var files: [URL] = []
+        if let index = args.firstIndex(of: "--measure-files"), index + 1 < args.count {
+            files = args[index + 1].split(separator: ",").map { URL(fileURLWithPath: String($0)) }
+            coordinator.injectedAudio = files.compactMap { try? Self.loadMono16k($0) }
+            if let outIndex = args.firstIndex(of: "--measure-output"), outIndex + 1 < args.count {
+                let out = URL(fileURLWithPath: args[outIndex + 1])
+                FileManager.default.createFile(atPath: out.path, contents: nil)
+                coordinator.onFinalTextForMeasurement = { text in
+                    if let handle = try? FileHandle(forWritingTo: out) {
+                        handle.seekToEndOfFile()
+                        handle.write(Data((text.replacingOccurrences(of: "\n", with: " ⏎ ") + "\n").utf8))
+                        try? handle.close()
+                    }
+                }
+            }
+        }
+        guard let seconds = files.isEmpty ? value("--measure-recording") : 0.3, seconds > 0 else { return }
+        let runs = files.isEmpty ? max(1, Int(value("--runs") ?? 1)) : coordinator.injectedAudio.count
         let stay = args.contains("--stay")
         coordinator.reuseAudioEngine = !args.contains("--fresh-engine")
         coordinator.insertionEnabled = false
@@ -153,5 +181,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         coordinator?.shutdown()
         Log.lifecycle.notice("terminating")
+    }
+
+    static func loadMono16k(_ url: URL) throws -> [Float] {
+        let file = try AVAudioFile(forReading: url)
+        guard let target = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false),
+              let converter = AVAudioConverter(from: file.processingFormat, to: target),
+              let input = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)) else { return [] }
+        try file.read(into: input)
+        let capacity = AVAudioFrameCount(Double(input.frameLength) * 16_000 / file.processingFormat.sampleRate) + 1024
+        guard let output = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: capacity) else { return [] }
+        var supplied = false
+        _ = converter.convert(to: output, error: nil) { _, status in
+            if supplied { status.pointee = .endOfStream; return nil }
+            supplied = true
+            status.pointee = .haveData
+            return input
+        }
+        return Array(UnsafeBufferPointer(start: output.floatChannelData![0], count: Int(output.frameLength)))
     }
 }

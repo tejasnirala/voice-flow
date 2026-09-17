@@ -106,6 +106,10 @@ final class WhisperEngine: Engine {
                 return (code, probs[Int(id)])
             }
             code = candidates.max { $0.1 < $1.1 }!.0
+            if opts["detect-only"] != nil || CommandLine.arguments.contains("--detect-only") {
+                lastDetection = ["detected": code].merging(Dictionary(uniqueKeysWithValues: candidates.map { ("p_\($0.0)", Double($0.1)) })) { a, _ in a }
+                return ""
+            }
             lastDetection = ["detected": code] .merging(Dictionary(uniqueKeysWithValues: candidates.map { ("p_\($0.0)", Double($0.1)) })) { a, _ in a }
         }
         let lang = strdup(code), promptC = prompt.map { strdup($0) }

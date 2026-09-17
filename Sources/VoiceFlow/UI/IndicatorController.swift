@@ -24,6 +24,7 @@ final class IndicatorController {
         hideWork?.cancel()
         switch next {
         case .recording, .transcribing, .processing, .inserting:
+            state.notice = nil
             show()
         case .idle:
             // Brief confirmation after a paste; otherwise (cancel, empty) hide right away.
@@ -32,6 +33,20 @@ final class IndicatorController {
             show()
             hide(after: 3)
         }
+    }
+
+    /// Shows a short notice on the pill (e.g. "Language: German") when no dictation is in progress.
+    func showNotice(_ text: String, seconds: Double = 1.6) {
+        guard state.settings.showIndicator, state.pipelineState == .idle || { if case .error = state.pipelineState { return true }; return false }() else { return }
+        hideWork?.cancel()
+        state.notice = text
+        show()
+        let work = DispatchWorkItem { [weak self] in
+            self?.panel?.orderOut(nil)
+            self?.state.notice = nil
+        }
+        hideWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: work)
     }
 
     func settingsChanged() {
@@ -136,7 +151,31 @@ struct PillView: View {
         .help("Drag to move")
     }
 
+    /// Language badge: the fixed language while recording, the detected one afterwards.
+    @ViewBuilder private var languageBadge: some View {
+        let text: String? = switch state.pipelineState {
+        case .recording: state.settings.language == .auto ? nil : state.settings.language.badge
+        case .transcribing: state.settings.language == .auto ? nil : state.settings.language.badge
+        case .processing, .inserting, .idle: state.dictationLanguage?.badge
+        case .error: nil
+        }
+        if let text {
+            Text(text).font(.system(size: 10, weight: .bold)).padding(.horizontal, 5).padding(.vertical, 2)
+                .background(Capsule().fill(Color.white.opacity(0.18)))
+        }
+    }
+
     @ViewBuilder private var content: some View {
+        if let notice = state.notice, state.pipelineState == .idle || { if case .error = state.pipelineState { return true }; return false }() {
+            Image(systemName: "globe").foregroundStyle(.white.opacity(0.85))
+            Text(notice).font(.system(size: 12, weight: .medium)).lineLimit(1)
+            Spacer(minLength: 0)
+        } else {
+            dictationContent
+        }
+    }
+
+    @ViewBuilder private var dictationContent: some View {
         switch state.pipelineState {
         case .recording where !state.audioFlowing:
             Image(systemName: "mic.fill").foregroundStyle(.white.opacity(0.6))
@@ -147,20 +186,24 @@ struct PillView: View {
             Circle().fill(Color.red).frame(width: 8, height: 8)
             LevelBars(levels: state.levels)
             Spacer(minLength: 0)
+            languageBadge
             if state.handsFree || interaction.hovering { finishButton }
             cancelButton
         case .transcribing:
             ProgressView().controlSize(.small).tint(.white)
             Text("Transcribing").font(.system(size: 12, weight: .medium))
             Spacer(minLength: 0)
+            languageBadge
         case .processing:
             ProgressView().controlSize(.small).tint(.white)
             Text("Rewriting").font(.system(size: 12, weight: .medium))
             Spacer(minLength: 0)
+            languageBadge
         case .inserting, .idle:
             Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
             Text("Pasted").font(.system(size: 12, weight: .medium))
             Spacer(minLength: 0)
+            languageBadge
         case .error(let failure):
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
             Text(failure.message).font(.system(size: 11, weight: .medium)).lineLimit(1).truncationMode(.tail)

@@ -16,6 +16,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     var onRetryTranscription: (() -> Void)?
     var onOpenInputMonitoringSettings: (() -> Void)?
     var onOpenWindow: (() -> Void)?
+    /// Install command for the model that's missing (set by AppDelegate from the coordinator).
+    var modelInstallCommand: String?
 
     /// Settings changed in the window (already saved).
     func apply(_ settings: Settings) {
@@ -135,7 +137,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             menu.addItem(open)
         }
         if state == .idle, modelStatus != .installed {
-            menu.addItem(disabled("⚠︎ Speech model \(modelStatusText) — run \(settings.sttModel.installCommand)"))
+            menu.addItem(disabled("⚠︎ Speech model \(modelStatusText) — run \(modelInstallCommand ?? settings.sttModel.installCommand)"))
         } else if state == .idle, settings.sttModel.coreMLEncoderInstallCommand != nil, !STTModelManager.hasCoreMLEncoder(for: settings.sttModel) {
             menu.addItem(disabled("Speech runs ~25% slower without the Neural Engine encoder — run \(settings.sttModel.coreMLEncoderInstallCommand!)"))
         }
@@ -175,6 +177,32 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             menu.addItem(copy)
             menu.addItem(.separator())
         }
+
+        let languageItem = NSMenuItem(title: "Language: \(settings.language.displayName)", action: nil, keyEquivalent: "")
+        let languages = NSMenu()
+        languages.autoenablesItems = false
+        for language in DictationLanguage.allCases {
+            let item = NSMenuItem(title: language.displayName, action: #selector(selectLanguage(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = language.rawValue
+            item.state = settings.language == language ? .on : .off
+            languages.addItem(item)
+        }
+        languages.addItem(.separator())
+        languages.addItem(disabled("When Auto hears Hindi, write:"))
+        for script in HindiScript.allCases {
+            let item = NSMenuItem(title: script == .devanagari ? "Devanagari (देवनागरी)" : "Hinglish (Latin letters)",
+                                  action: #selector(selectHindiScript(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = script.rawValue
+            item.state = settings.hindiScript == script ? .on : .off
+            item.isEnabled = settings.language == .auto
+            languages.addItem(item)
+        }
+        languages.addItem(.separator())
+        languages.addItem(disabled("Switch language: \(settings.languageHotkey.displayName)"))
+        languageItem.submenu = languages
+        menu.addItem(languageItem)
 
         let modelReason = OnDeviceRewriter.unavailableReason
         // The status menu doesn't activate VoiceFlow, so the frontmost app is the one the user was working in.
@@ -327,6 +355,18 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     @objc private func toggleSmartRewrite() {
         settings.processingMode = settings.processingMode == .smart ? .fast : .smart
+        persist()
+    }
+
+    @objc private func selectLanguage(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let language = DictationLanguage(rawValue: raw), settings.language != language else { return }
+        settings.language = language
+        persist()
+    }
+
+    @objc private func selectHindiScript(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let script = HindiScript(rawValue: raw), settings.hindiScript != script else { return }
+        settings.hindiScript = script
         persist()
     }
 

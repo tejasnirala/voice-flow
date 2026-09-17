@@ -24,4 +24,10 @@ import Testing
         #expect(HindiTransliteration.latinizeLoanwords("यह फ़ाइल चेक करो और डॉकर रीस्टार्ट करो।") == "यह file check करो और Docker restart करो।")
         #expect(HindiTransliteration.hinglish("already Latin text.") == "Already Latin text.")
     }
+
+    @Test func dandaAfterDevanagariOnly() {
+        #expect(LanguageRouting.convert("इस function में Redis में cache कर दो. Next.js use करो.", to: .hindiDevanagari)
+                == "इस function में Redis में cache कर दो। Next.js use करो।")
+        #expect(HindiTransliteration.devanagariPunctuation("Use Next.js. Done.") == "Use Next.js. Done.")
+    }
 }

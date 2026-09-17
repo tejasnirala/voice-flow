@@ -33,6 +33,18 @@ public enum HindiTransliteration {
         mapWords(text) { core in loanwords[core] }
     }
 
+    /// A sentence-ending "." right after a Devanagari word becomes the danda "।" ("Next.js" and English sentences keep ".").
+    public static func devanagariPunctuation(_ text: String) -> String {
+        var result = ""
+        let chars = Array(text)
+        for (i, ch) in chars.enumerated() {
+            let atSentenceEnd = i + 1 == chars.count || chars[i + 1] == " " || chars[i + 1] == "\n"
+            let afterDevanagari = i > 0 && chars[i - 1].unicodeScalars.contains { (0x0900...0x097F).contains($0.value) }
+            result.append(ch == "." && atSentenceEnd && afterDevanagari ? "।" : ch)
+        }
+        return result
+    }
+
     // MARK: Hinglish
 
     /// Common words in their usual Hinglish spelling (the letter rules can't know conventions like "hain", "mein").

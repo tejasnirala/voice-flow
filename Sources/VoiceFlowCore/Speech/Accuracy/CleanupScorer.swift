@@ -36,7 +36,9 @@ public struct CleanupScore: Sendable {
 
 public enum CleanupScorer {
     /// Fillers a cleanup is allowed to remove.
-    public static let fillerWords: Set<String> = ["um", "uh", "er", "erm", "ah", "hmm", "mm", "like", "basically", "you", "know"]
+    public static let fillerWords: Set<String> = ["um", "uh", "er", "erm", "ah", "hmm", "mm", "like", "basically", "you", "know",
+                                                   // German and Hindi hesitations (Phase 14)
+                                                   "äh", "ähm", "öhm", "hm", "उम्म", "अं", "हम्म", "आं"]
 
     public static let articleWords: Set<String> = ["a", "an", "the"]
     /// Grammatically optional words a cleanup may delete (not replace): "the things that I need" → "the things I need".

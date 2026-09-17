@@ -290,11 +290,13 @@ func runModes(_ args: [String]) throws -> Int32 {
     var entries: [Entry] = []
     for file in corpusFiles { entries += try JSONDecoder().decode(Corpus.self, from: Data(contentsOf: URL(fileURLWithPath: file))).entries }
     let terms = RewriteGuard.terms(fromVocabulary: DeveloperVocabulary.prompt())
+    // --language english|german|hindiDevanagari|hinglish: language-aware cleanup (Phase 14).
+    let language = values("--language").first.flatMap(OutputLanguage.init(rawValue:)) ?? .english
 
     switch args.first {
     case "prepare":
         guard let raw = values("--mode").first, let mode = TextMode(rawValue: raw), let out = values("--out").first else { return 2 }
-        let prepared = entries.map { Entry(id: $0.id, category: $0.category, input: TextProcessingPlan.prepare($0.input, mode: mode),
+        let prepared = entries.map { Entry(id: $0.id, category: $0.category, input: TextProcessingPlan.prepare($0.input, mode: mode, language: language),
                                            reference: $0.reference, terms: $0.terms) }
         let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try encoder.encode(Corpus(entries: prepared)).write(to: URL(fileURLWithPath: out))
@@ -322,7 +324,7 @@ func runModes(_ args: [String]) throws -> Int32 {
         var changed = 0, unsafe = 0, after = EditCounts(), times: [Double] = []
         for e in entries {
             let t = DispatchTime.now().uptimeNanoseconds
-            let out = TextProcessingPlan.prepare(e.input, mode: mode)
+            let out = TextProcessingPlan.prepare(e.input, mode: mode, language: language)
             times.append(Double(DispatchTime.now().uptimeNanoseconds - t) / 1e6)
             let s = CleanupScorer.score(input: unspoken(e.input), output: unspoken(out), reference: e.reference, terms: e.terms)
             after = after + s.formattingAfter
@@ -356,7 +358,7 @@ func runModes(_ args: [String]) throws -> Int32 {
         var accepted = 0, reasons: [String: Int] = [:], before = EditCounts(), after = EditCounts()
         for r in rs {
             let e = byID[r.id!]!
-            let prepared = TextProcessingPlan.prepare(e.input, mode: mode)
+            let prepared = TextProcessingPlan.prepare(e.input, mode: mode, language: language)
             let rewrite = (r.output ?? "").isEmpty ? nil : r.output
             let (text, verdict) = TextProcessingPlan.finalText(prepared: prepared, rewrite: rewrite, terms: terms + e.terms.map { String($0.prefix { $0 != "|" }) }, mode: mode)
             before = before + AccuracyScorer.editCounts(reference: AccuracyScorer.formattedTokens(e.reference), hypothesis: AccuracyScorer.formattedTokens(prepared))

@@ -1,0 +1,1 @@
+Yeh ek developer ki baatcheet hai. Hum function, API, Redis, PostgreSQL, Next.js, TypeScript, Docker, Kubernetes, kubectl, git rebase, npm install, useEffect aur production bug ki baat kar rahe hain.

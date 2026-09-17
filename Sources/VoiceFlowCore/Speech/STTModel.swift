@@ -23,7 +23,22 @@ public struct STTModel: Equatable, Sendable {
         sizeBytes: 823_382_461, sha256: "43fa2cd084de5a04399a896a9a7a786064e221365c01700cea4666005218f11c",
         language: "en", displayName: "Whisper medium.en (q8_0)")
 
-    public static let catalog: [STTModel] = [mediumEnQ8, largeV3TurboQ8]
+    /// Multilingual (German, Hindi): best on synthetic German and Hindi with a vocabulary prompt (docs/ACCURACY.md §9).
+    public static let largeV3Q5 = STTModel(
+        id: "large-v3-q5_0", runtimeDirectory: "whisper", fileName: "ggml-large-v3-q5_0.bin",
+        sizeBytes: 1_081_140_203, sha256: "d75795ecff3f83b5faa89d1900604ad8c780abd5739fae406de19f23ecd98ad1",
+        language: "de", displayName: "Whisper large-v3 (q5_0)")
+
+    /// Multilingual candidate evaluated in Phase 14.
+    public static let mediumQ8 = STTModel(
+        id: "medium-q8_0", runtimeDirectory: "whisper", fileName: "ggml-medium-q8_0.bin",
+        sizeBytes: 823_369_779, sha256: "42a1ffcbe4167d224232443396968db4d02d4e8e87e213d3ee2e03095dea6502",
+        language: "de", displayName: "Whisper medium (q8_0)")
+
+    public static let catalog: [STTModel] = [mediumEnQ8, largeV3TurboQ8, largeV3Q5, mediumQ8]
+
+    /// Models that can transcribe German and Hindi.
+    public static let multilingual: [STTModel] = [largeV3Q5, largeV3TurboQ8, mediumQ8]
 
     public static func model(id: String) -> STTModel? { catalog.first { $0.id == id } }
 

@@ -276,9 +276,10 @@ struct HomeView: View {
                       detail: model.accessibility ? "Allowed: text is pasted where you're typing" : "Needed to paste. Without it, text is copied to the clipboard.",
                       action: ("Allow…", { PermissionManager.requestAccessibility(); PermissionManager.openAccessibilitySettings() }))
             Divider()
-            StatusRow(ok: state.modelStatus == .installed, title: "Speech model (\(state.settings.sttModel.id))",
-                      detail: state.modelStatus == .installed ? "Installed" : "Run in Terminal: \(state.settings.sttModel.installCommand)",
-                      action: ("Copy Command", { copyToClipboard(state.settings.sttModel.installCommand) }))
+            let missing = state.modelNeedingInstall
+            StatusRow(ok: missing == nil, title: missing.map { "Speech model (\($0.id))" } ?? "Speech models",
+                      detail: missing.map { "Run in Terminal: \($0.installCommand)" } ?? "Installed for your language setting",
+                      action: ("Copy Command", { copyToClipboard(missing?.installCommand ?? "") }))
             if let command = state.settings.sttModel.coreMLEncoderInstallCommand {
                 Divider()
                 StatusRow(ok: model.encoderInstalled, title: "Neural Engine encoder",
@@ -568,6 +569,20 @@ struct SettingsView: View {
                                    set: { value in state.update { $0.maxRecordingSeconds = value } }), in: 30...600, step: 30) {
                 Text("Longest dictation: \(Int(state.settings.maxRecordingSeconds / 60)) min \(Int(state.settings.maxRecordingSeconds) % 60) s")
             }
+        }
+        Card {
+            Picker("Language", selection: Binding(get: { state.settings.language },
+                                                  set: { value in state.update { $0.language = value } })) {
+                ForEach(DictationLanguage.allCases, id: \.self) { Text($0.displayName).tag($0) }
+            }
+            Picker("When Auto hears Hindi, write", selection: Binding(get: { state.settings.hindiScript },
+                                                                     set: { value in state.update { $0.hindiScript = value } })) {
+                Text("Devanagari (देवनागरी)").tag(HindiScript.devanagari)
+                Text("Hinglish (Latin letters)").tag(HindiScript.hinglish)
+            }
+            .disabled(state.settings.language != .auto)
+            Text("Switch language anytime with \(state.settings.languageHotkey.displayName). English words stay in Latin letters in Hindi. Prompt, Writing and Smart Rewrite work in English and German; Hindi and Hinglish use Clean.")
+                .font(.callout).foregroundStyle(.secondary)
         }
         Card {
             Toggle("Show the floating pill while dictating", isOn: Binding(get: { state.settings.showIndicator },

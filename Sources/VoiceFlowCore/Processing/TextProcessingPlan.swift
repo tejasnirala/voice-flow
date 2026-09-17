@@ -6,12 +6,13 @@ public enum TextProcessingPlan {
     /// Raw → unchanged; Clean, Prompt, Writing → rule-based cleanup; Developer → cleanup + spoken symbols, developer
     /// corrections and term casing; Code → hesitations/stutters removed + code symbols. The owner's dictionary is applied
     /// last in every mode except Raw.
-    public static func prepare(_ transcript: String, mode: TextMode, dictionary: UserDictionary = .empty) -> String {
+    public static func prepare(_ transcript: String, mode: TextMode, dictionary: UserDictionary = .empty,
+                               language: OutputLanguage = .english) -> String {
         switch mode {
         case .raw: transcript
-        case .clean, .prompt, .writing: dictionary.apply(to: RuleBasedCleanup.clean(transcript))
-        case .developer: dictionary.apply(to: DeveloperFormatter.format(RuleBasedCleanup.clean(transcript)))
-        case .code: dictionary.apply(to: CodeFormatter.format(RuleBasedCleanup.clean(transcript, sentenceCase: false)))
+        case .clean, .prompt, .writing: dictionary.apply(to: RuleBasedCleanup.clean(transcript, language: language))
+        case .developer: dictionary.apply(to: DeveloperFormatter.format(RuleBasedCleanup.clean(transcript, language: language)))
+        case .code: dictionary.apply(to: CodeFormatter.format(RuleBasedCleanup.clean(transcript, sentenceCase: false, language: language)))
         }
     }
 

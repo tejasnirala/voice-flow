@@ -14,6 +14,8 @@ final class GlobalHotkeyManager {
         /// Esc and ⌥Esc are registered, and only while recording.
         case cancel = 2
         case cancelWithOption = 3
+        /// Cycles the dictation language (Phase 14; default ⌃⇧L).
+        case cycleLanguage = 4
     }
 
     enum Phase { case pressed, released }

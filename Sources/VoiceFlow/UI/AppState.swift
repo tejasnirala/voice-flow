@@ -16,6 +16,12 @@ final class AppState {
     var triggerInstructions = "hold ⌥ to dictate"
     var triggerWarning: String?
     var modelStatus: STTModelStatus = .installed
+    /// The model that needs installing, if any (German/Hindi need the multilingual model).
+    var modelNeedingInstall: STTModel?
+    /// Language of the current or last dictation (pill badge); nil until known.
+    var dictationLanguage: OutputLanguage?
+    /// Brief notice on the pill (e.g. after switching language with the shortcut).
+    var notice: String?
     /// In memory only (never saved).
     var lastTranscript: String?
 

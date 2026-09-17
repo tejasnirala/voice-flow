@@ -21,7 +21,7 @@
 | 11 | Final performance optimization | ✅ Complete (2026-09-17, owner approved) |
 | 12 | Packaging | ✅ Complete (2026-09-17, installed, owner approved) |
 | 13 | Final audit | ✅ Complete (2026-09-17, owner reviewed; follow-up: languages → Phase 14) |
-| 14 | Languages: Hindi (Devanagari), Hinglish, German | 🟡 In progress |
+| 14 | Languages: Hindi (Devanagari), Hinglish, German | 🟡 Implemented; awaiting owner Hindi recordings for the accuracy gate |
 
 Legend: ✅ complete · 🟡 in progress / awaiting approval · ⏭️ next · ⬜ not started · ⚠️ blocked
 
@@ -321,6 +321,24 @@ per 30–60 s, GPU 0, footprint 13 MB.
 - [x] 149 core + 5 app tests pass
 - [x] Owner reviewed (2026-09-17). Requests: add Hindi (Devanagari), Hinglish, German (Phase 14); keep the 5.0 GB benchmark models until the owner explicitly says to delete them
 
+## Phase 14 — Languages: Hindi (Devanagari), Hinglish, German 🟡 (awaiting owner Hindi recordings)
+Owner decisions (2026-09-17): Auto-detect by default + manual choice + switch shortcut; owner records Hindi/Hinglish (German judged on
+synthetic voices only); Hindi keeps English words in Latin; benchmark models kept until the owner says otherwise.
+- [x] Corpus `benchmarks/corpus/multilingual.json`: German 26, Hindi 24 (scored as Devanagari and Hinglish); prompts; `record.sh --hindi`
+- [x] Harness: `--language`, `auto3` detection, `--detect-only`; `stt-multilingual.sh`; scorer: Devanagari tokens, `--hinglish` spelling tolerance
+- [x] Synthetic shortlist (3 German voices, Lekha): German large-v3 q5_0 + prompt 8.3% WER / 79.6% terms; Hindi Devanagari
+      large-v3 + prompt ~9–12%, turbo + prompt 12%; Whisper can't write Hinglish directly (best 41%) → Devanagari + rules
+- [x] `HindiTransliteration`: Devanagari → Hinglish (lexicon + code-point romanization, schwa deletion) 6.8–10% WER; loanwords → Latin; danda
+- [x] Detection: large-v3-turbo 100/100 with widest margins; Neural Engine encoder 1.05 s → 0.48 s; base 57 ms but thin margins (cascade possible)
+- [x] Neural Engine encoders: large-v3 German 2.0 → 1.1 s/clip, Hindi 2.4 → 1.6 s, same accuracy
+- [x] App: language setting (Auto/English/German/Hindi/Hinglish), Hindi script for Auto, ⌃⇧L cycles language (pill notice), menu +
+      window controls, pill language badge; helper holds several models + language detection; English still uses medium.en;
+      per-language cleanup (German/Hindi fillers, questions, danda); on-device rewrite English/German only (German prompt: never translate)
+- [x] German model modes: 0 traps accepted (answers, poems, code, translations rejected); small gain, ~30% fallback
+- [x] `--measure-files` (dictate audio files without the microphone); live routing: EN/DE/HI detected correctly; Auto adds ~0.5 s
+- [ ] **Owner:** record Hindi (`scripts/bench/record.sh macbook-mic --hindi`) → human gate for Hindi/Hinglish (model: large-v3 vs turbo)
+- [ ] Then: docs (ACCURACY §9, PERFORMANCE, ARCHITECTURE), memory/latency write-up, owner live test, approval
+
 ## Phases 6–13
 Per SPEC.md. Notes so far:
 - **5:** clipboard algorithm in ARCHITECTURE.md §3.4. Never lose speech on paste failure.
@@ -377,4 +395,4 @@ _Overwrite at the end of every session._
   `benchmarks-output/results/human/`. Rerunning `scripts/bench/stt.sh human` re-scores instantly.
 - **Mode benchmark data:** `benchmarks-output/results/modes/` (prepared inputs, model JSONL per mode, `report.md` with every
   accepted/rejected rewrite). Re-score after guard changes with `vf-bench modes report … --results …` (no model rerun needed).
-- **Next action:** Phase 14 (languages). Do NOT delete benchmark models until the owner explicitly asks.
+- **Next action:** Phase 14: owner records Hindi (`scripts/bench/record.sh macbook-mic --hindi`), then `scripts/bench/stt-multilingual.sh human-hi` + transliteration scoring decides the Hindi model. Do NOT delete benchmark models until the owner explicitly asks.

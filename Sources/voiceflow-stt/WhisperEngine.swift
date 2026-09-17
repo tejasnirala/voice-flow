@@ -77,6 +77,33 @@ final class WhisperEngine: @unchecked Sendable {
     }
 
     func transcribe(_ samples: [Float]) throws -> TranscriptionResult {
+        try transcribe(samples, language: language, prompt: prompt)
+    }
+
+    /// Probability per candidate language (Whisper codes) from the first ≤ 30 s of speech (long pauses removed).
+    func detectLanguage(_ samples: [Float], candidates: [String]) throws -> (probabilities: [String: Double], seconds: Double) {
+        lock.lock()
+        defer { lock.unlock() }
+        _ = try loadLocked()
+        guard let ctx = context else { throw EngineError.loadFailed(modelFileName) }
+        let start = DispatchTime.now().uptimeNanoseconds
+        let chunks = SpeechSegmenter.chunks(for: samples, sampleRate: STTAudio.sampleRate)
+        let audio = chunks.first.map { SpeechSegmenter.audio(for: $0, in: samples) } ?? samples
+        guard audio.withUnsafeBufferPointer({ whisper_pcm_to_mel(ctx, $0.baseAddress, Int32($0.count), 4) }) == 0 else {
+            throw EngineError.inferenceFailed(-1)
+        }
+        var all = [Float](repeating: 0, count: Int(whisper_lang_max_id()) + 1)
+        let best = all.withUnsafeMutableBufferPointer { whisper_lang_auto_detect(ctx, 0, 4, $0.baseAddress) }
+        guard best >= 0 else { throw EngineError.inferenceFailed(best) }
+        var probabilities: [String: Double] = [:]
+        for code in candidates {
+            let id = code.withCString { whisper_lang_id($0) }
+            if id >= 0 { probabilities[code] = Double(all[Int(id)]) }
+        }
+        return (probabilities, Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9)
+    }
+
+    func transcribe(_ samples: [Float], language requestedLanguage: String, prompt requestedPrompt: String?) throws -> TranscriptionResult {
         let requested = DispatchTime.now().uptimeNanoseconds
         lock.lock()
         defer { lock.unlock() }
@@ -95,8 +122,8 @@ final class WhisperEngine: @unchecked Sendable {
         params.no_timestamps = true
         params.no_context = true
 
-        let language = strdup(self.language)
-        let promptCString = prompt.map { strdup($0) }
+        let language = strdup(requestedLanguage)
+        let promptCString = requestedPrompt.map { strdup($0) }
         defer {
             free(language)
             promptCString.map { free($0) }

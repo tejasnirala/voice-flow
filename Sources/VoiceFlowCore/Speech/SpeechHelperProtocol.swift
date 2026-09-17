@@ -48,10 +48,52 @@ public enum SpeechHelperMessage: Equatable, Sendable {
         }
     }
 
-    /// App → helper: load the model (reply `.ready` or `.failure`).
+    /// Which loaded model transcribes, in which language, with which vocabulary prompt.
+    public struct Transcribe: Codable, Equatable, Sendable {
+        public var modelPath: String
+        public var modelFileName: String
+        public var language: String
+        public var prompt: String?
+
+        public init(modelPath: String, modelFileName: String, language: String, prompt: String?) {
+            self.modelPath = modelPath
+            self.modelFileName = modelFileName
+            self.language = language
+            self.prompt = prompt
+        }
+    }
+
+    /// Detect the spoken language with a (multilingual) model, among `candidates` (Whisper codes).
+    public struct Detect: Codable, Equatable, Sendable {
+        public var modelPath: String
+        public var modelFileName: String
+        public var candidates: [String]
+
+        public init(modelPath: String, modelFileName: String, candidates: [String]) {
+            self.modelPath = modelPath
+            self.modelFileName = modelFileName
+            self.candidates = candidates
+        }
+    }
+
+    public struct Detection: Codable, Equatable, Sendable {
+        /// Probability per candidate code.
+        public var probabilities: [String: Double]
+        public var seconds: Double
+
+        public init(probabilities: [String: Double], seconds: Double) {
+            self.probabilities = probabilities
+            self.seconds = seconds
+        }
+    }
+
+    /// App → helper: load a model; several can be loaded at once (reply `.ready` or `.failure`).
     case prepare(Prepare)
     /// App → helper: transcribe 16 kHz mono Float32 samples (reply `.transcription` or `.failure`).
-    case transcribe([Float])
+    case transcribe(Transcribe, [Float])
+    /// App → helper: detect the language of 16 kHz mono Float32 samples (reply `.detection` or `.failure`).
+    case detectLanguage(Detect, [Float])
+    case detection(Detection)
     /// App → helper: free the model and exit.
     case shutdown
     case ready(Ready)
@@ -79,9 +121,15 @@ public enum SpeechHelperWire {
         var payload = Data()
         switch message {
         case .prepare(let value): kind = 1; json = try encoder.encode(value)
-        case .transcribe(let samples):
+        case .transcribe(let options, let samples):
             kind = 2
+            json = try encoder.encode(options)
             payload = samples.withUnsafeBufferPointer { Data(buffer: $0) }
+        case .detectLanguage(let options, let samples):
+            kind = 7
+            json = try encoder.encode(options)
+            payload = samples.withUnsafeBufferPointer { Data(buffer: $0) }
+        case .detection(let value): kind = 8; json = try encoder.encode(value)
         case .shutdown: kind = 3
         case .ready(let value): kind = 4; json = try encoder.encode(value)
         case .transcription(let value): kind = 5; json = try encoder.encode(value)
@@ -104,10 +152,14 @@ public enum SpeechHelperWire {
         let decoder = JSONDecoder()
         switch kindData[kindData.startIndex] {
         case 1: return .prepare(try decoder.decode(SpeechHelperMessage.Prepare.self, from: json))
-        case 2:
+        case 2, 7:
             guard payload.count % MemoryLayout<Float>.size == 0 else { throw WireError.malformed }
             let samples = payload.withUnsafeBytes { raw in Array(raw.bindMemory(to: Float.self)) }
-            return .transcribe(samples)
+            if kindData[kindData.startIndex] == 2 {
+                return .transcribe(try decoder.decode(SpeechHelperMessage.Transcribe.self, from: json), samples)
+            }
+            return .detectLanguage(try decoder.decode(SpeechHelperMessage.Detect.self, from: json), samples)
+        case 8: return .detection(try decoder.decode(SpeechHelperMessage.Detection.self, from: json))
         case 3: return .shutdown
         case 4: return .ready(try decoder.decode(SpeechHelperMessage.Ready.self, from: json))
         case 5: return .transcription(try decoder.decode(SpeechHelperMessage.Transcription.self, from: json))

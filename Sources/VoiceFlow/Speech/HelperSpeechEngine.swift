@@ -4,10 +4,10 @@ import VoiceFlowCore
 
 /// `SpeechEngine` backed by the `voiceflow-stt` helper process (see `SpeechHelperProtocol`).
 ///
-/// "Loaded" means the helper is running with the model loaded; `unload()` makes it exit, which returns all of its
-/// memory. Calls block the calling (background) thread and are serialized by a lock. If the helper dies, the current
+/// The helper can hold several models (Auto language: a detector and a transcriber); `unload()` makes it exit, which
+/// returns all of its memory. Calls block the calling (background) thread and are serialized by a lock. If the helper dies, the current
 /// request fails with a readable error; the next request starts a fresh helper.
-final class HelperSpeechEngine: SpeechEngine, @unchecked Sendable {
+final class HelperSpeechEngine: @unchecked Sendable {
     enum HelperError: LocalizedError {
         case notFound
         case launchFailed(String)
@@ -26,10 +26,6 @@ final class HelperSpeechEngine: SpeechEngine, @unchecked Sendable {
         }
     }
 
-    let model: STTModel
-    let modelURL: URL
-    let prompt: String?
-
     /// Most recent successful load (for logging): helper launch + model load, seconds, and the encoder in use.
     private(set) var lastLoad: (launchSeconds: Double, loadSeconds: Double, encoder: String)?
 
@@ -37,31 +33,31 @@ final class HelperSpeechEngine: SpeechEngine, @unchecked Sendable {
     private var process: Process?
     private var toHelper: FileHandle?
     private var fromHelper: FileHandle?
-    private var prepared = false
+    /// Model files loaded in the running helper (several at once for Auto language: detector + transcriber).
+    private var preparedPaths: Set<String> = []
     /// Signalled by the process termination handler (installed at launch, so an early exit can't be missed).
     private var exited: DispatchSemaphore?
 
-    init(model: STTModel, modelURL: URL, prompt: String?) {
-        self.model = model
-        self.modelURL = modelURL
-        self.prompt = prompt
+    var isRunning: Bool { lock.withLock { process?.isRunning == true } }
+
+    func isLoaded(_ url: URL) -> Bool { lock.withLock { process?.isRunning == true && preparedPaths.contains(url.path) } }
+
+    /// Starts the helper if needed and loads `model` (keeps other loaded models). Returns seconds spent.
+    @discardableResult
+    func prepare(_ model: STTModel, url: URL) throws -> Double {
+        try lock.withLock { try prepareLocked(model, url: url) }
     }
 
-    var isLoaded: Bool { lock.withLock { prepared && process?.isRunning == true } }
-
-    func prepare() throws {
-        _ = try lock.withLock { try prepareLocked() }
-    }
-
-    func transcribe(_ samples: [Float]) throws -> TranscriptionResult {
+    func transcribe(_ samples: [Float], model: STTModel, url: URL, language: String, prompt: String?) throws -> TranscriptionResult {
         let requested = DispatchTime.now().uptimeNanoseconds
         lock.lock()
         defer { lock.unlock() }
         let waited = Double(DispatchTime.now().uptimeNanoseconds - requested) / 1e9
-        let cold = !(prepared && process?.isRunning == true)
-        let loadSeconds = cold ? try prepareLocked() : 0
+        let cold = !(process?.isRunning == true && preparedPaths.contains(url.path))
+        let loadSeconds = cold ? try prepareLocked(model, url: url) : 0
 
-        switch try requestLocked(.transcribe(samples)) {
+        let options = SpeechHelperMessage.Transcribe(modelPath: url.path, modelFileName: model.fileName, language: language, prompt: prompt)
+        switch try requestLocked(.transcribe(options, samples)) {
         case .transcription(let t):
             var result = TranscriptionResult(text: t.text, audioSeconds: t.audioSeconds, transcribeSeconds: t.transcribeSeconds,
                                              coldStart: cold, loadSeconds: loadSeconds, waitedForModelSeconds: waited)
@@ -73,29 +69,39 @@ final class HelperSpeechEngine: SpeechEngine, @unchecked Sendable {
         }
     }
 
+    /// Probability per candidate language (Whisper codes) and the seconds detection took.
+    func detectLanguage(_ samples: [Float], model: STTModel, url: URL, candidates: [String]) throws -> (probabilities: [String: Double], seconds: Double) {
+        lock.lock()
+        defer { lock.unlock() }
+        if !(process?.isRunning == true && preparedPaths.contains(url.path)) { try prepareLocked(model, url: url) }
+        let options = SpeechHelperMessage.Detect(modelPath: url.path, modelFileName: model.fileName, candidates: candidates)
+        switch try requestLocked(.detectLanguage(options, samples)) {
+        case .detection(let d): return (d.probabilities, d.seconds)
+        case .failure(let message): throw HelperError.helper(message)
+        default: throw HelperError.protocolViolation
+        }
+    }
+
     func unload() {
         lock.withLock { stopLocked(graceful: true) }
     }
 
     // MARK: - Locked helpers
 
-    /// Starts the helper if needed and loads the model. Returns seconds spent (launch + load).
     @discardableResult
-    private func prepareLocked() throws -> Double {
-        if prepared, process?.isRunning == true { return 0 }
+    private func prepareLocked(_ model: STTModel, url: URL) throws -> Double {
+        if process?.isRunning == true, preparedPaths.contains(url.path) { return 0 }
         let start = DispatchTime.now().uptimeNanoseconds
         try launchLocked()
         let launched = DispatchTime.now().uptimeNanoseconds
-        let request = SpeechHelperMessage.Prepare(modelPath: modelURL.path, modelFileName: model.fileName,
-                                                  language: model.language, prompt: prompt)
+        let request = SpeechHelperMessage.Prepare(modelPath: url.path, modelFileName: model.fileName, language: model.language, prompt: nil)
         switch try requestLocked(.prepare(request)) {
         case .ready(let ready):
-            prepared = true
+            preparedPaths.insert(url.path)
             let total = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9
             lastLoad = (Double(launched - start) / 1e9, ready.loadSeconds, ready.encoder)
             return total
         case .failure(let message):
-            stopLocked(graceful: true)
             throw HelperError.helper(message)
         default:
             stopLocked(graceful: false)
@@ -124,7 +130,7 @@ final class HelperSpeechEngine: SpeechEngine, @unchecked Sendable {
         self.exited = exited
         toHelper = stdin.fileHandleForWriting
         fromHelper = stdout.fileHandleForReading
-        prepared = false
+        preparedPaths = []
     }
 
     private func requestLocked(_ message: SpeechHelperMessage) throws -> SpeechHelperMessage {
@@ -154,7 +160,7 @@ final class HelperSpeechEngine: SpeechEngine, @unchecked Sendable {
         self.process = nil
         toHelper = nil
         fromHelper = nil
-        prepared = false
+        preparedPaths = []
     }
 
     /// The helper ships next to the app executable (Contents/MacOS/voiceflow-stt, or .build/<config>/ when unbundled).

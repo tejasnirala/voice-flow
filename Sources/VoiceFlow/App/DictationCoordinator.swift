@@ -31,8 +31,6 @@ final class DictationCoordinator {
     private var pendingSpeechSeconds = 0.0
 
     // MARK: Speech-to-text state
-    private var speechEngine: HelperSpeechEngine?
-    private var speechEngineKey: String?
     /// Model load started when recording begins, so the model is ready (or nearly) at release.
     private var prepareTask: Task<Void, Error>?
     private var unloadWork: DispatchWorkItem?
@@ -53,6 +51,27 @@ final class DictationCoordinator {
 
     /// Called after every accepted transition, before its side effects run.
     var onStateChange: ((PipelineState) -> Void)?
+    /// The language a dictation was written in (detected or fixed), for the pill.
+    var onLanguageResolved: ((OutputLanguage) -> Void)?
+    /// The switch-language shortcut was pressed.
+    var onCycleLanguage: (() -> Void)?
+    private var languageHotkeyRegistered: Settings.Hotkey?
+
+    /// Registers the switch-language shortcut (again when it changes in settings).
+    func registerLanguageHotkey() {
+        guard languageHotkeyRegistered != settings.languageHotkey else { return }
+        hotkeys.unregister(.cycleLanguage)
+        let hotkey = settings.languageHotkey
+        do {
+            try hotkeys.register(.cycleLanguage, keyCode: hotkey.keyCode, carbonModifiers: hotkey.carbonModifiers)
+            languageHotkeyRegistered = hotkey
+            Log.hotkey.notice("language shortcut \(hotkey.displayName, privacy: .public)")
+        } catch {
+            languageHotkeyRegistered = nil
+            Log.hotkey.error("language shortcut \(hotkey.displayName, privacy: .public) unavailable (OSStatus \(error.status, privacy: .public))")
+        }
+    }
+    private(set) var lastOutputLanguage: OutputLanguage?
     /// Recording is live: real (non-zero) audio is arriving, so speech from now on is captured.
     var onAudioFlowing: (() -> Void)?
     /// Called when a dictation ends: the pipeline returns to idle or error from an active state (measurement mode).
@@ -95,6 +114,7 @@ final class DictationCoordinator {
             self?.handleModifier(event, latencyMs: latencyMs)
         }
         activateTrigger()
+        registerLanguageHotkey()
     }
 
     /// Uses ⌥ alone when configured and Input Monitoring is granted; otherwise registers the key combination.
@@ -209,6 +229,7 @@ final class DictationCoordinator {
         self.settings = settings
         refreshModelStatus()
         if triggerChanged || (settings.dictationTrigger == .option && activeTrigger != .option) { activateTrigger() }
+        registerLanguageHotkey()
     }
 
     /// Pill ✕: discard the current recording.
@@ -242,13 +263,23 @@ final class DictationCoordinator {
     func shutdown() {
         unloadWork?.cancel()
         modifierMonitor.stop()
-        speechEngine?.unload()
+        speechEngine.unload()
     }
 
+    /// First model the language setting needs that isn't installed (Auto also needs the multilingual model for German and
+    /// Hindi); nil when everything is installed.
+    private(set) var modelNeedingInstall: STTModel?
+
     private func refreshModelStatus() {
-        modelStatus = STTModelManager.quickStatus(for: settings.sttModel)
-        if modelStatus != .installed {
-            Log.speech.error("model \(self.settings.sttModel.id, privacy: .public) status: \(String(describing: self.modelStatus), privacy: .public)")
+        var needed = LanguageRouting.modelsToPrepare(setting: settings.language, multilingual: settings.multilingualModel)
+        if settings.language == .auto { needed.append(settings.multilingualModel) }
+        modelStatus = .installed
+        modelNeedingInstall = nil
+        for model in needed {
+            let status = STTModelManager.quickStatus(for: model)
+            guard status != .installed else { continue }
+            Log.speech.error("model \(model.id, privacy: .public) status: \(String(describing: status), privacy: .public)")
+            if modelNeedingInstall == nil { modelStatus = status; modelNeedingInstall = model }
         }
         onSpeechInfoChange?(modelStatus, lastTranscript)
     }
@@ -292,6 +323,10 @@ final class DictationCoordinator {
         case (.cancel, .pressed), (.cancelWithOption, .pressed):
             send(.cancelRequested)
         case (.cancel, .released), (.cancelWithOption, .released):
+            break
+        case (.cycleLanguage, .pressed):
+            onCycleLanguage?()
+        case (.cycleLanguage, .released), (.dictation, _):
             break
         }
     }
@@ -378,6 +413,11 @@ final class DictationCoordinator {
         }
         cpuAtStart = ResourceUsage.cpuSeconds
         footprintAtStartMB = ResourceUsage.footprintMB
+        guard injectedAudio.isEmpty else {
+            Log.audio.notice("measurement: using an audio file instead of the microphone")
+            registerCancelKeys()
+            return
+        }
         do {
             let metrics = try recorder.start(maxSeconds: settings.maxRecordingSeconds)
             let sincePressMs = Double(DispatchTime.now().uptimeNanoseconds - pressUptimeNs) / 1_000_000
@@ -396,9 +436,15 @@ final class DictationCoordinator {
     }
 
     /// Stops capture, measures the recording, and decides whether there's anything to transcribe.
+    /// Developer measurement (`--measure-files`): audio files used instead of the microphone, one per dictation. The
+    /// microphone isn't opened for these.
+    var injectedAudio: [[Float]] = []
+    /// Developer measurement (`--measure-output`): called with each final text. Never set in normal use.
+    var onFinalTextForMeasurement: ((String) -> Void)?
+
     private func finishRecording(event: PipelineEvent) {
         let firstBuffer = recorder.firstBufferUptimeNs
-        let samples = recorder.stop()
+        let samples = injectedAudio.isEmpty ? recorder.stop() : injectedAudio.removeFirst()
         let analysis = RecordingGate.analyze(samples, sampleRate: STTAudio.sampleRate)
         let verdict = RecordingGate.verdict(for: analysis)
         let firstBufferMs = firstBuffer.map { Double($0 - pressUptimeNs) / 1_000_000 } ?? -1
@@ -438,41 +484,47 @@ final class DictationCoordinator {
     /// The owner's dictionary (`dictionary.json`), re-read at each recording start so edits apply without a restart.
     private var dictionary: UserDictionary = .empty
 
-    /// Returns the engine for the current settings, creating it if the model or speech prompt changed.
-    private func currentSpeechEngine() -> HelperSpeechEngine {
-        let model = settings.sttModel
-        let prompt = settings.useVocabularyPrompt ? dictionary.speechPrompt(base: DeveloperVocabulary.prompt()) : nil
-        let key = "\(model.id)|\(prompt ?? "")"
-        if let engine = speechEngine, speechEngineKey == key { return engine }
-        speechEngine?.unload()
-        let engine = HelperSpeechEngine(model: model, modelURL: STTModelManager.url(for: model), prompt: prompt)
-        speechEngine = engine
-        speechEngineKey = key
-        return engine
+    /// The speech helper (one process; several models for Auto language).
+    private let speechEngine = HelperSpeechEngine()
+
+    /// Vocabulary prompt for a language and model, plus the owner's dictionary terms.
+    private func speechPrompt(for spoken: SpokenLanguage, model: STTModel) -> String? {
+        guard settings.useVocabularyPrompt else { return nil }
+        return dictionary.speechPrompt(base: DeveloperVocabulary.prompt(resource: LanguageRouting.promptResource(for: spoken, model: model)))
     }
 
-    /// Verifies and loads the model in the background while the user is still speaking.
+    /// Verifies and loads the models for the language setting in the background while the user is still speaking.
+    /// For Auto, a missing detector isn't fatal: dictation continues in English (see `transcribePendingAudio`).
     private func prepareSpeechEngine() {
-        let engine = currentSpeechEngine()
-        // Restart whenever the model isn't loaded, so an earlier failure (e.g. model missing, since installed)
-        // isn't reused. Concurrent loads are safe: the engine serializes them and loads at most once.
-        guard !engine.isLoaded else { return }
-        let model = engine.model
+        let models = LanguageRouting.modelsToPrepare(setting: settings.language, multilingual: settings.multilingualModel)
+        guard models.contains(where: { !speechEngine.isLoaded(STTModelManager.url(for: $0)) }) else { return }
+        let engine = speechEngine
+        let optionalDetector = settings.language == .auto ? LanguageRouting.detectorModel.id : nil
         prepareTask = Task.detached(priority: .userInitiated) {
-            let (status, hashed) = STTModelManager.verify(model)
-            if hashed > 0 {
-                Log.speech.notice("model verified (SHA-256) in \(hashed, format: .fixed(precision: 2), privacy: .public) s: \(String(describing: status), privacy: .public)")
-            }
-            guard status == .installed else { throw ModelUnavailable(status: status, model: model) }
-            let start = DispatchTime.now().uptimeNanoseconds
-            try engine.prepare()
-            let total = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9
-            if let load = engine.lastLoad {
-                Log.speech.notice("""
-                    speech helper ready in \(total, format: .fixed(precision: 2), privacy: .public) s (started at recording start): \
-                    launch \(load.launchSeconds * 1000, format: .fixed(precision: 0), privacy: .public) ms, \
-                    model load \(load.loadSeconds, format: .fixed(precision: 2), privacy: .public) s, encoder: \(load.encoder, privacy: .public)
-                    """)
+            for model in models {
+                let url = STTModelManager.url(for: model)
+                guard !engine.isLoaded(url) else { continue }
+                let (status, hashed) = STTModelManager.verify(model)
+                if hashed > 0 {
+                    Log.speech.notice("model \(model.id, privacy: .public) verified (SHA-256) in \(hashed, format: .fixed(precision: 2), privacy: .public) s: \(String(describing: status), privacy: .public)")
+                }
+                guard status == .installed else {
+                    if model.id == optionalDetector {
+                        Log.speech.error("language detector \(model.id, privacy: .public) unavailable (\(String(describing: status), privacy: .public)); Auto uses English")
+                        continue
+                    }
+                    throw ModelUnavailable(status: status, model: model)
+                }
+                let start = DispatchTime.now().uptimeNanoseconds
+                try engine.prepare(model, url: url)
+                let total = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9
+                if let load = engine.lastLoad {
+                    Log.speech.notice("""
+                        speech model \(model.id, privacy: .public) ready in \(total, format: .fixed(precision: 2), privacy: .public) s (started at recording start): \
+                        launch \(load.launchSeconds * 1000, format: .fixed(precision: 0), privacy: .public) ms, \
+                        model load \(load.loadSeconds, format: .fixed(precision: 2), privacy: .public) s, encoder: \(load.encoder, privacy: .public)
+                        """)
+                }
             }
         }
     }
@@ -482,7 +534,7 @@ final class DictationCoordinator {
         let model: STTModel
         var errorDescription: String? {
             switch status {
-            case .missing: "Speech model not installed. Run: \(model.installCommand)"
+            case .missing: "Speech model \(model.id) not installed. Run: \(model.installCommand)"
             case .corrupted(let reason): "Speech model file is damaged (\(reason)). Reinstall: \(model.installCommand)"
             case .incompatible(let reason): "Speech model can't be used (\(reason))"
             case .installed: "Speech model unavailable"
@@ -490,24 +542,57 @@ final class DictationCoordinator {
         }
     }
 
+    /// Language outcome of a transcription (for text processing, the pill and logs).
+    struct LanguageOutcome: Sendable {
+        var output: OutputLanguage
+        /// Probabilities when Auto detected the language; nil when fixed.
+        var probabilities: [SpokenLanguage: Double]?
+        var detectionSeconds: Double
+    }
+
     private func transcribePendingAudio() {
         guard let audio = pendingAudio else {
             send(.transcriptionEmpty)
             return
         }
-        let engine = currentSpeechEngine()
-        if !engine.isLoaded { prepareSpeechEngine() }
+        prepareSpeechEngine()
         let preparation = prepareTask
         let speechSeconds = pendingSpeechSeconds
         let releasedAt = DispatchTime.now().uptimeNanoseconds
         releaseUptimeNs = releasedAt
         let cpuBefore = ResourceUsage.cpuSeconds
+        let engine = speechEngine
+        let setting = settings.language, hindiScript = settings.hindiScript, multilingual = settings.multilingualModel
+        let prompts = Dictionary(uniqueKeysWithValues: SpokenLanguage.allCases.map { spoken in
+            (spoken, speechPrompt(for: spoken, model: LanguageRouting.transcriptionModel(for: spoken, multilingual: multilingual)))
+        })
 
         Task { [weak self] in
-            let outcome: Result<TranscriptionResult, Error> = await Task.detached(priority: .userInitiated) {
+            let outcome: Result<(TranscriptionResult, LanguageOutcome), Error> = await Task.detached(priority: .userInitiated) {
                 do {
                     try await preparation?.value
-                    return .success(try engine.transcribe(audio))
+                    var detected: SpokenLanguage?
+                    var probabilities: [SpokenLanguage: Double]?
+                    var detectionSeconds = 0.0
+                    let detector = LanguageRouting.detectorModel
+                    if setting == .auto, STTModelManager.quickStatus(for: detector) == .installed {
+                        let (raw, seconds) = try engine.detectLanguage(audio, model: detector, url: STTModelManager.url(for: detector),
+                                                                       candidates: SpokenLanguage.allCases.map(\.rawValue))
+                        let parsed = Dictionary(uniqueKeysWithValues: raw.compactMap { key, value in SpokenLanguage(rawValue: key).map { ($0, value) } })
+                        probabilities = parsed
+                        detected = LanguageRouting.pick(parsed)
+                        detectionSeconds = seconds
+                    }
+                    let output = OutputLanguage.resolve(setting: setting, detected: detected, hindiScript: hindiScript)
+                    let model = LanguageRouting.transcriptionModel(for: output.spoken, multilingual: multilingual)
+                    let url = STTModelManager.url(for: model)
+                    if !engine.isLoaded(url) {
+                        let status = STTModelManager.quickStatus(for: model)
+                        guard status == .installed else { throw ModelUnavailable(status: status, model: model) }
+                    }
+                    let result = try engine.transcribe(audio, model: model, url: url, language: output.spoken.rawValue,
+                                                       prompt: prompts[output.spoken] ?? nil)
+                    return .success((result, LanguageOutcome(output: output, probabilities: probabilities, detectionSeconds: detectionSeconds)))
                 } catch {
                     return .failure(error)
                 }
@@ -516,7 +601,7 @@ final class DictationCoordinator {
         }
     }
 
-    private func finishTranscription(_ outcome: Result<TranscriptionResult, Error>, speechSeconds: Double,
+    private func finishTranscription(_ outcome: Result<(TranscriptionResult, LanguageOutcome), Error>, speechSeconds: Double,
                                      releasedAt: UInt64, cpuBefore: Double) {
         prepareTask = nil
         refreshModelStatus()
@@ -528,10 +613,20 @@ final class DictationCoordinator {
         case .failure(let error):
             Log.speech.error("transcription failed: \(error.localizedDescription, privacy: .public)")
             send(.failed(PipelineFailure(stage: .transcription, message: error.localizedDescription, recovery: .retryTranscription)))
-        case .success(var result):
+        case .success(let (transcribed, language)):
+            var result = transcribed
             let cleaned = TranscriptGuard.clean(result.text, speechSeconds: speechSeconds)
             result.guardFlags = cleaned.flags
-            result.text = cleaned.text
+            // Hindi: restore Latin English words (Devanagari) or romanize (Hinglish).
+            result.text = LanguageRouting.convert(cleaned.text, to: language.output)
+            let probabilityText = language.probabilities.map { p in
+                SpokenLanguage.allCases.map { String(format: "%@ %.2f", $0.rawValue, p[$0] ?? 0) }.joined(separator: ", ")
+            }
+            Log.speech.notice("""
+                language \(language.output.rawValue, privacy: .public) (\(probabilityText.map { "detected: \($0), \(Int(language.detectionSeconds * 1000)) ms" } ?? "fixed", privacy: .public))
+                """)
+            lastOutputLanguage = language.output
+            onLanguageResolved?(language.output)
             let totalMs = Double(DispatchTime.now().uptimeNanoseconds - releasedAt) / 1_000_000
             let words = result.text.split(whereSeparator: \.isWhitespace).count
             Log.speech.notice("""
@@ -558,7 +653,7 @@ final class DictationCoordinator {
                 mode \(mode.rawValue, privacy: .public) (\(resolution.source.rawValue, privacy: .public)) for \(target.bundleID ?? "unknown", privacy: .public), \
                 detected in \(detectMs, format: .fixed(precision: 2), privacy: .public) ms
                 """)
-            let prepared = TextProcessingPlan.prepare(result.text, mode: mode, dictionary: dictionary)
+            let prepared = TextProcessingPlan.prepare(result.text, mode: mode, dictionary: dictionary, language: language.output)
             if prepared.isEmpty {
                 send(.transcriptionEmpty)
             } else {
@@ -566,7 +661,9 @@ final class DictationCoordinator {
                 onSpeechInfoChange?(modelStatus, lastTranscript)
                 rewriteMode = mode
                 let wordCount = prepared.split(whereSeparator: \.isWhitespace).count
-                let rewrite = mode.usesModel(processing: settings.processingMode, wordCount: wordCount) && rewritePrompt(for: mode) != nil
+                // Apple's on-device model supports English and German only; Hindi and Hinglish keep the rule-based text.
+                let rewrite = language.output.supportsOnDeviceRewrite
+                    && mode.usesModel(processing: settings.processingMode, wordCount: wordCount) && rewritePrompt(for: mode) != nil
                     && OnDeviceRewriter.unavailableReason == nil
                 send(.transcriptionSucceeded(needsProcessing: rewrite))
             }
@@ -590,7 +687,7 @@ final class DictationCoordinator {
 
     private func rewriteLastTranscript() {
         let mode = rewriteMode
-        guard let prepared = lastTranscript, let prompt = rewritePrompt(for: mode) else {
+        guard let prepared = lastTranscript, let prompt = rewritePrompt(for: mode)?.forLanguage(lastOutputLanguage ?? .english) else {
             send(.processingFellBackToTranscript)
             return
         }
@@ -633,6 +730,7 @@ final class DictationCoordinator {
             return
         }
         guard insertionEnabled else {
+            onFinalTextForMeasurement?(text)
             Log.insertion.notice("insertion disabled (measurement mode)")
             send(.insertionFinished)
             return
@@ -669,10 +767,10 @@ final class DictationCoordinator {
     /// One-shot timer (not polling): frees ~1 GB of model memory after the configured idle time.
     private func scheduleUnload() {
         unloadWork?.cancel()
-        guard let engine = speechEngine else { return }
+        let engine = speechEngine
         let delay = settings.sttUnloadAfterSeconds
         let work = DispatchWorkItem { [weak self] in
-            guard let self, !self.machine.state.isActive, engine.isLoaded else { return }
+            guard let self, !self.machine.state.isActive, engine.isRunning else { return }
             DispatchQueue.global(qos: .utility).async {
                 // The helper process exits, returning all model memory (whisper.cpp keeps ~190 MB after whisper_free
                 // and leaks ~0.7 MB per load when run in-process: PERFORMANCE.md §3.8–3.9).
