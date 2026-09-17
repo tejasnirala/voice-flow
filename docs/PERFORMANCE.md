@@ -286,6 +286,27 @@ short). Keeping the model warm doesn't buy latency.
 instead of five; a burst of dictations shares one load, so few leak cycles. Open: the ~190 MB after unload plus the slow
 per-cycle growth can only be fully avoided by running STT in a helper process that exits when idle (owner decision).
 
+### 3.9 Phase 6: speech helper process, adopted, 2026-09-17
+whisper.cpp moved out of the app into `voiceflow-stt`, a helper started when dictation starts and stopped after
+`sttUnloadAfterSeconds` idle (owner chose this over accepting ~190 MB left after in-process unload plus ~0.7 MB growth
+per load cycle, §3.8).
+
+| Measurement | Result |
+|---|---|
+| App footprint: idle / helper running with model loaded / after helper exit | **13 MB / 17–18 MB / 17 MB** |
+| Helper footprint with model loaded | 1,180 MB (returned to the system when it exits) |
+| App idle after helper exit (30 s) | CPU 0.00 s, 9 wakeups |
+| App idle, never dictated (`measure-idle.sh 30`) | launch 113.8 ms, CPU 0.00 s, 5 wakeups, GPU 0, 13 MB |
+| Helper launch | 1–5 ms |
+| Helper ready (launch + model load), fresh process | **0.33–0.38 s**; 7.2 s once for a newly built binary (Neural Engine compile) |
+| Release → text, new helper per dictation (3.1 s audio) | **606 / 639 / 622 / 634 ms** |
+| Release → text, warm helper (5.2 s audio) | 581–764 ms |
+| App force-killed (`kill -9`) with helper loaded | Helper exits on its own (stdin closed), no orphan |
+| Accuracy via `voiceflow-stt --transcribe-benchmark` | Identical transcripts to in-process Core ML: 50/50, 7/7 (WER 1.1% / 0.7%, terms 97.4%) |
+
+The app binary no longer links whisper.cpp; only the helper does. Bundle 5.8 MB (app 1.0 MB, helper 0.7 MB, whisper
+framework).
+
 ## 4. Audio recording (Phase 3)
 
 ### 4.1 Start latency and cost, 2026-09-17

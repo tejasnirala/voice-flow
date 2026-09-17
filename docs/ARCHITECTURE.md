@@ -48,6 +48,21 @@ MLX-Swift can't be built from source here.
 | **Testing** | Swift Testing unit tests on `VoiceFlowCore` (pure logic). Protocol-based fakes at hardware/model boundaries. Corpus benchmark (`vf-bench`) for STT quality | Decided |
 | **Build** | SwiftPM + `scripts/build-app.sh` (assemble, embed linked frameworks, codesign) | Decided |
 
+### Processes (Phase 6)
+
+```
+VoiceFlow.app/Contents/MacOS/VoiceFlow        menu bar, ⌥ trigger, audio, state machine, paste      ~13–18 MB, always running
+VoiceFlow.app/Contents/MacOS/voiceflow-stt    whisper.cpp (Core ML encoder + Metal decoder)          ~1.2 GB, only while in use
+                     ▲ stdin: prepare / transcribe(Float32) / shutdown   ▼ stdout: ready / transcription / failure
+```
+
+The app starts the helper when recording starts (launch ≈ 1–5 ms, model load ≈ 0.3 s while the user speaks) and stops
+it `sttUnloadAfterSeconds` after the last dictation (default 60 s). Why a process: whisper.cpp keeps ~190 MB after
+`whisper_free` and grows ~0.7 MB per load, so only process exit returns the app to its 13 MB baseline. Frames:
+`VoiceFlowCore/Speech/SpeechHelperProtocol.swift` (tested). If the helper crashes or is killed, the dictation fails with
+*Retry Transcription* (audio kept in the app); if the app dies, the helper sees stdin close and exits. The app never
+links whisper.cpp.
+
 ### Pipeline & state machine
 
 ```
@@ -73,7 +88,7 @@ Sources/VoiceFlowCore/          (no AppKit/AVFoundation; unit-tested)
   Insertion/    InsertionPolicy (paste vs leave on clipboard, restore rule)
   Settings/     Settings model + persistence (Codable JSON)
   Speech/       SpeechEngine protocol, TranscriptionResult, STTModel catalog/status/verification record,
-                TranscriptGuard, Accuracy/ (corpus, normalizer, scorer)
+                STTModelManager, SpeechHelperProtocol, DeveloperVocabulary, TranscriptGuard, Accuracy/ (scorer)
   Processing/   TextProcessor, DeveloperVocabulary, prompt templates, LLM output guard
   Diagnostics/  PerformanceMonitor spans
 Sources/VoiceFlow/              (app; OS & native runtime boundaries)
@@ -81,7 +96,8 @@ Sources/VoiceFlow/              (app; OS & native runtime boundaries)
   MenuBar/      MenuBarController (status item; menu built on demand)
   Hotkey/       GlobalHotkeyManager (Carbon)
   Audio/        AudioRecorder (AVAudioEngine), DebugRecordingWriter (opt-in WAV)
-  Speech/       WhisperEngine (whisper.cpp, Metal), STTModelManager (locate, SHA-256 verify, vocabulary prompt)
+  Speech/       HelperSpeechEngine (SpeechEngine over the helper process)
+Sources/voiceflow-stt/          Speech helper: WhisperEngine (whisper.cpp), serve loop, --transcribe-benchmark
   Processing/   LocalLLMEngine (llama.cpp)
   Insertion/    ClipboardManager (full snapshot/restore), TextInserter (⌘V, focus check)
   Permissions/  PermissionManager (microphone; Accessibility in Phase 5)

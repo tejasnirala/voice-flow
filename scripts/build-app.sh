@@ -16,20 +16,22 @@ APP="build/VoiceFlow.app"
 IDENTITY="${VOICEFLOW_SIGN_IDENTITY:-VoiceFlow Dev}"
 
 swift build -c "$CONFIG" --product VoiceFlow
+swift build -c "$CONFIG" --product voiceflow-stt
 BIN_DIR="$(swift build -c "$CONFIG" --show-bin-path)"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp "$BIN_DIR/VoiceFlow" "$APP/Contents/MacOS/VoiceFlow"
+cp "$BIN_DIR/voiceflow-stt" "$APP/Contents/MacOS/voiceflow-stt"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/developer-vocabulary.txt "$APP/Contents/Resources/"
 cp -R prompts "$APP/Contents/Resources/prompts" 2>/dev/null || true
 
-# Embed only the Vendor/ frameworks the executable actually links.
+# Embed only the Vendor/ frameworks the executables actually link.
 for fw in Vendor/*.xcframework; do
   [[ -e "$fw" ]] || continue
   name="$(basename "$fw" .xcframework)"
-  otool -L "$APP/Contents/MacOS/VoiceFlow" | grep -q "@rpath/$name.framework" || continue
+  otool -L "$APP/Contents/MacOS/VoiceFlow" "$APP/Contents/MacOS/voiceflow-stt" | grep -q "@rpath/$name.framework" || continue
   slice="$(find "$fw" -maxdepth 1 -type d -name 'macos-*' | head -1)"
   cp -R "$slice/$name.framework" "$APP/Contents/Frameworks/"
   # Apple Silicon only: drop the x86_64 slice (roughly halves the framework).

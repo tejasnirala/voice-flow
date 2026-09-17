@@ -1,4 +1,5 @@
 import AVFoundation
+import VoiceFlowCore
 import os
 
 /// Captures the default input device while dictating: AVAudioEngine input tap → one `AVAudioConverter` step →
@@ -8,7 +9,7 @@ import os
 /// (and its orange indicator) is only active while the hotkey is held.
 @MainActor
 final class AudioRecorder {
-    nonisolated static let sampleRate = 16_000.0
+    nonisolated static let sampleRate = STTAudio.sampleRate
 
     struct StartMetrics {
         let deviceName: String

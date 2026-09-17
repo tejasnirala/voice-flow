@@ -30,7 +30,9 @@ public struct STTModel: Equatable, Sendable {
     /// Core ML encoder directory whisper.cpp looks for next to the model: "ggml-medium.en-q8_0.bin" →
     /// "ggml-medium.en-encoder.mlmodelc" (extension and quantization suffix removed). When present, the encoder runs on
     /// the Neural Engine; otherwise on Metal.
-    public var coreMLEncoderDirectoryName: String {
+    public var coreMLEncoderDirectoryName: String { Self.coreMLEncoderDirectoryName(forModelFileName: fileName) }
+
+    public static func coreMLEncoderDirectoryName(forModelFileName fileName: String) -> String {
         var base = fileName.hasSuffix(".bin") ? String(fileName.dropLast(4)) : fileName
         if let dash = base.lastIndex(of: "-") {
             let suffix = base[base.index(after: dash)...]

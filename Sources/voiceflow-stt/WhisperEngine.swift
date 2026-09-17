@@ -2,12 +2,12 @@ import Foundation
 import VoiceFlowCore
 import whisper
 
-/// whisper.cpp on Metal. One `whisper_context` guarded by a lock: calls are serialized, and `unload()` waits
-/// for an in-flight transcription (required before exit, or ggml's Metal teardown asserts).
+/// whisper.cpp (encoder on Core ML when available, otherwise Metal). Runs only inside the `voiceflow-stt` helper process.
+/// One `whisper_context` guarded by a lock; `unload()` must run before exit, or ggml's Metal teardown asserts.
 ///
 /// Inference settings match the benchmark harness that selected the model (scripts/bench/stt_engines.swift):
 /// greedy decoding, 4 threads, no timestamps, Metal + flash attention, fixed language, optional vocabulary prompt.
-final class WhisperEngine: SpeechEngine, @unchecked Sendable {
+final class WhisperEngine: @unchecked Sendable {
     enum EngineError: LocalizedError {
         case loadFailed(String)
         case inferenceFailed(Int32)
@@ -20,8 +20,9 @@ final class WhisperEngine: SpeechEngine, @unchecked Sendable {
         }
     }
 
-    let model: STTModel
-    let modelURL: URL
+    let modelPath: String
+    let modelFileName: String
+    let language: String
     let prompt: String?
 
     private let lock = NSLock()
@@ -34,17 +35,31 @@ final class WhisperEngine: SpeechEngine, @unchecked Sendable {
         whisper_log_set({ _, _, _ in }, nil)
     }()
 
-    init(model: STTModel, modelURL: URL, prompt: String?) {
-        self.model = model
-        self.modelURL = modelURL
+    init(modelPath: String, modelFileName: String, language: String, prompt: String?) {
+        self.modelPath = modelPath
+        self.modelFileName = modelFileName
+        self.language = language
         self.prompt = prompt
         _ = Self.silenceLogs
     }
 
+    convenience init(_ request: SpeechHelperMessage.Prepare) {
+        self.init(modelPath: request.modelPath, modelFileName: request.modelFileName, language: request.language, prompt: request.prompt)
+    }
+
+    /// Whether whisper.cpp will find a Core ML encoder next to the model.
+    var encoderName: String {
+        let dir = URL(fileURLWithPath: modelPath).deletingLastPathComponent()
+            .appendingPathComponent(STTModel.coreMLEncoderDirectoryName(forModelFileName: modelFileName))
+        return FileManager.default.fileExists(atPath: dir.resolvingSymlinksInPath().path) ? "Core ML (Neural Engine)" : "Metal"
+    }
+
     var isLoaded: Bool { lock.withLock { context != nil } }
 
-    func prepare() throws {
-        try lock.withLock { _ = try loadLocked() }
+    /// Loads the model if needed; returns the seconds spent loading.
+    @discardableResult
+    func prepare() throws -> Double {
+        try lock.withLock { try loadLocked() }
     }
 
     /// Loads the model if needed. Returns the seconds spent loading (0 if it was already loaded).
@@ -54,8 +69,8 @@ final class WhisperEngine: SpeechEngine, @unchecked Sendable {
         var params = whisper_context_default_params()
         params.use_gpu = true
         params.flash_attn = true
-        guard let ctx = whisper_init_from_file_with_params(modelURL.path, params) else {
-            throw EngineError.loadFailed(model.fileName)
+        guard let ctx = whisper_init_from_file_with_params(modelPath, params) else {
+            throw EngineError.loadFailed(modelFileName)
         }
         context = ctx
         return Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9
@@ -69,7 +84,7 @@ final class WhisperEngine: SpeechEngine, @unchecked Sendable {
 
         let cold = context == nil
         let loadSeconds = try loadLocked()
-        guard let ctx = context else { throw EngineError.loadFailed(model.fileName) }
+        guard let ctx = context else { throw EngineError.loadFailed(modelFileName) }
 
         var params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY)
         params.n_threads = 4
@@ -80,7 +95,7 @@ final class WhisperEngine: SpeechEngine, @unchecked Sendable {
         params.no_timestamps = true
         params.no_context = true
 
-        let language = strdup(model.language)
+        let language = strdup(self.language)
         let promptCString = prompt.map { strdup($0) }
         defer {
             free(language)
@@ -92,7 +107,7 @@ final class WhisperEngine: SpeechEngine, @unchecked Sendable {
         // Long recordings: drop long pauses and transcribe ≤ 29 s chunks independently (SpeechSegmenter).
         // The encoder always uses Whisper's full 30 s window: fitting it to the audio (audio_ctx) was 2–3× faster but
         // failed the accuracy gate, returning empty transcripts for some clips (PERFORMANCE.md §3.5).
-        let chunks = SpeechSegmenter.chunks(for: samples, sampleRate: AudioRecorder.sampleRate)
+        let chunks = SpeechSegmenter.chunks(for: samples, sampleRate: STTAudio.sampleRate)
         var texts: [String] = []
         var transcribedSamples = 0
         let start = DispatchTime.now().uptimeNanoseconds
@@ -110,11 +125,11 @@ final class WhisperEngine: SpeechEngine, @unchecked Sendable {
         let seconds = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9
 
         var result = TranscriptionResult(text: texts.joined(separator: " "),
-                                         audioSeconds: Double(samples.count) / AudioRecorder.sampleRate,
+                                         audioSeconds: Double(samples.count) / STTAudio.sampleRate,
                                          transcribeSeconds: seconds, coldStart: cold, loadSeconds: loadSeconds,
                                          waitedForModelSeconds: waited)
         result.chunkCount = chunks.count
-        result.transcribedAudioSeconds = Double(transcribedSamples) / AudioRecorder.sampleRate
+        result.transcribedAudioSeconds = Double(transcribedSamples) / STTAudio.sampleRate
         return result
     }
 

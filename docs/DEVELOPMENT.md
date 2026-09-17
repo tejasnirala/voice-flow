@@ -32,7 +32,8 @@ Swift Testing macro plugin. The script passes its path explicitly.
 Package.swift                 SwiftPM manifest
 Sources/VoiceFlowCore/        Platform-independent logic (unit-tested): accuracy scoring now;
                               state machine, settings, text processing later
-Sources/VoiceFlow/            Menu-bar app: AppKit, audio, hotkey, insertion, inference runtimes
+Sources/VoiceFlow/            Menu-bar app: AppKit, audio, hotkey, insertion (never loads whisper.cpp)
+Sources/voiceflow-stt/        Speech helper process: whisper.cpp; also the in-app STT benchmark mode
 Sources/vf-bench/             Benchmark scorer/report CLI
 Tests/VoiceFlowCoreTests/     Swift Testing tests
 Resources/Info.plist          App bundle metadata (LSUIElement, microphone usage string)
@@ -61,7 +62,7 @@ scripts/bench/stt.sh human
 
 # Long dictations (built from your recordings + pauses), transcribed by the app's own engine
 python3 scripts/bench/make-longform.py macbook-mic
-build/VoiceFlow.app/Contents/MacOS/VoiceFlow --transcribe-benchmark benchmarks-output/audio/longform/macbook-mic \
+build/VoiceFlow.app/Contents/MacOS/voiceflow-stt --transcribe-benchmark benchmarks-output/audio/longform/macbook-mic \
   --corpus benchmarks-output/longform-corpus.json --out benchmarks-output/results/longform/run.jsonl
 
 # Subset of runs: regex filter on run names
@@ -112,7 +113,7 @@ benchmark → verify → review `git diff` → update docs + PROGRESS → commit
   go to `~/Library/Application Support/VoiceFlow/debug-recordings/`. Turn it off and delete the folder afterwards.
 - Microphone permission: `tccutil reset Microphone local.voiceflow.VoiceFlow` to test the first-run prompt again.
 - In-app STT over benchmark clips (the same code path as dictation, writes vf-bench JSONL):
-  `build/VoiceFlow.app/Contents/MacOS/VoiceFlow --transcribe-benchmark <audio-dir> --corpus benchmarks/corpus/developer-speech.json --out <file.jsonl>`
+  `build/VoiceFlow.app/Contents/MacOS/voiceflow-stt --transcribe-benchmark <audio-dir> --corpus benchmarks/corpus/developer-speech.json --out <file.jsonl>`
   then `swift run -c release vf-bench score benchmarks/corpus/developer-speech.json <file.jsonl>`.
   Alternate variants and cool down between runs: back-to-back runs throttle on the MacBook Air.
 - STT settings (settings.json): `sttModelID` (`medium.en-q8_0` default | `large-v3-turbo-q8_0`), `useVocabularyPrompt`,

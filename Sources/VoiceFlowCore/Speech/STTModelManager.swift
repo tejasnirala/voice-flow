@@ -1,11 +1,10 @@
 import CryptoKit
 import Foundation
-import VoiceFlowCore
 
 /// Locates and validates STT model files in `~/Library/Application Support/VoiceFlow/models/`.
 /// Never downloads anything: a missing model is reported with the setup command that installs it.
-enum STTModelManager {
-    static var modelsDirectory: URL {
+public enum STTModelManager {
+    public static var modelsDirectory: URL {
         // Developer override for benchmark experiments (e.g. a copy of the model with a Core ML encoder beside it).
         if let override = ProcessInfo.processInfo.environment["VOICEFLOW_MODELS_DIR"], !override.isEmpty {
             return URL(fileURLWithPath: override, isDirectory: true)
@@ -13,12 +12,12 @@ enum STTModelManager {
         return SettingsStore.applicationSupportDirectory().appendingPathComponent("models", isDirectory: true)
     }
 
-    static func url(for model: STTModel) -> URL {
+    public static func url(for model: STTModel) -> URL {
         modelsDirectory.appendingPathComponent(model.runtimeDirectory, isDirectory: true).appendingPathComponent(model.fileName)
     }
 
     /// Whether a Core ML encoder is installed next to the model (encoder runs on the Neural Engine).
-    static func hasCoreMLEncoder(for model: STTModel) -> Bool {
+    public static func hasCoreMLEncoder(for model: STTModel) -> Bool {
         let dir = modelsDirectory.appendingPathComponent(model.runtimeDirectory, isDirectory: true)
             .appendingPathComponent(model.coreMLEncoderDirectoryName)
         return FileManager.default.fileExists(atPath: dir.resolvingSymlinksInPath().path)
@@ -27,13 +26,13 @@ enum STTModelManager {
     private static var recordsURL: URL { modelsDirectory.appendingPathComponent("verified.json") }
 
     /// Cheap check (file attributes only). Safe to call on the main thread.
-    static func quickStatus(for model: STTModel) -> STTModelStatus {
+    public static func quickStatus(for model: STTModel) -> STTModelStatus {
         STTModelValidation.quickStatus(for: model, fileSize: attributes(of: model)?.size)
     }
 
     /// Full check. Hashes the file (~1 s for 0.8 GB) only if it hasn't been verified in its current state.
     /// Call off the main thread.
-    static func verify(_ model: STTModel) -> (status: STTModelStatus, hashedSeconds: Double) {
+    public static func verify(_ model: STTModel) -> (status: STTModelStatus, hashedSeconds: Double) {
         guard let attrs = attributes(of: model) else { return (.missing, 0) }
         let quick = STTModelValidation.quickStatus(for: model, fileSize: attrs.size)
         guard quick == .installed else { return (quick, 0) }
@@ -88,17 +87,5 @@ enum STTModelManager {
     private static func saveRecords(_ records: [ModelVerificationRecord]) {
         guard let data = try? JSONEncoder().encode(records) else { return }
         try? data.write(to: recordsURL, options: .atomic)
-    }
-
-    /// The developer vocabulary bundled with the app (Resources/developer-vocabulary.txt), used as Whisper's
-    /// initial prompt. Falls back to the source tree when running unbundled (`swift run`).
-    static func vocabularyPrompt() -> String? {
-        let bundled = Bundle.main.url(forResource: "developer-vocabulary", withExtension: "txt")
-        let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-            .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources/developer-vocabulary.txt")
-        guard let url = bundled ?? (FileManager.default.fileExists(atPath: source.path) ? source : nil),
-              let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
     }
 }

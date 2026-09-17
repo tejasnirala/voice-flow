@@ -199,7 +199,8 @@ per 30–60 s, GPU 0, footprint 13 MB.
 - [x] Memory step (+292 MB once): decode-fallback hypothesis tested; not reproduced in 20 live dictations → watch, no change
 - [x] Fixed: model size check didn't follow symlinks (a symlinked model was reported as damaged)
 - [x] Cold vs warm: cold = warm latency (load 0.3 s runs during speech); load/unload cycles leak ~0.7 MB each → default unload 300 → 60 s
-- [ ] Residual ~187 MB after unload: decide (accept / helper process / upstream)
+- [x] Residual ~187 MB after unload → owner chose the helper process: `voiceflow-stt` owns whisper.cpp; app 13–18 MB always; helper
+      ready in 0.33–0.38 s per fresh process; release → text 606–764 ms; no orphans on app kill; accuracy identical (50/50, 7/7)
 - [ ] Recording start latency (engine prepare) and ⌥ dispatch latency (from owner use)
 - [ ] Docs + commit + owner check
 
@@ -230,6 +231,7 @@ Per SPEC.md. Notes so far:
 | 2026-09-17 | Load STT model at recording start; idle unload via one-shot timer (300 s provisional) | Model ready at release; memory returned when idle (except ~170 MB whisper.cpp residue) | ARCHITECTURE §3.6 |
 | 2026-09-17 | Paste via clipboard snapshot → ⌘V → restore after 250 ms; paste only into the app focused at key press | Owner-tested in VS Code/WhatsApp; never loses text | ARCHITECTURE §3.4 |
 | 2026-09-17 | Paste into the app focused when the transcript is ready (switch apps while dictating); `pasteInto: dictationApp` keeps the old behavior | Owner request (Wispr Flow-style continuity); last transcript stays in the menu | ARCHITECTURE §3.4 |
+| 2026-09-17 | whisper.cpp in a helper process (`voiceflow-stt`) that exits 60 s after last use | Owner approved; app stays at 13–18 MB; no latency cost; frees whisper.cpp's leftover and leaked memory | ARCHITECTURE §Processes |
 | 2026-09-17 | Unload STT model 60 s after last use (was 300 s) | Cold dictation as fast as warm; ~0.7 MB leak per load cycle favors bursts sharing a load | PERFORMANCE §3.8 |
 | 2026-09-17 | Core ML (Neural Engine) Whisper encoder | Same accuracy, −17…25% latency; `audio_ctx` fitting rejected (fails gate) | PERFORMANCE §3.5–3.6 |
 | 2026-09-17 | Trigger = ⌥ alone (hold; double-tap for hands-free), listen-only event taps; ⌥Space fallback | Owner request (Wispr Flow–style); no idle cost measured | ARCHITECTURE §3.3 |
@@ -247,4 +249,4 @@ _Overwrite at the end of every session._
   llm qwen2.5-1.5b-instruct-q4_k_m.
 - **Owner recordings:** `benchmarks-output/audio/human/macbook-mic/` (50 clips + `spoken-overrides.json`, gitignored). Results cached in
   `benchmarks-output/results/human/`. Rerunning `scripts/bench/stt.sh human` re-scores instantly.
-- **Next action:** continue the Phase 6 checklist (cold vs warm next).
+- **Next action:** remaining Phase 6 items (recording start latency, ⌥ latency from owner use), then close Phase 6.

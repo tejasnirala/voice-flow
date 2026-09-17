@@ -31,7 +31,7 @@ final class DictationCoordinator {
     private var pendingSpeechSeconds = 0.0
 
     // MARK: Speech-to-text state
-    private var speechEngine: WhisperEngine?
+    private var speechEngine: HelperSpeechEngine?
     private var speechEngineKey: String?
     /// Model load started when recording begins, so the model is ready (or nearly) at release.
     private var prepareTask: Task<Void, Error>?
@@ -364,7 +364,7 @@ final class DictationCoordinator {
     private func finishRecording(event: PipelineEvent) {
         let firstBuffer = recorder.firstBufferUptimeNs
         let samples = recorder.stop()
-        let analysis = RecordingGate.analyze(samples, sampleRate: AudioRecorder.sampleRate)
+        let analysis = RecordingGate.analyze(samples, sampleRate: STTAudio.sampleRate)
         let verdict = RecordingGate.verdict(for: analysis)
         let firstBufferMs = firstBuffer.map { Double($0 - pressUptimeNs) / 1_000_000 } ?? -1
 
@@ -381,7 +381,7 @@ final class DictationCoordinator {
 
         if settings.saveRecordingsForDebugging, !samples.isEmpty {
             do {
-                let url = try DebugRecordingWriter.write(samples, sampleRate: AudioRecorder.sampleRate)
+                let url = try DebugRecordingWriter.write(samples, sampleRate: STTAudio.sampleRate)
                 Log.audio.notice("debug recording saved: \(url.lastPathComponent, privacy: .public)")
             } catch {
                 Log.audio.error("debug recording not saved: \(error.localizedDescription, privacy: .public)")
@@ -401,13 +401,13 @@ final class DictationCoordinator {
     // MARK: - Speech-to-text
 
     /// Returns the engine for the current settings, creating it if the model or prompt setting changed.
-    private func currentSpeechEngine() -> WhisperEngine {
+    private func currentSpeechEngine() -> HelperSpeechEngine {
         let model = settings.sttModel
         let key = "\(model.id)|\(settings.useVocabularyPrompt)"
         if let engine = speechEngine, speechEngineKey == key { return engine }
         speechEngine?.unload()
-        let engine = WhisperEngine(model: model, modelURL: STTModelManager.url(for: model),
-                                   prompt: settings.useVocabularyPrompt ? STTModelManager.vocabularyPrompt() : nil)
+        let engine = HelperSpeechEngine(model: model, modelURL: STTModelManager.url(for: model),
+                                        prompt: settings.useVocabularyPrompt ? DeveloperVocabulary.prompt() : nil)
         speechEngine = engine
         speechEngineKey = key
         return engine
@@ -428,8 +428,14 @@ final class DictationCoordinator {
             guard status == .installed else { throw ModelUnavailable(status: status, model: model) }
             let start = DispatchTime.now().uptimeNanoseconds
             try engine.prepare()
-            let encoder = STTModelManager.hasCoreMLEncoder(for: model) ? "Core ML (Neural Engine)" : "Metal"
-            Log.speech.notice("model loaded in \(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9, format: .fixed(precision: 2), privacy: .public) s (started at recording start), encoder: \(encoder, privacy: .public)")
+            let total = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9
+            if let load = engine.lastLoad {
+                Log.speech.notice("""
+                    speech helper ready in \(total, format: .fixed(precision: 2), privacy: .public) s (started at recording start): \
+                    launch \(load.launchSeconds * 1000, format: .fixed(precision: 0), privacy: .public) ms, \
+                    model load \(load.loadSeconds, format: .fixed(precision: 2), privacy: .public) s, encoder: \(load.encoder, privacy: .public)
+                    """)
+            }
         }
     }
 
@@ -563,14 +569,10 @@ final class DictationCoordinator {
         let work = DispatchWorkItem { [weak self] in
             guard let self, !self.machine.state.isActive, engine.isLoaded else { return }
             DispatchQueue.global(qos: .utility).async {
-                let before = ResourceUsage.footprintMB
+                // The helper process exits, returning all model memory (whisper.cpp keeps ~190 MB after whisper_free
+                // and leaks ~0.7 MB per load when run in-process: PERFORMANCE.md §3.8–3.9).
                 engine.unload()
-                // ~170 MB stays allocated inside whisper.cpp/ggml after whisper_free (not allocator caching:
-                // malloc_zone_pressure_relief frees 0 MB). See PERFORMANCE.md §3.4.
-                Log.speech.notice("""
-                    model unloaded after \(delay, format: .fixed(precision: 0), privacy: .public) s idle: footprint \
-                    \(before, format: .fixed(precision: 0), privacy: .public) → \(ResourceUsage.footprintMB, format: .fixed(precision: 0), privacy: .public) MB
-                    """)
+                Log.speech.notice("speech helper stopped after \(delay, format: .fixed(precision: 0), privacy: .public) s idle; app footprint \(ResourceUsage.footprintMB, format: .fixed(precision: 0), privacy: .public) MB")
             }
         }
         unloadWork = work
