@@ -40,7 +40,7 @@ MLX-Swift can't be built from source here.
 | **Audio** | `AVAudioEngine` input tap → `AVAudioConverter` → in-memory 16 kHz mono Float32 buffer. No files | Decided (start latency measured in Phase 3) |
 | **Global hotkey** | Carbon `RegisterEventHotKey` (press + release events). Esc registered only while recording, for cancel | Decided |
 | **STT runtime** | **whisper.cpp** (prebuilt `whisper.xcframework`, Metal) behind a `SpeechEngine` protocol. The same framework also runs **Parakeet** | Decided, confirmed by measurement (§4) |
-| **STT model** | **Whisper medium.en q8_0 + developer vocabulary prompt** (alternate: large-v3-turbo q8_0 + prompt), §4.3 | Provisional; final at Phase 4 gate |
+| **STT model** | **Whisper large-v3-turbo q8_0 + developer vocabulary prompt** (alternate: medium.en q8_0 + prompt), §4.3 | Provisional; final at Phase 4 gate |
 | **LLM runtime** | **llama.cpp**, in-process, lazily loaded, Smart Mode only | Provisional; MLX comparison in Phase 7 |
 | **LLM model** | Qwen2.5-1.5B-Instruct Q4_K_M as the starting candidate | Provisional; compared in Phase 7 |
 | **Text insertion** | Full pasteboard snapshot → set text (transient/concealed markers) → CGEvent ⌘V → restore if unchanged | Decided |
@@ -212,26 +212,26 @@ Data: ACCURACY.md §5 and PERFORMANCE.md §3. Measured 2026-09-16/17 on this mac
 **Synthetic set (2026-09-16/17):** couldn't separate the Whisper finalists (shared TTS mispronunciations).
 Eliminated Apple SpeechTranscriber and distil-large-v3.
 
-**Owner's voice, MacBook mic (2026-09-17), the decision set:**
+**Owner's voice, MacBook mic (2026-09-17), the decision set** (with owner-confirmed scoring decisions, ACCURACY.md §5.5):
 
-| Config | WER | Terms | Mean / p95 latency | Loaded | Status |
-|---|---|---|---|---|---|
-| **medium.en q8_0 + vocabulary prompt** | 2.1% | 97.4% | 0.84 / 1.32 s | ~1.13 GB | **Provisional default** |
-| large-v3-turbo q8_0 + vocabulary prompt | 2.0% | 97.4% | 1.42 / 1.60 s | ~1.05 GB | Alternate (one hallucinated insertion observed) |
-| any model *without* the prompt | 2.1–4.1% | ≤ 93.6% | — | — | Fail the ≥95% term threshold |
-| small.en ± prompt, Parakeet, distil, Apple | ≥ 4.0% | ≤ 93.6% | — | — | Eliminated |
+| Config | WER | Terms | Lowest category | Mean / p95 latency | Loaded | Status |
+|---|---|---|---|---|---|---|
+| **large-v3-turbo q8_0 + vocabulary prompt** | 1.8% | 98.7% | 93.3% | 1.42 / 1.60 s | ~1.05 GB | **Provisional default**: the only config meeting every proposed criterion |
+| medium.en q8_0 + vocabulary prompt | 2.1% | 97.4% | 88.9% (files) | 0.84 / 1.32 s | ~1.13 GB | Alternate: fails by one term ("nginx.com") |
+| any model *without* the prompt | 2.0–4.1% | ≤ 94.9% | — | — | — | Fails ≥95% terms |
+| small.en ± prompt, Parakeet, distil, Apple | ≥ 4.0% | ≤ 93.6% | — | — | — | Eliminated |
 
-**Why medium.en + prompt:** tied with large-v3-turbo + prompt on accuracy (76/78 terms), no unspoken
-insertion observed, ~41% lower latency. English-only: Hinglish would require large-v3-turbo.
+**Why large-v3-turbo + prompt:** accuracy first (spec §23). It's the only configuration that passes the
+threshold; latency (p95 1.6 s) is within the sanity bound and gets optimized in Phase 6 (the fixed 30 s
+encoder window is the main cost). Also multilingual (Hinglish possible). **Known risk:** one unspoken phrase
+inserted in 50 clips. Mitigations: an inserted/repeated n-gram guard in the engine, an explicit insertion
+criterion (proposed D3), and measuring the rate on more recordings (D4).
 
 **Consequence for the design:** the developer vocabulary prompt (`initial_prompt`) is part of the STT
-configuration, not an optional extra. It's decode-time biasing toward terms actually present in the audio,
-not post-hoc correction, so it's consistent with rule 8. It needs guarding: the in-app engine checks for
-repeated or inserted n-grams, and Phase 4 re-measures the insertion rate on more recordings.
+configuration, not an optional extra. It's decode-time biasing toward terms present in the audio, not
+post-hoc correction, so it's consistent with rule 8.
 
-**Final decision at the Phase 4 gate**, after the open items in ACCURACY.md §5.6: reviewed reading variations,
-the "cube control" scoring policy, threshold approval (the per-category criterion is noisy at 8–10 terms), and
-more real recordings.
+**Final decision at the Phase 4 gate** after the open items in ACCURACY.md §5.6.
 
 ### 4.4 Performance measurements collected (per configuration)
 Model size, load time, first-run time, per-clip warm latency (mean/p95/max), real-time factor, process CPU

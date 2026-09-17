@@ -97,7 +97,7 @@
     {"id": "commands-05", "category": "commands", "synthesizable": true, "terms": ["docker compose down"],
      "spoken": "Stop the stack with docker compose down.",
      "reference": "Stop the stack with docker compose down."},
-    {"id": "commands-06", "category": "commands", "synthesizable": true, "terms": ["kubectl get pods|kube control get pods|kube cuddle get pods|kube c t l get pods"],
+    {"id": "commands-06", "category": "commands", "synthesizable": true, "terms": ["kubectl get pods|kube control get pods|cube control get pods|kube cuddle get pods|cube cuddle get pods|kube c t l get pods|cube c t l get pods"],
      "spoken": "Run kube control get pods to see which pods are crashing.",
      "reference": "Run kubectl get pods to see which pods are crashing."},
     {"id": "commands-07", "category": "commands", "synthesizable": true, "terms": ["git checkout -b feature/login"],

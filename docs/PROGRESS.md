@@ -8,8 +8,8 @@
 | Phase | Name | Status |
 |---|---|---|
 | 0 | Machine & architecture discovery | ✅ Complete (2026-09-17; STT model final at Phase 4 gate) |
-| 1 | Native macOS shell | 🟡 **Implemented, awaiting owner menu check & approval** (2026-09-17) |
-| 2 | Global hotkey | ⏭️ Next |
+| 1 | Native macOS shell | ✅ Complete (2026-09-17, owner verified menu) |
+| 2 | Global hotkey | 🟡 In progress |
 | 3 | Audio recording | ⬜ |
 | 4 | STT integration (+ accuracy gate) | ⬜ |
 | 5 | Text insertion (first usable product) | ⬜ |
@@ -61,19 +61,18 @@ benchmark → fix → review → CPU/RAM check → docs + this file → show cha
 
 - **Owner-voice benchmark (MacBook mic, 50 clips), 2026-09-17** → ACCURACY.md §5.4–5.6:
   - Without the developer vocabulary prompt, **no model meets ≥95% term recognition** (best 93.6%)
-  - **medium.en q8_0 + vocab**: 2.1% WER, 97.4% terms, 0.84 s mean → **provisional default**
-  - large-v3-turbo q8_0 + vocab: 2.0% WER, 97.4% terms, 1.42 s mean; one hallucinated insertion → alternate
+  - After owner decisions (kubectl pronunciation, Helm/git confirmed): **large-v3-turbo q8_0 + vocab** 1.8% WER, 98.7% terms,
+    the only config meeting every criterion → **provisional default**; medium.en q8_0 + vocab 97.4% (files 8/9) → alternate
   - Eliminated on real speech: small.en (±vocab), Parakeet, distil-large-v3, Apple SpeechTranscriber
   - Scorer fix: contractions / "ok" treated as equivalent (was the whole 3.2% normal-English WER); 15 tests
   - `vf-bench`: per-category term table; `--overrides-dir` for reviewed "what was actually said" corrections
 - Owner approved moving forward (2026-09-17)
 
 **Leftovers carried forward**
-- **Phase 4 gate (STT model final), open items D1–D5 in ACCURACY.md §5.6:**
-  D1 owner listens to flagged clips → `spoken-overrides.json`; D2 accept "cube control" for kubectl?;
-  D3 approve threshold (per-category rule noisy at 8–10 terms); D4 more recordings (second take, other mics,
-  in-app); D5 Helm → "help" in every model. Also measure the vocab-prompt insertion rate, and add an
-  inserted/repeated n-gram guard to the engine.
+- **Phase 4 gate (STT model final), ACCURACY.md §5.6:** D1 six clips still to review (technical-03, technical-04,
+  architecture-04, architecture-05, natural-01, natural-02); D2 ✅ "cube control" accepted; D3 threshold approval,
+  including a proposed inserted-phrase criterion; D4 more recordings to measure the insertion rate of large-v3-turbo + vocab;
+  D5 ✅ Helm confirmed (genuine error in all models). Add an inserted/repeated n-gram guard to the engine.
 - Hinglish: needs human recordings plus a multilingual model run (large-v3-turbo with language auto/hi).
 - MLX and Apple Foundation Models LLM comparison: Phase 7.
 - "VoiceFlow Dev" signing identity: create before Phase 3 (DEVELOPMENT.md).
@@ -84,7 +83,7 @@ benchmark → fix → review → CPU/RAM check → docs + this file → show cha
   an unchanged human-set accuracy. Handle the one-time Metal shader compile per new binary.
 - Vocabulary prompt: decisive on real speech (+4 terms, +11–14% latency) but produced one unspoken insertion with large-v3-turbo. Keep, guard, and re-measure.
 
-## Phase 1 — Native macOS shell 🟡
+## Phase 1 — Native macOS shell ✅
 - [x] Menu bar item (template mic icon) + menu built on demand: version, "● Ready", Mode (Fast ✓ / Smart
       disabled), Open Settings File… (⌘,), Quit (⌘Q) — `Sources/VoiceFlow/MenuBar/MenuBarController.swift`
 - [x] Lifecycle: accessory app, launch time logged from kernel process start, terminate logged
@@ -94,8 +93,8 @@ benchmark → fix → review → CPU/RAM check → docs + this file → show cha
       preserved as `settings.invalid.json` → defaults. 6 new tests (21 total)
 - [x] `scripts/measure-idle.sh`: launch, idle CPU / wakeups / GPU / footprint, quit → PERFORMANCE.md §2.1
 - [x] Verified: build, tests, launch ×5, quit ×3 (~225 ms), corrupt-settings path end to end (logged, preserved, app keeps running)
-- [ ] **Owner check:** click the menu-bar mic icon and confirm the menu items, the Fast ✓ checkmark, that
-      Open Settings File… opens the JSON, and that Quit works (automated clicking needs Accessibility for Terminal, not granted)
+- [x] Owner verified the menu (items, Fast ✓, Open Settings File…, Quit), 2026-09-17. Note: `scripts/measure-idle.sh`
+      quits the app when done, so relaunch with `open build/VoiceFlow.app` afterwards
 - Moved to Phase 2: `PipelineState` state machine (spec v2 pairs state transitions with the hotkey phase)
 
 Measured: launch 85–110 ms (653 ms on the first run of a new build), idle CPU 0.00 s over 60 s, 2–5 wakeups
@@ -134,7 +133,9 @@ Per SPEC.md. Notes so far:
 | 2026-09-16 | whisper.cpp framework as STT runtime (runs Whisper and Parakeet) | In-process, Metal, no daemon, prebuilt, replaceable behind a protocol | ARCHITECTURE §4 |
 | 2026-09-16 | STT model chosen on the owner's recordings, never on synthetic audio alone | TTS audio isn't representative of real accents/pace (spec §3) | ACCURACY §2 |
 | 2026-09-17 | Provisional STT default: Whisper large-v3-turbo q8_0 on Metal; Apple Speech, distil-large-v3 and CPU backend eliminated | Synthetic benchmark: lowest WER; Apple 58.5% terms; CPU 15–30× slower | ARCHITECTURE §4 |
-| 2026-09-17 | Provisional STT: **medium.en q8_0 + developer vocabulary prompt**; large-v3-turbo q8_0 + prompt as alternate | Owner-voice benchmark: tied at 97.4% terms, no insertion observed, 41% faster; no prompt-less model reaches 95% | ARCHITECTURE §4.3, ACCURACY §5.6 |
+| 2026-09-17 | Provisional STT: medium.en q8_0 + vocab, superseded the same day ↓ | Tied at 97.4% before owner scoring decisions | — |
+| 2026-09-17 | Owner: "cube control" = kubectl pronunciation; "Helm" and "git" were said | Listening review | ACCURACY §5.5 |
+| 2026-09-17 | **Provisional STT: large-v3-turbo q8_0 + developer vocabulary prompt**; medium.en q8_0 + prompt alternate | Only config meeting every proposed criterion (98.7% terms); insertion risk tracked (D3/D4) | ARCHITECTURE §4.3, ACCURACY §5.6 |
 | 2026-09-16 | Carbon RegisterEventHotKey; Esc cancel registered only while recording | Press+release, no permission, zero idle cost | ARCHITECTURE §3.3 |
 | 2026-09-16 | Clipboard + ⌘V with full snapshot/restore; never lose speech | Works in Electron/terminals/browsers | ARCHITECTURE §3.4 |
 | 2026-09-16 | llama.cpp in-process (provisional); Ollama rejected | No daemon/IPC; MLX re-evaluated in Phase 7 | ARCHITECTURE §3.5 |
@@ -142,10 +143,10 @@ Per SPEC.md. Notes so far:
 ## Session handoff notes
 _Overwrite at the end of every session._
 
-- **Last session (2026-09-17):** Phase 0 closed; Phase 1 implemented and measured, awaiting owner menu check and approval.
+- **Last session (2026-09-17):** Phases 0–1 complete; Phase 2 (global hotkey + state machine) started.
 - **Models on this machine** (`~/Library/Application Support/VoiceFlow/models/`): whisper tiny.en, base.en,
   small.en, medium.en-q8_0, large-v3-turbo, large-v3-turbo-q8_0, distil-large-v3; parakeet tdt-0.6b-v3-q8_0;
   llm qwen2.5-1.5b-instruct-q4_k_m.
 - **Owner recordings:** `benchmarks-output/audio/human/macbook-mic/` (50 clips, gitignored). Results cached in
   `benchmarks-output/results/human/`. Rerunning `scripts/bench/stt.sh human` re-scores instantly.
-- **Next action:** owner confirms the menu → Phase 2. The Phase 4 gate items (D1–D5) are waiting on the owner.
+- **Next action:** finish Phase 2. Phase 4 gate items D1, D3, D4 are waiting on the owner.

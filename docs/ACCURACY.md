@@ -159,84 +159,77 @@ Every Whisper model tops out at ~91–92% term recognition largely **because of 
 
 **Conditions:** owner's voice, MacBook Air built-in microphone, recorded with `scripts/bench/record.sh`;
 50 clips (Hinglish not recorded), 450 s total, 4.9–39.2 s per clip; 78 key-term occurrences. Engines and
-settings as §5.1, plus `+vocab` runs for small.en and medium.en. Scored after the contraction fix
-(§5.5). Report: `benchmarks-output/results/human/report.md`.
+settings as §5.1, plus `+vocab` runs for small.en and medium.en. Scored with the contraction fix and the
+owner-confirmed kubectl pronunciation (§5.5). Report: `benchmarks-output/results/human/report.md`.
 
 | Configuration | WER | normal | technical | identifiers | commands | files | architecture | natural | **Terms** | Exact | Fmt WER |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| **whisper medium.en q8_0 + vocab** | **2.1%** | 0.0% | 1.7% | 0.0% | 0.0% | 7.5% | 5.5% | 2.2% | **97.4%** (76/78) | 79.5% | 12.4% |
-| **whisper large-v3-turbo q8_0 + vocab** | **2.0%** | 0.0% | 1.7% | 0.0% | 2.3% | 0.0% | 3.6% | 3.0% | **97.4%** (76/78) | 73.1% | 11.6% |
-| whisper large-v3-turbo (f16) | 2.1% | 0.0% | 1.7% | 0.0% | 4.3% | 0.0% | 7.3% | 2.2% | 93.6% (73/78) | 60.3% | 14.1% |
-| whisper large-v3-turbo q8_0 | 2.3% | 0.0% | 1.7% | 0.0% | 4.3% | 0.0% | 9.1% | 2.2% | 92.3% (72/78) | 59.0% | 15.1% |
-| whisper medium.en q8_0 | 3.1% | 0.0% | 3.3% | 0.0% | 4.3% | 10.0% | 5.5% | 2.6% | 92.3% (72/78) | 64.1% | 14.8% |
+| **whisper large-v3-turbo q8_0 + vocab** | **1.8%** | 0.0% | 1.7% | 0.0% | 0.0% | 0.0% | 3.6% | 3.0% | **98.7%** (77/78) | 73.1% | 11.6% |
+| whisper medium.en q8_0 + vocab | 2.1% | 0.0% | 1.7% | 0.0% | 0.0% | 7.5% | 5.5% | 2.2% | 97.4% (76/78) | 79.5% | 12.4% |
+| whisper large-v3-turbo (f16) | 2.0% | 0.0% | 1.7% | 0.0% | 2.3% | 0.0% | 7.3% | 2.2% | 94.9% (74/78) | 60.3% | 14.1% |
+| whisper large-v3-turbo q8_0 | 2.1% | 0.0% | 1.7% | 0.0% | 2.3% | 0.0% | 9.1% | 2.2% | 93.6% (73/78) | 59.0% | 15.1% |
+| whisper medium.en q8_0 | 2.9% | 0.0% | 3.3% | 0.0% | 2.3% | 10.0% | 5.5% | 2.6% | 93.6% (73/78) | 64.1% | 14.8% |
 | whisper small.en + vocab | 4.0% | 0.0% | 3.3% | 1.6% | 18.0% | 10.0% | 3.6% | 2.2% | 93.6% (73/78) | 70.5% | 17.3% |
 | whisper small.en | 4.1% | 0.0% | 7.5% | 0.0% | 2.3% | 10.0% | 10.9% | 2.2% | 92.3% (72/78) | 65.4% | 16.4% |
-| whisper distil-large-v3 | 6.7% | 1.5% | 8.3% | 1.6% | 8.0% | 19.6% | 12.7% | 4.3% | 75.6% (59/78) | 42.3% | 19.6% |
-| Parakeet TDT 0.6B v3 q8_0 | 6.8% | 1.5% | 8.3% | 1.6% | 13.5% | 18.6% | 16.4% | 3.0% | 79.5% (62/78) | 48.7% | 17.6% |
-| Apple SpeechTranscriber en-US (± contextual strings) | 11.1% | 0.0% | 16.4% | 11.1% | 9.8% | 28.9% | 16.4% | 7.2% | 61.5% (48/78) | 24.4% | 24.2% |
-| Apple SpeechTranscriber en-IN | 12.0% | 1.5% | 14.8% | 14.1% | 16.4% | 28.9% | 21.4% | 6.4% | 57.7% (45/78) | 21.8% | 25.8% |
+| whisper distil-large-v3 | 6.5% | 1.5% | 8.3% | 1.6% | 6.4% | 19.6% | 12.7% | 4.3% | 76.9% (60/78) | 42.3% | 19.6% |
+| Parakeet TDT 0.6B v3 q8_0 | 6.7% | 1.5% | 8.3% | 1.6% | 12.2% | 18.6% | 16.4% | 3.0% | 80.8% (63/78) | 48.7% | 17.6% |
+| Apple SpeechTranscriber en-US (± contextual strings) | 11.0% | 0.0% | 16.4% | 11.1% | 8.3% | 28.9% | 16.4% | 7.2% | 62.8% (49/78) | 24.4% | 24.2% |
+| Apple SpeechTranscriber en-IN | 11.9% | 1.5% | 14.8% | 14.1% | 15.4% | 28.9% | 21.4% | 6.4% | 59.0% (46/78) | 21.8% | 25.8% |
 
-Term recognition by category (threshold: every category ≥ 90%):
+Term recognition by category (proposed threshold: every category ≥ 90%):
 
 | Configuration | technical | identifiers | commands | files | architecture | natural |
 |---|---|---|---|---|---|---|
+| **large-v3-turbo q8_0 + vocab** | 100% (24/24) | 100% (12/12) | 100% (8/8) | 100% (9/9) | 100% (10/10) | 93.3% (14/15) |
 | medium.en q8_0 + vocab | 100% (24/24) | 100% (12/12) | 100% (8/8) | **88.9%** (8/9) | 100% (10/10) | 93.3% (14/15) |
-| large-v3-turbo q8_0 + vocab | 100% (24/24) | 100% (12/12) | **87.5%** (7/8) | 100% (9/9) | 100% (10/10) | 93.3% (14/15) |
-| large-v3-turbo (f16) | 100% | 100% | 75.0% | 100% | 80.0% | 93.3% |
-| large-v3-turbo q8_0 | 100% | 100% | 75.0% | 100% | 70.0% | 93.3% |
-| medium.en q8_0 | 95.8% | 100% | 75.0% | 77.8% | 100% | 93.3% |
+| large-v3-turbo (f16) | 100% | 100% | 87.5% | 100% | 80.0% | 93.3% |
+| large-v3-turbo q8_0 | 100% | 100% | 87.5% | 100% | 70.0% | 93.3% |
+| medium.en q8_0 | 95.8% | 100% | 87.5% | 77.8% | 100% | 93.3% |
 | small.en + vocab | 100% | 100% | 62.5% | 88.9% | 100% | 93.3% |
 | small.en | 95.8% | 100% | 87.5% | 88.9% | 80.0% | 93.3% |
 
 **Every remaining error of the two finalists (reviewed by hand):**
 
-| Clip | medium.en q8_0 + vocab | large-v3-turbo q8_0 + vocab |
+| Clip | large-v3-turbo q8_0 + vocab | medium.en q8_0 + vocab |
 |---|---|---|
-| files-06 | ❌ "nginx.**com**" for nginx.conf (substitution; changes meaning) | ✓ |
-| commands-06 | ✓ "kubectl" | "cube control get pods": homophone of the spoken "kube control" (see decision D2) |
-| natural-01 | ✓ | ❌ **inserted** "run dev": "run npm install, run dev and then npm run dev" (a phrase not spoken) |
-| natural-03 | "help" for Helm | "help" for Helm |
-| (shared by *all* Whisper runs) | "with **a** Redis", "documents **to** MongoDB", "message… result", dropped "the" (natural-01/02), "into Redis" | same |
+| natural-03 | ❌ "help" for **Helm** (owner confirmed "Helm" was said) | ❌ same |
+| natural-01 | ❌ **inserted** "run dev": "run npm install, run dev and then npm run dev" (not spoken) | ✓ |
+| files-06 | ✓ | ❌ "nginx.**com**" for nginx.conf (changes meaning) |
+| commands-06 | "cube control get pods": accepted pronunciation of kubectl (owner, D2) | ✓ "kubectl" |
+| (shared by *all* Whisper runs; D1 pending) | "with **a** Redis", "documents **to** MongoDB", "message… result", dropped "the" (natural-01/02), "into Redis", "cache **the** responses" | same |
 
 ### 5.5 Findings from the human set
 
 1. **Real speech separates the models; synthetic speech didn't.** Without the vocabulary prompt, every
-   Whisper model misses 5–6 of 78 terms ("gate rebase", "Radis", "Reddish", "radius", "PostgresSQL",
-   "Rabit Amq", "nginx.com", "QuestGrace SQL"). **No configuration without the prompt meets the ≥95% term
-   threshold.**
-2. **The vocabulary prompt is decisive on real speech.** +4 terms for large-v3-turbo and medium.en.
-   Latency cost is modest here: +11% (1.28 → 1.42 s) and +14% (0.73 → 0.84 s), unlike the 1.6× seen on
-   synthetic audio. No technical terms were inserted into normal-English clips (normal WER 0.0%).
-   **But** large-v3-turbo + vocab inserted an unspoken phrase once (natural-01). That's a hallucination
-   risk to monitor (rules 8–9). small.en + vocab degraded commands badly ("npm rendev", "rungit").
-3. **Finalists are tied on accuracy** (76/78 terms each, WER 2.0% vs 2.1%). Each fails exactly one
-   per-category criterion by a single term (medium.en: files 8/9; large-v3-turbo: commands 7/8). With
-   8–10 terms per category, one term is 10+ pp, so **the per-category criterion is too noisy at this sample
-   size to separate them**.
-4. **Eliminated on real speech:** small.en (with and without vocab), distil-large-v3, Parakeet (79.5%;
-   commands 50%, files 55.6%), Apple SpeechTranscriber (≤61.5%).
-5. **Scoring fix applied:** the normalizer treated "I'll" vs "I will" (and "I'm/I am", "Ok/Okay") as
-   errors. That was the *entire* 3.2% normal-English WER of every Whisper model. Contractions and informal
-   spellings are now equivalent (unit-tested). No other numbers were changed.
+   Whisper model misses 4–6 of 78 terms ("gate rebase" for git rebase, "Radis", "Reddish", "radius",
+   "PostgresSQL", "Rabit Amq", "nginx.com", "QuestGrace SQL"). **No configuration without the prompt meets
+   the ≥95% term threshold** (best: large-v3-turbo f16, 94.9%).
+2. **The vocabulary prompt is decisive on real speech.** +4 terms for both large-v3-turbo q8_0 and medium.en,
+   at +11% / +14% latency (unlike the median 1.6× on synthetic audio). No technical terms were inserted into
+   normal-English clips (normal WER 0.0%). **But** large-v3-turbo + vocab inserted an unspoken phrase once
+   (natural-01): a hallucination the current threshold doesn't capture (see D3). small.en + vocab degraded
+   commands badly ("npm rendev", "rungit").
+3. **Helm → "help" in every model**, prompt included (owner confirmed "Helm"). It's a genuine limit for now;
+   Phase 9 vocabulary work should target it.
+4. **Eliminated on real speech:** small.en (±vocab), distil-large-v3, Parakeet (80.8%), Apple SpeechTranscriber (≤62.8%).
+5. **Scoring corrections, all owner-visible:** (a) contractions and "ok/okay" are equivalent (previously
+   the *entire* 3.2% normal-English WER); (b) "cube control get pods" is an accepted pronunciation of
+   `kubectl get pods` (owner decision D2); formatting to `kubectl` belongs to Developer mode. No other numbers changed.
 
 ### 5.6 Provisional decision and what closes it (Phase 4 gate)
 
-**Provisional default: Whisper medium.en q8_0 + developer vocabulary prompt.** Equal accuracy to
-large-v3-turbo + vocab on the owner's voice, no hallucinated insertion observed, ~41% lower latency
-(0.84 s vs 1.42 s mean; PERFORMANCE.md §3.3). Trade-off: English-only (no Hinglish).
-**large-v3-turbo q8_0 + vocab stays the alternate.**
+Applying the proposed threshold (§3) and selection rule: **whisper large-v3-turbo q8_0 + developer
+vocabulary prompt is the only configuration meeting every criterion** (WER 1.8%, normal 0.0%, terms 98.7%,
+lowest category 93.3%, 0 hallucinated terms in normal clips). **Provisional default.**
+medium.en q8_0 + vocab misses the per-category criterion by one term (files 8/9) and is the **alternate**:
+~41% faster (0.84 s vs 1.42 s mean), English-only. large-v3-turbo is multilingual, so Hinglish stays possible.
 
-Open items, to resolve before Phase 4 passes:
+Open items before Phase 4 passes:
 
-| # | Item | Why |
+| # | Item | Status |
 |---|---|---|
-| D1 | **Owner review of reading variations.** Listen to the flagged clips and confirm what was said; confirmed differences go into `benchmarks-output/audio/human/macbook-mic/spoken-overrides.json` | The corpus script isn't ground truth when the speaker paraphrased. All models are currently penalized for it |
-| D2 | **Accept "cube control" as a recognized pronunciation of kubectl?** It's phonetically what "kube control" sounds like; the exact spelling is still scored separately | Scoring policy (owner decision) |
-| D3 | **Approve the threshold**, possibly with the per-category criterion applied only to categories with ≥ 20 term occurrences (or pooled across two recording takes) | The per-category rule is noisy at 8–10 terms |
-| D4 | **More real speech:** a second take on the MacBook mic, plus any other mic you dictate with (AirPods/iPhone), and in-app recordings in Phase 4 | Break the tie; check the vocab-prompt insertion rate |
-| D5 | **Helm → "help" in every model:** listen to natural-03 | Pronunciation vs model limit |
-
-Clips to listen to for D1/D5 (`afplay benchmarks-output/audio/human/macbook-mic/<id>.wav`):
-technical-03 ("with a Redis"?), technical-04 ("documents to MongoDB"?), architecture-04 ("message… result"?),
-architecture-05 ("cache the responses"?), natural-01 (dropped "the" ×2, "into Redis"?), natural-02 (dropped
-"the"?), natural-03 ("Helm" or "help"?), commands-03 ("git" or "gate"?).
+| D1 | Owner review of reading variations (clips technical-03, technical-04, architecture-04, architecture-05, natural-01, natural-02) → `spoken-overrides.json` | **Partly done:** commands-03 "git" and natural-03 "Helm" confirmed as scripted. The six clips above are still pending. They affect WER equally for all models, not term recognition |
+| D2 | "cube control" as kubectl pronunciation | ✅ Accepted by owner (2026-09-17) |
+| D3 | Approve the threshold. Proposed additions: (a) **inserted-phrase criterion**: no unspoken words or phrases inserted, measured as insertion errors outside the spoken text, max 1 per 100 clips; (b) apply the per-category criterion on ≥ 20 term occurrences (pool takes) | Pending owner |
+| D4 | More real speech: second MacBook-mic take, other mics used for dictation, in-app recordings in Phase 4, to measure the insertion rate of large-v3-turbo + vocab | Pending |
+| D5 | Helm → "help" | ✅ Owner confirmed "Helm" was said → a genuine error in all models |
