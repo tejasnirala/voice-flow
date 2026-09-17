@@ -10,19 +10,20 @@ public struct STTModel: Equatable, Sendable {
     public var language: String
     public var displayName: String
 
-    /// Provisional default (docs/ACCURACY.md §5.6). Hashes and sizes from Hugging Face LFS metadata.
+    /// Alternate: most accurate on terms, but produced an invented phrase (2.0 per 100 clips > approved 1 per 100);
+    /// multilingual (docs/ACCURACY.md §5.8). Hashes and sizes from Hugging Face LFS metadata.
     public static let largeV3TurboQ8 = STTModel(
         id: "large-v3-turbo-q8_0", runtimeDirectory: "whisper", fileName: "ggml-large-v3-turbo-q8_0.bin",
         sizeBytes: 874_188_075, sha256: "317eb69c11673c9de1e1f0d459b253999804ec71ac4c23c17ecf5fbe24e259a1",
         language: "en", displayName: "Whisper large-v3-turbo (q8_0)")
 
-    /// Alternate (docs/ACCURACY.md §5.6).
+    /// Default: passes the approved accuracy threshold on the owner's recordings (docs/ACCURACY.md §5.8).
     public static let mediumEnQ8 = STTModel(
         id: "medium.en-q8_0", runtimeDirectory: "whisper", fileName: "ggml-medium.en-q8_0.bin",
         sizeBytes: 823_382_461, sha256: "43fa2cd084de5a04399a896a9a7a786064e221365c01700cea4666005218f11c",
         language: "en", displayName: "Whisper medium.en (q8_0)")
 
-    public static let catalog: [STTModel] = [largeV3TurboQ8, mediumEnQ8]
+    public static let catalog: [STTModel] = [mediumEnQ8, largeV3TurboQ8]
 
     public static func model(id: String) -> STTModel? { catalog.first { $0.id == id } }
 

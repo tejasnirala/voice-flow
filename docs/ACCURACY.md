@@ -53,18 +53,26 @@ Scoring code: `Sources/VoiceFlowCore/Speech/Accuracy/` (14 unit tests). Report: 
 Limitation: automatic metrics can't judge whether a punctuation choice is _acceptable_ (e.g. comma vs
 period). Formatting WER is a proxy. The error listing is reviewed by hand for the final decision.
 
-### Proposed acceptance threshold (**needs owner approval**)
+### Acceptance threshold (**approved by owner, 2026-09-17**)
+Measured on the **human** set, per microphone the owner dictates with. The owner may revise it later.
 
-Measured on the **human** set, per microphone the owner dictates with:
+| Criterion | Threshold |
+|---|---|
+| Overall WER | **≤ 5 %** |
+| Normal-English WER | **≤ 3 %** |
+| Key-term recognition, all categories combined | **≥ 95 %** |
+| Key-term recognition, per category | **≥ 90 %**, applied to categories with ≥ 20 term occurrences in the evaluated set (pool takes to reach it) |
+| Invented phrases | **≤ 1 per 100 clips** |
+| Latency sanity bound (not a ranking criterion) | warm p95 ≤ 2 s for clips ≤ 10 s |
 
-| Criterion                                            | Threshold                       |
-| ---------------------------------------------------- | ------------------------------- |
-| Overall WER                                          | **≤ 5 %**                       |
-| Normal-English WER                                   | **≤ 3 %**                       |
-| Key-term recognition, all categories combined        | **≥ 95 %**                      |
-| Key-term recognition, any single category            | **≥ 90 %**                      |
-| Hallucinated technical terms in normal-English clips | **0**                           |
-| Latency sanity bound (not a ranking criterion)       | warm p95 ≤ 2 s for clips ≤ 10 s |
+**Invented phrase** (scorer: `AccuracyScorer.insertedRuns`, 3 tests): 2+ consecutive output words that weren't spoken,
+bounded by correctly recognized words. A single extra word ("with **a** Redis") is an ordinary error (counted in WER).
+Extra words next to a misrecognized word ("PostgreSQL" → "post gray sql") are a split misrecognition (counted in WER
+and term recognition).
+
+**Reviewed references:** when the speaker's words differ from the corpus script, the owner confirms what was said, and
+the correction goes in `benchmarks-output/audio/human/<mic>/spoken-overrides.json` (applied by
+`scripts/bench/stt.sh` / `vf-bench --overrides-dir`).
 
 **Selection rule (spec §23):** keep only models meeting every accuracy criterion. Among those, choose the
 lowest warm latency. If latencies are within ~20 %, choose the lower memory footprint. If **no** model
@@ -216,26 +224,52 @@ Term recognition by category (proposed threshold: every category ≥ 90%):
    the *entire* 3.2% normal-English WER); (b) "cube control get pods" is an accepted pronunciation of
    `kubectl get pods` (owner decision D2); formatting to `kubectl` belongs to Developer mode. No other numbers changed.
 
-### 5.6 Provisional decision and what closes it (Phase 4 gate)
+### 5.6 Owner review (2026-09-17)
 
-Applying the proposed threshold (§3) and selection rule: **whisper large-v3-turbo q8_0 + developer
-vocabulary prompt is the only configuration meeting every criterion** (WER 1.8%, normal 0.0%, terms 98.7%,
-lowest category 93.3%, 0 hallucinated terms in normal clips). **Provisional default.**
-medium.en q8_0 + vocab misses the per-category criterion by one term (files 8/9) and is the **alternate**:
-~41% faster (0.84 s vs 1.42 s mean), English-only. large-v3-turbo is multilingual, so Hinglish stays possible.
+| Item | Decision |
+|---|---|
+| D1 reading variations | Confirmed as spoken: "with **a** Redis" (technical-03), "documents **to** MongoDB" (technical-04), "message… result" (architecture-04), no "the" + "**into** Redis" (natural-01), no "the" before useEffect (natural-02). Scripted as spoken: "cache responses" (architecture-05; medium.en's "cache **the** responses" is a real 1-word insertion), "git rebase" (commands-03), "Helm" (natural-03). → `spoken-overrides.json` (5 clips) |
+| D2 "cube control" | Accepted pronunciation of kubectl |
+| D3 threshold | Approved as above, including the invented-phrase criterion |
+| D4 more data | Recommendation accepted: **don't** save everyday dictations (unlabeled audio can't be scored; privacy default). Record a second scripted take instead (confirmation, not blocking) |
 
-**In-app verification (Phase 4, 2026-09-17):** the app's own STT path (`VoiceFlow --transcribe-benchmark`: same
-`WhisperEngine`, model, vocabulary prompt and `TranscriptGuard` as live dictation) over the owner's 50 clips produced
-**identical transcripts to the benchmark harness on 50/50 clips**: WER 1.8%, terms 98.7% (77/78). Repeated across
-6 further in-app runs (residency on/off, 10- and 50-clip sets): transcripts identical every time. TranscriptGuard flags:
-none triggered on the owner's clips.
+### 5.7 Human set re-scored with reviewed references (2026-09-17)
 
-Open items before Phase 4 passes:
+| Configuration | WER | normal | technical | Terms | Technical terms (24) | Invented phrases |
+|---|---|---|---|---|---|---|
+| whisper large-v3-turbo q8_0 + vocab | **0.5%** | 0.0% | 0.0% | **98.7%** (77/78) | 100% | **1 (2.0 per 100)**: "run dev" (natural-01) |
+| **whisper medium.en q8_0 + vocab** | **1.1%** | 0.0% | 0.0% | **97.4%** (76/78) | 100% | **0** |
+| whisper large-v3-turbo (f16) | 0.7% | 0.0% | 0.0% | 94.9% | 100% | 0 |
+| whisper large-v3-turbo q8_0 | 0.8% | 0.0% | 0.0% | 93.6% | 100% | 0 |
+| whisper medium.en q8_0 | 1.6% | 0.0% | 1.7% | 93.6% | 95.8% | 0 |
+| whisper small.en + vocab | 3.1% | 0.0% | 3.3% | 93.6% | 100% | 0 |
+| whisper small.en | 2.8% | 0.0% | 5.8% | 92.3% | 95.8% | 0 |
+| whisper distil-large-v3 | 5.3% | 1.5% | — | 76.9% | 83.3% | 0 |
+| Parakeet TDT 0.6B v3 q8_0 | 5.8% | 1.5% | 8.3% | 80.8% | 87.5% | 0 |
+| Apple SpeechTranscriber en-US | 10.1% | 0.0% | 14.6% | 62.8% | 66.7% | 0 |
 
-| # | Item | Status |
+### 5.8 Phase 4 accuracy gate: decision (2026-09-17)
+
+Applying the approved threshold and selection rule:
+
+| Criterion | large-v3-turbo q8_0 + vocab | medium.en q8_0 + vocab |
 |---|---|---|
-| D1 | Owner review of reading variations (clips technical-03, technical-04, architecture-04, architecture-05, natural-01, natural-02) → `spoken-overrides.json` | **Partly done:** commands-03 "git" and natural-03 "Helm" confirmed as scripted. The six clips above are still pending. They affect WER equally for all models, not term recognition |
-| D2 | "cube control" as kubectl pronunciation | ✅ Accepted by owner (2026-09-17) |
-| D3 | Approve the threshold. Proposed additions: (a) **inserted-phrase criterion**: no unspoken words or phrases inserted, measured as insertion errors outside the spoken text, max 1 per 100 clips; (b) apply the per-category criterion on ≥ 20 term occurrences (pool takes) | Pending owner |
-| D4 | More real speech: second MacBook-mic take, other mics used for dictation, in-app recordings in Phase 4, to measure the insertion rate of large-v3-turbo + vocab | Pending |
-| D5 | Helm → "help" | ✅ Owner confirmed "Helm" was said → a genuine error in all models |
+| WER ≤ 5% | 0.5% ✓ | 1.1% ✓ |
+| Normal WER ≤ 3% | 0.0% ✓ | 0.0% ✓ |
+| Terms ≥ 95% | 98.7% ✓ | 97.4% ✓ |
+| Per category ≥ 90% (technical, 24 occurrences) | 100% ✓ | 100% ✓ |
+| Invented phrases ≤ 1 per 100 | 2.0 ✗ | 0 ✓ |
+| **Result** | Fails | **Passes** |
+
+**Chosen STT: Whisper medium.en q8_0 + developer vocabulary prompt** (now the app default). The only configuration
+without the prompt that comes close (large-v3-turbo f16, 94.9%) fails the term criterion. In-app verification with
+medium.en: `--transcribe-benchmark` on the 50 clips → **identical transcripts to the benchmark (50/50)**, WER 1.1%,
+terms 97.4%, 0 invented phrases.
+
+**Known weaknesses of the choice:** "nginx.com" for nginx.conf (a meaning-changing file-name error), and "help" for Helm
+(all models). English-only: Hinglish would need large-v3-turbo. Phase 9 targets file names and tool names.
+
+**Confidence:** one microphone, one take, 50 clips. The two finalists differ by one event, so a **second scripted take
+is recommended to confirm** (`scripts/bench/record.sh macbook-mic-take2`, or with AirPods). If it changes the outcome,
+switching is a one-line settings change (`sttModelID`).
+

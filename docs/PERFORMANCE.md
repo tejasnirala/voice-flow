@@ -165,14 +165,17 @@ Notes:
 ### 3.4 In-app STT (Phase 4), 2026-09-17
 Release app, whisper large-v3-turbo q8_0 + developer vocabulary prompt, Metal, residency sets off (below).
 
-**Live dictation path** (`scripts/measure-recording.sh 5 3` with speech played through the speakers; the model starts
-loading when recording starts):
+**Live dictation path, large-v3-turbo q8_0 + vocab** (`scripts/measure-recording.sh 5 3` with speech played through
+the speakers; the model starts loading when recording starts):
 
 | Dictation | Model at release | Press → first audio | Transcribe (5.2 s audio) | **Release → text** | Footprint |
 |---|---|---|---|---|---|
 | 1 (fresh launch; load 0.35 s during recording) | loaded | 237 ms | 1.106 s | **1119 ms** | 13 → 1110 MB |
 | 2 | warm | 169 ms | 1.133 s | **1146 ms** | 1110 MB |
 | 3 | warm | 164 ms | 1.105 s | **1114 ms** | 1110 MB |
+
+**Chosen model, medium.en q8_0 + vocab** (same method, 2026-09-17): model load 0.36 s during recording; release → text
+**1015 / 914 / 930 ms** (transcribe 0.972 / 0.904 / 0.921 s for 5.2 s of audio); footprint with model loaded 1,185 MB.
 
 An earlier identical run showed the first audio buffer delivered 1976 ms after the press while the model loaded in
 parallel, with no audio lost (recording length = press → release). It didn't reproduce in the next run. Watch in Phase 6.

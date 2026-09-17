@@ -53,7 +53,7 @@ public struct Settings: Codable, Equatable, Sendable {
     public static let `default` = Settings(processingMode: .fast, hotkey: .optionSpace, maxRecordingSeconds: 120)
 
     public init(processingMode: ProcessingMode, hotkey: Hotkey, maxRecordingSeconds: Double,
-                saveRecordingsForDebugging: Bool = false, sttModelID: String = STTModel.largeV3TurboQ8.id,
+                saveRecordingsForDebugging: Bool = false, sttModelID: String = STTModel.mediumEnQ8.id,
                 useVocabularyPrompt: Bool = true, sttUnloadAfterSeconds: Double = 300) {
         self.processingMode = processingMode
         self.hotkey = hotkey
@@ -65,7 +65,7 @@ public struct Settings: Codable, Equatable, Sendable {
     }
 
     /// The configured model, or the default if the configured id isn't in the catalog.
-    public var sttModel: STTModel { STTModel.model(id: sttModelID) ?? .largeV3TurboQ8 }
+    public var sttModel: STTModel { STTModel.model(id: sttModelID) ?? .mediumEnQ8 }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)

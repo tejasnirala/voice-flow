@@ -20,6 +20,9 @@ public struct EditCounts: Sendable, Equatable {
 public struct EntryScore: Sendable {
     /// Spelling-agnostic WER (terms merged, punctuation and case ignored).
     public var words: EditCounts
+    /// Runs of 2+ consecutive words in the output that weren't spoken: invented phrases (approved threshold:
+    /// at most 1 per 100 clips). A single extra word ("a", "the") is an ordinary recognition error, not a phrase.
+    public var insertedPhrases: [String]
     /// Case- and punctuation-sensitive token WER: a proxy for punctuation/capitalization quality.
     public var formatted: EditCounts
     /// Terms the engine heard correctly, in any spelling.
@@ -64,8 +67,11 @@ public enum AccuracyScorer {
         }
         let recognizedKeys = Set(recognized.map(\.key))
 
+        let refTokens = forWER(TranscriptNormalizer.words(spoken))
+        let hypTokens = forWER(hypWords)
         return EntryScore(
-            words: editCounts(reference: forWER(TranscriptNormalizer.words(spoken)), hypothesis: forWER(hypWords)),
+            words: editCounts(reference: refTokens, hypothesis: hypTokens),
+            insertedPhrases: insertedRuns(reference: refTokens, hypothesis: hypTokens, minimumLength: 2),
             formatted: editCounts(reference: formattedTokens(reference), hypothesis: formattedTokens(hypothesis)),
             recognizedTerms: recognized.map(\.name),
             missedTerms: variantsByTerm.filter { !recognizedKeys.contains($0.key) }.map(\.name),
@@ -75,6 +81,58 @@ public enum AccuracyScorer {
 
     static func formattedTokens(_ text: String) -> [String] {
         text.split(whereSeparator: \.isWhitespace).map(String.init)
+    }
+
+    enum AlignmentOp: Equatable { case match, substitution, deletion, insertion(String) }
+
+    /// Minimum-edit alignment as a forward list of operations.
+    static func alignment(reference: [String], hypothesis: [String]) -> [AlignmentOp] {
+        let n = reference.count, m = hypothesis.count
+        var cost = [[Int]](repeating: [Int](repeating: 0, count: m + 1), count: n + 1)
+        for i in 0...n { cost[i][0] = i }
+        for j in 0...m { cost[0][j] = j }
+        if n > 0, m > 0 {
+            for i in 1...n {
+                for j in 1...m {
+                    let diag = cost[i - 1][j - 1] + (reference[i - 1] == hypothesis[j - 1] ? 0 : 1)
+                    cost[i][j] = min(diag, cost[i - 1][j] + 1, cost[i][j - 1] + 1)
+                }
+            }
+        }
+        var ops: [AlignmentOp] = []
+        var i = n, j = m
+        while i > 0 || j > 0 {
+            if i > 0, j > 0, cost[i][j] == cost[i - 1][j - 1] + (reference[i - 1] == hypothesis[j - 1] ? 0 : 1) {
+                ops.append(reference[i - 1] == hypothesis[j - 1] ? .match : .substitution); i -= 1; j -= 1
+            } else if i > 0, cost[i][j] == cost[i - 1][j] + 1 {
+                ops.append(.deletion); i -= 1
+            } else {
+                ops.append(.insertion(hypothesis[j - 1])); j -= 1
+            }
+        }
+        return ops.reversed()
+    }
+
+    /// Invented phrases: runs of at least `minimumLength` consecutive inserted words whose neighbors are correctly
+    /// recognized words (or the start/end). Insertions next to a substitution or deletion are a misrecognized spoken
+    /// word split into several ("PostgreSQL" → "post gray"), which WER already counts, so they're not invented.
+    public static func insertedRuns(reference: [String], hypothesis: [String], minimumLength: Int) -> [String] {
+        let ops = alignment(reference: reference, hypothesis: hypothesis)
+        var runs: [String] = []
+        var index = 0
+        while index < ops.count {
+            guard case .insertion = ops[index] else { index += 1; continue }
+            var end = index
+            var words: [String] = []
+            while end < ops.count, case .insertion(let word) = ops[end] { words.append(word); end += 1 }
+            let before = index > 0 ? ops[index - 1] : .match
+            let after = end < ops.count ? ops[end] : .match
+            if words.count >= minimumLength, before == .match, after == .match {
+                runs.append(words.joined(separator: " "))
+            }
+            index = end
+        }
+        return runs
     }
 
     /// Levenshtein alignment over tokens (two-row DP, tracking operation counts).

@@ -108,6 +108,33 @@ import Testing
         #expect(s.exactTerms == [".env"])
     }
 
+    @Test func detectsInventedPhraseButNotSingleExtraWord() {
+        // The real benchmark case: "run dev" inserted by large-v3-turbo + vocabulary prompt.
+        let spoken = "run npm install, and then npm run dev to make sure"
+        let s = AccuracyScorer.score(reference: spoken, spoken: spoken,
+                                     hypothesis: "run npm install, run dev and then npm run dev to make sure",
+                                     terms: ["npm install", "npm run dev"])
+        #expect(s.insertedPhrases == ["run dev"])
+
+        let single = AccuracyScorer.score(reference: "cache responses in Redis", spoken: "cache responses in Redis",
+                                          hypothesis: "cache the responses in Redis", terms: ["Redis"])
+        #expect(single.insertedPhrases.isEmpty)
+        #expect(single.words.insertions == 1)
+    }
+
+    @Test func splitMisrecognitionIsNotAnInventedPhrase() {
+        let s = AccuracyScorer.score(reference: "The database is PostgreSQL with Redis", spoken: "The database is PostgreSQL with Redis",
+                                     hypothesis: "The database is post gray sql with Redis", terms: ["PostgreSQL", "Redis"])
+        #expect(s.missedTerms == ["PostgreSQL"])
+        #expect(s.insertedPhrases.isEmpty)
+    }
+
+    @Test func misrecognitionIsNotAnInsertion() {
+        let s = AccuracyScorer.score(reference: "Do a git rebase main", spoken: "Do a git rebase main",
+                                     hypothesis: "Do a Jitra base main", terms: ["git rebase main"])
+        #expect(s.insertedPhrases.isEmpty)
+    }
+
     @Test func exactTermRequiresCanonicalSpelling() {
         let s = AccuracyScorer.score(reference: "Next.js app", spoken: "Next.js app", hypothesis: "Next.js app", terms: ["Next.js"])
         #expect(s.exactTerms == ["Next.js"])

@@ -40,7 +40,7 @@ MLX-Swift can't be built from source here.
 | **Audio** | `AVAudioEngine` input tap → `AVAudioConverter` → in-memory 16 kHz mono Float32 buffer. No files | Decided (start latency measured in Phase 3) |
 | **Global hotkey** | Carbon `RegisterEventHotKey` (press + release events). Esc registered only while recording, for cancel | Decided |
 | **STT runtime** | **whisper.cpp** (prebuilt `whisper.xcframework`, Metal) behind a `SpeechEngine` protocol. The same framework also runs **Parakeet** | Decided, confirmed by measurement (§4) |
-| **STT model** | **Whisper large-v3-turbo q8_0 + developer vocabulary prompt** (alternate: medium.en q8_0 + prompt), §4.3 | Provisional; final at Phase 4 gate |
+| **STT model** | **Whisper medium.en q8_0 + developer vocabulary prompt** (alternate: large-v3-turbo q8_0 + prompt), §4.3 | Decided at Phase 4 gate (2026-09-17); second take to confirm |
 | **LLM runtime** | **llama.cpp**, in-process, lazily loaded, Smart Mode only | Provisional; MLX comparison in Phase 7 |
 | **LLM model** | Qwen2.5-1.5B-Instruct Q4_K_M as the starting candidate | Provisional; compared in Phase 7 |
 | **Text insertion** | Full pasteboard snapshot → set text (transient/concealed markers) → CGEvent ⌘V → restore if unchanged | Decided |
@@ -243,26 +243,24 @@ Data: ACCURACY.md §5 and PERFORMANCE.md §3. Measured 2026-09-16/17 on this mac
 **Synthetic set (2026-09-16/17):** couldn't separate the Whisper finalists (shared TTS mispronunciations).
 Eliminated Apple SpeechTranscriber and distil-large-v3.
 
-**Owner's voice, MacBook mic (2026-09-17), the decision set** (with owner-confirmed scoring decisions, ACCURACY.md §5.5):
+**Owner's voice, MacBook mic (2026-09-17), the decision set**, with owner-reviewed references and the owner-approved
+threshold (ACCURACY.md §3, §5.6–5.8):
 
-| Config | WER | Terms | Lowest category | Mean / p95 latency | Loaded | Status |
+| Config | WER | Terms | Invented phrases / 100 | Mean latency | Loaded | Result |
 |---|---|---|---|---|---|---|
-| **large-v3-turbo q8_0 + vocabulary prompt** | 1.8% | 98.7% | 93.3% | 1.42 / 1.60 s | ~1.05 GB | **Provisional default**: the only config meeting every proposed criterion |
-| medium.en q8_0 + vocabulary prompt | 2.1% | 97.4% | 88.9% (files) | 0.84 / 1.32 s | ~1.13 GB | Alternate: fails by one term ("nginx.com") |
-| any model *without* the prompt | 2.0–4.1% | ≤ 94.9% | — | — | — | Fails ≥95% terms |
-| small.en ± prompt, Parakeet, distil, Apple | ≥ 4.0% | ≤ 93.6% | — | — | — | Eliminated |
+| **medium.en q8_0 + vocabulary prompt** | 1.1% | 97.4% | 0 | 0.84 s | ~1.13 GB | **Passes: chosen** |
+| large-v3-turbo q8_0 + vocabulary prompt | 0.5% | 98.7% | 2.0 | 1.42 s | ~1.05 GB | Fails the invented-phrase criterion ("run dev"); alternate |
+| any model without the prompt | 0.7–2.8% | ≤ 94.9% | 0 | — | — | Fails terms ≥ 95% |
+| small.en ± prompt, Parakeet, distil, Apple | ≥ 2.8% | ≤ 93.6% | — | — | — | Eliminated |
 
-**Why large-v3-turbo + prompt:** accuracy first (spec §23). It's the only configuration that passes the
-threshold; latency (p95 1.6 s) is within the sanity bound and gets optimized in Phase 6 (the fixed 30 s
-encoder window is the main cost). Also multilingual (Hinglish possible). **Known risk:** one unspoken phrase
-inserted in 50 clips. Mitigations: an inserted/repeated n-gram guard in the engine, an explicit insertion
-criterion (proposed D3), and measuring the rate on more recordings (D4).
+**Why medium.en + prompt:** it's the only configuration passing every approved criterion. It's also ~40% faster than
+large-v3-turbo. Trade-offs: English-only, and weaker on the file name nginx.conf ("nginx.com"). In-app output is
+identical to the benchmark (50/50 clips). A second scripted take is recommended to confirm (n = 50; the finalists
+differ by one event).
 
-**Consequence for the design:** the developer vocabulary prompt (`initial_prompt`) is part of the STT
-configuration, not an optional extra. It's decode-time biasing toward terms present in the audio, not
-post-hoc correction, so it's consistent with rule 8.
-
-**Final decision at the Phase 4 gate** after the open items in ACCURACY.md §5.6.
+**Consequence for the design:** the developer vocabulary prompt (`initial_prompt`) is part of the STT configuration,
+not an optional extra. It's decode-time biasing toward terms present in the audio, not post-hoc correction, so it's
+consistent with rule 8.
 
 ### 4.4 Performance measurements collected (per configuration)
 Model size, load time, first-run time, per-clip warm latency (mean/p95/max), real-time factor, process CPU

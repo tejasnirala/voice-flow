@@ -11,8 +11,8 @@
 | 1 | Native macOS shell | ✅ Complete (2026-09-17, owner verified menu) |
 | 2 | Global hotkey | ✅ Complete (2026-09-17, owner tested) |
 | 3 | Audio recording | ✅ Complete (2026-09-17, owner tested incl. AirPods) |
-| 4 | STT integration (+ accuracy gate) | 🟡 Implemented & verified; **accuracy gate awaiting owner** |
-| 5 | Text insertion (first usable product) | ⬜ |
+| 4 | STT integration (+ accuracy gate) | ✅ Gate passed 2026-09-17 (medium.en q8_0 + vocab); owner live test pending |
+| 5 | Text insertion (first usable product) | ⏭️ Next (after approval) |
 | 6 | Fast path optimization | ⬜ |
 | 7 | Local LLM (Smart Mode) | ⬜ |
 | 8 | Text modes | ⬜ |
@@ -69,10 +69,9 @@ benchmark → fix → review → CPU/RAM check → docs + this file → show cha
 - Owner approved moving forward (2026-09-17)
 
 **Leftovers carried forward**
-- **Phase 4 gate (STT model final), ACCURACY.md §5.6:** D1 six clips still to review (technical-03, technical-04,
-  architecture-04, architecture-05, natural-01, natural-02); D2 ✅ "cube control" accepted; D3 threshold approval,
-  including a proposed inserted-phrase criterion; D4 more recordings to measure the insertion rate of large-v3-turbo + vocab;
-  D5 ✅ Helm confirmed (genuine error in all models). Add an inserted/repeated n-gram guard to the engine.
+- Phase 4 gate closed (D1–D5 resolved). Optional confirmation: second scripted take. Hinglish not supported by the chosen
+  English-only model (would need large-v3-turbo).
+- Phase 9 targets from the gate: "nginx.com" for nginx.conf (medium.en), "help" for Helm (all models).
 - Hinglish: needs human recordings plus a multilingual model run (large-v3-turbo with language auto/hi).
 - MLX and Apple Foundation Models LLM comparison: Phase 7.
 - ✅ "VoiceFlow Dev" signing identity created by owner (2026-09-17); build script fixed to use untrusted self-signed identities
@@ -139,7 +138,7 @@ per 30–60 s, GPU 0, footprint 13 MB.
 - Known limitation → Phase 6: speech right after the press can be clipped. Built-in mic ~0.18 s; **AirPods ~0.53 s**
   (342 ms of leading silence during the Bluetooth profile switch). No pre-roll by design
 
-## Phase 4 — STT integration (accuracy gate) 🟡
+## Phase 4 — STT integration (accuracy gate) ✅
 - [x] Core: `SpeechEngine` protocol, `TranscriptionResult`, `STTModel` catalog (large-v3-turbo q8_0 default, medium.en q8_0
       alternate; size + SHA-256), `STTModelStatus`, `ModelVerificationRecord`, `TranscriptGuard` (removes non-speech tags,
       collapses decoder loops, drops stock silence phrases; never adds/replaces words), retry-transcription transition,
@@ -156,8 +155,11 @@ per 30–60 s, GPU 0, footprint 13 MB.
       (A/B: no latency cost)
 - [x] Measured → PERFORMANCE.md §3.4
 - [ ] **Owner live test:** dictate a few developer sentences; open the menu → Last transcript / Copy Last Transcript; judge accuracy
-- [ ] **Accuracy gate (ACCURACY.md §5.6):** D1 review 6 clips · D3 approve threshold (+ inserted-phrase criterion) ·
-      D4 more recordings (second take and/or in-app dictations with `saveRecordingsForDebugging`)
+- [x] **Accuracy gate passed (ACCURACY.md §5.6–5.8):** owner reviewed references (D1), approved the threshold incl. invented
+      phrases ≤ 1/100 (D3), and chose not to save everyday dictations (D4). Scorer gained an invented-phrase metric (3 tests).
+      Result: medium.en q8_0 + vocab passes (WER 1.1%, terms 97.4%, 0 invented); large-v3-turbo + vocab fails (2.0/100,
+      "run dev"). **Default switched to medium.en**; in-app == benchmark 50/50; live release → text 914–1015 ms
+- [ ] Recommended confirmation (not blocking): second scripted take (`scripts/bench/record.sh macbook-mic-take2` or AirPods) → rerun gate at n = 100
 - Known → Phase 6: release → text ~1.1 s (fixed 30 s encoder window); ~170 MB remains allocated in whisper.cpp after
   unload (baseline 14 MB) → evaluate a helper process or upstream fix; cold vs warm unload timing
 
@@ -181,7 +183,9 @@ Per SPEC.md. Notes so far:
 | 2026-09-17 | Provisional STT default: Whisper large-v3-turbo q8_0 on Metal; Apple Speech, distil-large-v3 and CPU backend eliminated | Synthetic benchmark: lowest WER; Apple 58.5% terms; CPU 15–30× slower | ARCHITECTURE §4 |
 | 2026-09-17 | Provisional STT: medium.en q8_0 + vocab, superseded the same day ↓ | Tied at 97.4% before owner scoring decisions | — |
 | 2026-09-17 | Owner: "cube control" = kubectl pronunciation; "Helm" and "git" were said | Listening review | ACCURACY §5.5 |
-| 2026-09-17 | **Provisional STT: large-v3-turbo q8_0 + developer vocabulary prompt**; medium.en q8_0 + prompt alternate | Only config meeting every proposed criterion (98.7% terms); insertion risk tracked (D3/D4) | ARCHITECTURE §4.3, ACCURACY §5.6 |
+| 2026-09-17 | Provisional STT: large-v3-turbo q8_0 + prompt, superseded the same day ↓ | Before the invented-phrase criterion was measured | — |
+| 2026-09-17 | Owner approved the accuracy threshold (incl. ≤ 1 invented phrase / 100 clips); reviewed references; no everyday dictation saving | Owner decisions D1, D3, D4 | ACCURACY §3, §5.6 |
+| 2026-09-17 | **STT: Whisper medium.en q8_0 + developer vocabulary prompt** (default); large-v3-turbo + prompt alternate | Only configuration passing the approved gate (0 invented phrases); ~40% faster | ARCHITECTURE §4.3, ACCURACY §5.8 |
 | 2026-09-17 | Disable ggml Metal residency sets (`GGML_METAL_NO_RESIDENCY`) | Otherwise a 5 ms polling thread runs for the process lifetime; A/B shows no latency cost | PERFORMANCE §3.4 |
 | 2026-09-17 | Load STT model at recording start; idle unload via one-shot timer (300 s provisional) | Model ready at release; memory returned when idle (except ~170 MB whisper.cpp residue) | ARCHITECTURE §3.6 |
 | 2026-09-16 | Carbon RegisterEventHotKey; Esc cancel registered only while recording | Press+release, no permission, zero idle cost | ARCHITECTURE §3.3 |
@@ -191,10 +195,10 @@ Per SPEC.md. Notes so far:
 ## Session handoff notes
 _Overwrite at the end of every session._
 
-- **Last session (2026-09-17):** Phases 0–3 complete; Phase 4 implemented, verified and committed; accuracy gate + owner live test pending.
+- **Last session (2026-09-17):** Phases 0–4 complete (gate passed with medium.en q8_0 + vocab). Owner live test of dictation pending.
 - **Models on this machine** (`~/Library/Application Support/VoiceFlow/models/`): whisper tiny.en, base.en,
   small.en, medium.en-q8_0, large-v3-turbo, large-v3-turbo-q8_0, distil-large-v3; parakeet tdt-0.6b-v3-q8_0;
   llm qwen2.5-1.5b-instruct-q4_k_m.
-- **Owner recordings:** `benchmarks-output/audio/human/macbook-mic/` (50 clips, gitignored). Results cached in
+- **Owner recordings:** `benchmarks-output/audio/human/macbook-mic/` (50 clips + `spoken-overrides.json`, gitignored). Results cached in
   `benchmarks-output/results/human/`. Rerunning `scripts/bench/stt.sh human` re-scores instantly.
-- **Next action:** owner live-tests dictation (transcript in menu) and resolves D1/D3/D4 → close Phase 4 gate → Phase 5 (text insertion).
+- **Next action:** owner live test + approval → Phase 5 (text insertion). Optional: second scripted take.

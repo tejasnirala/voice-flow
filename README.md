@@ -21,7 +21,7 @@ or transcripts.
 ## Quick start (development)
 ```sh
 scripts/fetch-deps.sh
-scripts/fetch-models.sh whisper large-v3-turbo-q8_0
+scripts/fetch-models.sh whisper medium.en-q8_0
 scripts/build-app.sh && open build/VoiceFlow.app
 scripts/test.sh
 ```

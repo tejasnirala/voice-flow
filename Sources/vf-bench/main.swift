@@ -89,15 +89,15 @@ let categories = BenchmarkCorpus.Category.allCases.filter { c in clips.values.jo
 
 print("## Accuracy\n")
 print("WER = word error rate vs the spoken words, spelling-agnostic (lower is better). Terms = key terms heard correctly in any spelling. Exact = canonical spelling in raw output. Fmt WER = case/punctuation-sensitive.\n")
-print("| Run | Clips | WER | " + categories.map { "WER \($0.rawValue)" }.joined(separator: " | ") + " | Terms | Exact | Fmt WER |")
-print("|" + String(repeating: "---|", count: 6 + categories.count))
+print("| Run | Clips | WER | " + categories.map { "WER \($0.rawValue)" }.joined(separator: " | ") + " | Terms | Exact | Fmt WER | Invented phrases |")
+print("|" + String(repeating: "---|", count: 7 + categories.count))
 var errorReport: [String] = []
 var termsByCategory: [String: [BenchmarkCorpus.Category: (hit: Int, total: Int)]] = [:]
 for run in order {
     guard let lines = clips[run] else { continue }
     var total = EditCounts(), formatted = EditCounts()
     var perCategory: [BenchmarkCorpus.Category: EditCounts] = [:]
-    var termsTotal = 0, termsHit = 0, termsExact = 0
+    var termsTotal = 0, termsHit = 0, termsExact = 0, inventedPhrases = 0
     for l in lines {
         guard let e = entries[l.id ?? ""] else { continue }
         let spoken = spokenText(for: e, voice: l.voice)
@@ -107,10 +107,12 @@ for run in order {
         total = total + s.words; formatted = formatted + s.formatted
         perCategory[e.category, default: EditCounts()] = perCategory[e.category, default: EditCounts()] + s.words
         termsTotal += e.terms.count; termsHit += s.recognizedTerms.count; termsExact += s.exactTerms.count
-        if showErrors && (s.words.errors > 0 || !s.missedTerms.isEmpty) {
+        inventedPhrases += s.insertedPhrases.count
+        if showErrors && (s.words.errors > 0 || !s.missedTerms.isEmpty || !s.insertedPhrases.isEmpty) {
             errorReport.append("- **\(run)** `\(e.id)` [\(l.voice ?? "")] WER \(pct(s.words.rate))"
                 + (spoken.overridden ? " (reviewed reference)" : "")
                 + (s.missedTerms.isEmpty ? "" : " · missed: \(s.missedTerms.joined(separator: ", "))")
+                + (s.insertedPhrases.isEmpty ? "" : " · invented: \(s.insertedPhrases.map { "\"\($0)\"" }.joined(separator: ", "))")
                 + "\n  - ref: \(e.reference)\n  - hyp: \(l.text ?? "")")
         }
     }
@@ -118,7 +120,7 @@ for run in order {
     let termRate = termsTotal == 0 ? 0 : Double(termsHit) / Double(termsTotal)
     let exactRate = termsTotal == 0 ? 0 : Double(termsExact) / Double(termsTotal)
     print("| \(run) | \(lines.count) | **\(pct(total.rate))** | " + catCols.joined(separator: " | ")
-          + " | **\(pct(termRate))** (\(termsHit)/\(termsTotal)) | \(pct(exactRate)) | \(pct(formatted.rate)) |")
+          + " | **\(pct(termRate))** (\(termsHit)/\(termsTotal)) | \(pct(exactRate)) | \(pct(formatted.rate)) | \(inventedPhrases) (\(String(format: "%.1f", Double(inventedPhrases) * 100 / Double(lines.count))) per 100) |")
 }
 
 print("\n### Term recognition by category\n")

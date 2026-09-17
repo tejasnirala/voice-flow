@@ -8,7 +8,7 @@
 ## First-time setup
 ```sh
 scripts/fetch-deps.sh     # whisper.cpp framework → Vendor/ (SHA-256 pinned)
-scripts/fetch-models.sh whisper large-v3-turbo-q8_0     # example; see ACCURACY.md for the chosen model
+scripts/fetch-models.sh whisper medium.en-q8_0          # default STT model (ACCURACY.md §5.8)
 ```
 Models go to `~/Library/Application Support/VoiceFlow/models/{whisper,parakeet,llm}/`. Each file is
 verified against Hugging Face's SHA-256 before use. Setup is the only step that uses the network.
@@ -109,7 +109,7 @@ benchmark → verify → review `git diff` → update docs + PROGRESS → commit
   `build/VoiceFlow.app/Contents/MacOS/VoiceFlow --transcribe-benchmark <audio-dir> --corpus benchmarks/corpus/developer-speech.json --out <file.jsonl>`
   then `swift run -c release vf-bench score benchmarks/corpus/developer-speech.json <file.jsonl>`.
   Alternate variants and cool down between runs: back-to-back runs throttle on the MacBook Air.
-- STT settings (settings.json): `sttModelID` (`large-v3-turbo-q8_0` | `medium.en-q8_0`), `useVocabularyPrompt`,
+- STT settings (settings.json): `sttModelID` (`medium.en-q8_0` default | `large-v3-turbo-q8_0`), `useVocabularyPrompt`,
   `sttUnloadAfterSeconds`. `VOICEFLOW_METAL_RESIDENCY=1` re-enables ggml residency sets (A/B testing only).
 - Settings file: `~/Library/Application Support/VoiceFlow/settings.json` (menu → Open Settings File…). It's
   created only when first changed/opened. An invalid file is moved to `settings.invalid.json` and defaults
