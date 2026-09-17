@@ -15,7 +15,7 @@
 | 5 | Text insertion (first usable product) | ✅ Complete (2026-09-17, owner tested) |
 | 6 | Fast path optimization | ✅ Complete (2026-09-17, owner verified in real use) |
 | 7 | Local LLM (Smart Mode) | ✅ Complete (2026-09-17) |
-| 8 | Text modes | ⏭️ Next (after approval) |
+| 8 | Text modes | 🟡 In progress |
 | 9 | Developer intelligence | ⬜ |
 | 10 | Application awareness | ⬜ |
 | 11 | Final performance optimization | ⬜ |
@@ -260,10 +260,10 @@ Per SPEC.md. Notes so far:
 ## Session handoff notes
 _Overwrite at the end of every session._
 
-- **Last session (2026-09-17):** Phases 0–7 complete. Models also present: llm qwen2.5 0.5/1.5/3b, gemma-3-1b, Llama-3.2-1B (benchmark only; deletable).
-- **Models on this machine** (`~/Library/Application Support/VoiceFlow/models/`): whisper tiny.en, base.en,
-  small.en, medium.en-q8_0, large-v3-turbo, large-v3-turbo-q8_0, distil-large-v3; parakeet tdt-0.6b-v3-q8_0;
-  llm qwen2.5-1.5b-instruct-q4_k_m.
+- **Last session (2026-09-17):** Phases 0–7 complete; Phase 8 (text modes) started. LLM test models deleted (5.0 GB) on owner request.
+- **Models on this machine** (`~/Library/Application Support/VoiceFlow/models/`): **in use:** whisper medium.en-q8_0 +
+  ggml-medium.en-encoder.mlmodelc. Benchmark-only (deletable on request): whisper tiny.en, base.en, small.en, large-v3-turbo,
+  large-v3-turbo-q8_0 (STT alternate), distil-large-v3; parakeet tdt-0.6b-v3-q8_0.
 - **Owner recordings:** `benchmarks-output/audio/human/macbook-mic/` (50 clips + `spoken-overrides.json`, gitignored). Results cached in
   `benchmarks-output/results/human/`. Rerunning `scripts/bench/stt.sh human` re-scores instantly.
-- **Next action:** owner tries Smart Mode (menu → Mode → Smart) → approval for Phase 8 (text modes).
+- **Next action:** Phase 8 — mode framework + rule-based Developer formatting, then Prompt/Writing with per-mode guards.
