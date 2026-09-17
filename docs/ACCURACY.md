@@ -466,3 +466,55 @@ unchanged); "a" added ("consumes a message").
 reliably in Prompt and Writing (8/8 enumerations) and sometimes in Clean + Smart Rewrite (1/4 plus the owner's case); without
 Smart Rewrite, Clean has no model and makes no lists. About 1 in 5–7 real dictations falls back to the rule-cleaned text in
 the model modes.
+
+## 8. Developer intelligence (Phase 9, 2026-09-17)
+
+**Starting point:** errors in the owner's 50 recordings (medium.en + vocabulary prompt, ACCURACY §5) that are developer
+spelling, not recognition of the words: `nginx.com` (nginx.conf), "kube control" (kubectl), "help" (Helm), "use effect hook",
+"on submit prop", "refresh access token function", "fetch orders", `database_url` "in the environment" (DATABASE_URL).
+
+**Approach (spec §13: conservative, context matters):** `DeveloperCorrections` rules fire only when neighbouring words make the
+technical reading unambiguous:
+
+| Rule | Fires when | Stays unchanged |
+|---|---|---|
+| kube/cube control → kubectl | next word is a kubectl subcommand (get, apply, logs…) | "my cube control panel" |
+| gate → git | next word is a git subcommand **and** a command can start there (clause start, run/then/and…) | "check the gate status", "the gate push back" |
+| help → Helm | "help chart(s)"; "help install … --flag" → helm | "we don't need help for now", "help install the printer" |
+| nginx.com → nginx.conf | after in/edit/update/change, or before file/config | "go to nginx.com" |
+| use X hook → useX | X is a known hook and "hook(s)" follows | "use state funding", "use hooks for coats" |
+| on X prop → onX | X is a DOM/React event and prop/handler/callback/listener follows | "on submit day", "on call engineer" |
+| verb … function → camelCase | 2–4 words starting with a common verb, then function/method/helper | "pure function", "higher order function", "check the function" |
+| snake_case → UPPER | followed by "in the environment", "environment variable", "env var", or after "export" | "the user_id column" |
+| X dot com → X.com; localhost colon N | after on/at/to/visit/open… or at clause start | "the local host dot com event", "the dot com bubble" |
+| camel/snake/pascal/kebab/constant case + words | after a naming word (to/named/called/call it) and the name ends the clause | "use camel case for variable names", "to camelCase, enable strict mode…" |
+
+Plus: the owner's **dictionary** (`dictionary.json`: terms and explicit spoken → written replacements, every mode except Raw;
+terms added to the speech prompt and protected by rewrite guards) and **Code mode** (rules only: spoken symbols, flags, paths,
+explicit case cues anywhere, no sentence capitalization or final period).
+
+**Benchmark.** `benchmarks/corpus/developer-intel.json` (49: 17 Developer corrections, 10 Code mode, 22 traps using the same
+trigger words in ordinary speech) and, as held-out data written before Phase 9, the 57 real transcripts, Phase 7/8 traps and 54
+spoken forms (Phase 8 vs Phase 9 Developer output, built from the Phase 8 commit):
+
+| Set | Result |
+|---|---|
+| developer-intel: corrections / Code / traps exact | 17/17 · 10/10 · 22/22; **0 over-corrections** |
+| Real transcripts (57): outputs changed vs Phase 8 | 10, all toward the reference or an identifier the reference wrote as words |
+| Phase 7/8 traps + mode traps (37): changed | 2 ("the get user by id function" → getUserById; "use effect hook" → useEffect), both identifiers |
+| Spoken forms (54): changed | 7, all toward the reference |
+| Formatting error, Developer mode, Phase 8 → 9 | real 10.8% → 10.6%; spoken forms 14.3% → 12.3% |
+| Word-changing corrections (flagged by the transform-only scorer) | 2 (nginx.com, engine x dot conf → nginx.conf), both correct |
+
+**Over-corrections found during development and fixed (tests added):** "the local host dot com event" → `host.com` (domain rule
+now needs an address context); and, only visible on the **held-out long-form transcript**, "convert all the column names to
+camelCase, enable strict mode in tsconfig.json" → "to enableStrictMode in tsconfig.json" (case cues can no longer cross
+punctuation and must end the clause outside Code mode). The Phase 9 corpus was written together with the rules, so the held-out
+comparison is the stronger evidence; it is small (owner-read sentences), so real use remains the final test.
+
+**Not corrected (no safe context):** "we don't need help for now" (Helm), "forms" (form's), "getUserByID" (ID vs Id is style),
+"fetch orders" without "function", "QuestgreSQL" (a recognition error, left visible), Hinglish.
+
+**Speech recognition unchanged:** with an empty dictionary the Whisper prompt is byte-identical, so §5.8 still holds. Owner terms
+are appended to the prompt (max 40); a long custom list changes recognition and should be re-checked with `scripts/bench/stt.sh human`.
+

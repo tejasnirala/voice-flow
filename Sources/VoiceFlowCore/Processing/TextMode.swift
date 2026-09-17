@@ -10,6 +10,8 @@ public enum TextMode: String, Codable, Sendable, CaseIterable {
     case prompt
     /// Polished prose (on-device model, content-preserving guard).
     case writing
+    /// Terminals and editors: spoken symbols and explicit identifier cues, no sentence styling (rules).
+    case code
 
     /// Whether the mode always uses the on-device model (Prompt, Writing). Clean and Developer use it only in Smart Mode;
     /// Raw never does.
@@ -18,7 +20,7 @@ public enum TextMode: String, Codable, Sendable, CaseIterable {
     /// Whether this mode rewrites with the on-device model under the given processing mode.
     public func usesModel(processing: Settings.ProcessingMode) -> Bool {
         switch self {
-        case .raw: false
+        case .raw, .code: false
         case .clean, .developer: processing == .smart
         case .prompt, .writing: true
         }
@@ -27,7 +29,7 @@ public enum TextMode: String, Codable, Sendable, CaseIterable {
     /// The bundled prompt file (prompts/<name>.json). Developer reuses Clean: its formatting is deterministic.
     public var promptName: String? {
         switch self {
-        case .raw: nil
+        case .raw, .code: nil
         case .clean, .developer: "clean"
         case .prompt: "prompt"
         case .writing: "writing"
@@ -41,13 +43,14 @@ public enum TextMode: String, Codable, Sendable, CaseIterable {
         case .developer: "Developer"
         case .prompt: "Prompt"
         case .writing: "Writing"
+        case .code: "Code"
         }
     }
 
     /// Guard policy for model rewrites in this mode.
     public var guardPolicy: RewriteGuard.Policy {
         switch self {
-        case .raw, .clean, .developer: .strict
+        case .raw, .clean, .developer, .code: .strict
         case .prompt, .writing: .contentPreserving
         }
     }

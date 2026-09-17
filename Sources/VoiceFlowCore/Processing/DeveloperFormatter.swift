@@ -23,6 +23,7 @@ public enum DeveloperFormatter {
 
     /// Multi-word spoken names → canonical (matched on whole words, case-insensitively).
     static let spokenNames: [([String], String)] = [
+        (["engine", "x", "dot", "conf"], "nginx.conf"), (["engine", "x.conf"], "nginx.conf"),
         (["ts", "config", "dot", "json"], "tsconfig.json"), (["docker", "compose", "dot", "yaml"], "docker-compose.yaml"),
         (["docker", "compose", "dot", "yml"], "docker-compose.yml"), (["package", "lock", "dot", "json"], "package-lock.json"),
         (["next", "dot", "js"], "Next.js"), (["next", "js"], "Next.js"), (["nextjs"], "Next.js"),
@@ -49,6 +50,7 @@ public enum DeveloperFormatter {
         var tokens = text.split(whereSeparator: \.isWhitespace).map(String.init)
         tokens = applySpokenNames(tokens)
         tokens = applySymbols(tokens)
+        tokens = DeveloperCorrections.apply(tokens)
         tokens = tokens.map(applyCasing)
         return tokens.joined(separator: " ")
     }

@@ -1,25 +1,29 @@
 /// The deterministic part of turning a raw STT transcript into the text that gets pasted, per text mode.
 public enum TextProcessingPlan {
     /// Applied before any optional model rewrite (after Whisper artifact removal):
-    /// Raw → unchanged; Clean, Prompt, Writing → rule-based cleanup; Developer → cleanup + spoken symbols and term casing.
-    public static func prepare(_ transcript: String, mode: TextMode) -> String {
+    /// Raw → unchanged; Clean, Prompt, Writing → rule-based cleanup; Developer → cleanup + spoken symbols, developer
+    /// corrections and term casing; Code → hesitations/stutters removed + code symbols. The owner's dictionary is applied
+    /// last in every mode except Raw.
+    public static func prepare(_ transcript: String, mode: TextMode, dictionary: UserDictionary = .empty) -> String {
         switch mode {
         case .raw: transcript
-        case .clean, .prompt, .writing: RuleBasedCleanup.clean(transcript)
-        case .developer: DeveloperFormatter.format(RuleBasedCleanup.clean(transcript))
+        case .clean, .prompt, .writing: dictionary.apply(to: RuleBasedCleanup.clean(transcript))
+        case .developer: dictionary.apply(to: DeveloperFormatter.format(RuleBasedCleanup.clean(transcript)))
+        case .code: dictionary.apply(to: CodeFormatter.format(RuleBasedCleanup.clean(transcript, sentenceCase: false)))
         }
     }
 
     /// Chooses between a model rewrite and the prepared text using the mode's guard policy.
     /// Developer output is re-formatted so the model can't undo symbol joins or term casing.
-    public static func finalText(prepared: String, rewrite: String?, terms: [String], mode: TextMode = .clean)
+    public static func finalText(prepared: String, rewrite: String?, terms: [String], mode: TextMode = .clean,
+                                 dictionary: UserDictionary = .empty)
         -> (text: String, verdict: RewriteGuard.Verdict?) {
         guard let rewrite else { return (prepared, nil) }
         let verdict = RewriteGuard.evaluate(input: prepared, output: rewrite, terms: terms, policy: mode.guardPolicy)
         switch verdict {
         case .accept:
             let text = tidy(rewrite, keepParagraphs: mode.guardPolicy == .contentPreserving)
-            return (mode == .developer ? DeveloperFormatter.format(text) : text, verdict)
+            return (dictionary.apply(to: mode == .developer ? DeveloperFormatter.format(text) : text), verdict)
         case .reject:
             return (prepared, verdict)
         }

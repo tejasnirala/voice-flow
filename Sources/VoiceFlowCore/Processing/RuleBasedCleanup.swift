@@ -15,7 +15,8 @@ public enum RuleBasedCleanup {
     static let questionStarters: Set<String> = ["what", "why", "how", "when", "where", "who", "which", "should", "can", "could",
                                                 "would", "is", "are", "do", "does", "did", "will", "shall"]
 
-    public static func clean(_ text: String) -> String {
+    /// - Parameter sentenceCase: capitalize and punctuate as prose (false in Code mode: only hesitations and stutters go).
+    public static func clean(_ text: String, sentenceCase: Bool = true) -> String {
         var words = text.split(whereSeparator: \.isWhitespace).map(String.init)
 
         // 1. Hesitation sounds (a trailing comma or period on the filler goes with it).
@@ -42,6 +43,7 @@ public enum RuleBasedCleanup {
             }
         }
         guard !words.isEmpty else { return "" }
+        guard sentenceCase else { return words.joined(separator: " ") }
 
         // 3. Capitalize the first word when it's a plain lowercase word (not npm, getUserById, .env, …).
         let first = words[0]

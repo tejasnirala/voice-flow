@@ -6,7 +6,7 @@ A local-only macOS menu-bar dictation utility built for software development.
 Speech recognition and optional cleanup run entirely on your Mac. No cloud, no telemetry, no stored audio
 or transcripts.
 
-> **Status:** Phase 6 complete: hold ⌥ (or double-tap for hands-free) → speak → text pasted in ~0.6–1.1 s, clipboard preserved. The app uses ~13–27 MB; speech recognition runs in an on-demand helper process. Phase 7 complete: rule-based cleanup by default, optional guarded Smart Mode. Phase 8: Raw / Clean / Developer / Prompt / Writing text modes.
+> **Status:** Phase 6 complete: hold ⌥ (or double-tap for hands-free) → speak → text pasted in ~0.6–1.1 s, clipboard preserved. The app uses ~13–27 MB; speech recognition runs in an on-demand helper process. Phase 7 complete: rule-based cleanup by default, optional guarded Smart Mode. Phase 8: Raw / Clean / Developer / Prompt / Writing text modes. Phase 9: developer corrections, Code mode, personal dictionary.
 > See [`docs/PROGRESS.md`](docs/PROGRESS.md).
 
 ## Priorities
@@ -24,6 +24,12 @@ guard, and a rejected rewrite falls back to the rule-based text.
 - **Prompt:** Apple's on-device model turns spoken thoughts into a clear prompt for an AI assistant (+~1 s). Spoken
   enumerations ("two things: one is …, the second is …") become bullet lists here, in Writing, and in Clean with Smart Rewrite.
 - **Writing:** Apple's on-device model turns speech into polished prose (+~1 s).
+- **Code:** for terminals and editors: "git checkout dash b feature slash login" → `git checkout -b feature/login`,
+  "const user equals await camel case get user by id open paren id close paren" → `const user = await getUserById(id)`.
+  No capitalization or final period. Instant.
+- **Developer corrections** (Developer and Code): only with clear context: "kube control get pods" → `kubectl get pods`,
+  "in nginx.com" → `nginx.conf`, "use effect hook" → `useEffect hook`, "database_url in the environment" → `DATABASE_URL`.
+- **Your dictionary** (menu → Open Dictionary File…): `terms` to spell your way and `replacements` ("voice flow" → VoiceFlow).
 - **Smart Rewrite** (toggle): also runs the on-device model for Clean and Developer, with a word-for-word guard (+~0.8 s).
   Prompt and Writing use a content-preserving guard: sentences may be restructured, but no content word may be added,
   dropped or replaced.

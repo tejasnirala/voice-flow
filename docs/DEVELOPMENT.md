@@ -82,6 +82,9 @@ $B modes prepare benchmarks-output/cleanup-corpus.json benchmarks/corpus/mode-tr
 benchmarks-output/bin/llm_apple $O/prepared-prompt.json prompts/prompt.json $O/prompt-apple.jsonl prompt/apple   # run name = <mode>/<label>
 $B modes report benchmarks-output/cleanup-corpus.json benchmarks/corpus/mode-traps.json --results $O/prompt-apple.jsonl --show
 
+# Developer intelligence (Phase 9): corrections, Code mode and over-correction traps
+$B modes intel benchmarks/corpus/developer-intel.json
+
 # Subset of runs: regex filter on run names
 scripts/bench/stt.sh human 'large-v3-turbo|parakeet'
 ```

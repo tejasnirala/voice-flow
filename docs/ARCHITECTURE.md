@@ -253,6 +253,28 @@ the prompt and the guard policy. `processingMode: smart` is now the **Smart Rewr
 - Content-preserving details: pronouns you/me/us/they/them are content; "so" is droppable only as a lead-in; "you know" only as
   a pair.
 - The mode is captured when the transcript is ready, so a menu change during processing can't mix modes.
+
+### 3.5.2 Developer intelligence (Phase 9)
+
+- **`DeveloperCorrections`** (Core, rules): context-gated corrections run inside `DeveloperFormatter` after spoken symbols and
+  before product casing (rule table: ACCURACY §8). Each rule names the neighbouring words it needs; nothing is replaced
+  globally. Measured over-corrections on held-out text: 0.
+- **Code mode** (`TextMode.code`, `CodeFormatter`): `RuleBasedCleanup(sentenceCase: false)` → spoken names → corrections with
+  case cues allowed anywhere → symbol pieces (glue left/right/both, spaced operators, toggling quotes, "dash dash" flags,
+  paths after shell commands keep a space) → render. Never uses the model. Intended for terminals/editors (Phase 10 can select
+  it per app).
+- **`UserDictionary`** (`~/Library/Application Support/VoiceFlow/dictionary.json`, menu "Open Dictionary File…"): `terms` and
+  `replacements`, re-read at each recording start (a few KB, no watcher). Applied last in every mode except Raw; terms appended
+  to the Whisper prompt (max 40; the helper restarts when the prompt changes) and passed to `RewriteGuard` as protected terms.
+  Invalid or missing files give an empty dictionary.
+
+| Option for corrections | Pros | Cons | Decision |
+|---|---|---|---|
+| Context-gated rules (chosen) | Deterministic, testable, instant, explainable | Only covers measured/known patterns | **Adopted** |
+| Global replacement lexicon | Simple | Violates spec §13 (help → Helm everywhere) | Rejected |
+| On-device model correction | Broad | Phase 7/8: models invent and change meaning; guard would reject corrections (word changes) | Rejected |
+| Larger Whisper prompt | Helps recognition | Prompt window limited; changes accuracy, needs re-gating | Owner terms only, capped |
+
 - Prompt/Writing when the on-device model is unavailable: menu items disabled with the reason; if selected anyway (settings
   file), the rule-cleaned text is pasted.
 

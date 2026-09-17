@@ -425,6 +425,11 @@ load once. App size 6.2 MB. Full results: ACCURACY.md §7.
 4.5 s (Writing, 33 s), 3.0 s and 6.0 s (Clean + Smart Rewrite, 28 s and 65 s). Of that, the model took 1.1–3.4 s; for the
 two rejected Clean rewrites (1.8 s and 3.4 s) the time bought nothing. Long dictations are where Smart Rewrite costs most.
 
+### 5.2.1 Developer intelligence (Phase 9), 2026-09-17
+Developer mode rules with corrections, per transcript (release build): real transcripts 0.53 ms mean / 3.9 ms max (was 0.40 / 2.9 ms
+in Phase 8), spoken forms 0.29 / 1.8 ms. Code mode is the same order. Dictionary: one small JSON read per recording start. No
+idle cost; no new threads or timers.
+
 ### 5.3 Phase 0 exploration, 2026-09-16 (for reference)
 llama.cpp `llama-bench`, Qwen2.5-1.5B Q4_K_M: Metal pp256 1,033 tok/s, tg64 85 tok/s; CPU 290 / 67 tok/s. A zero-shot
 prompt produced a TypeScript code block for a dictated sentence (the first sign of the contract problem in §5.1).

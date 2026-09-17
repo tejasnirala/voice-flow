@@ -342,6 +342,7 @@ final class DictationCoordinator {
         }
 
         unloadWork?.cancel()
+        dictionary = UserDictionary.load(from: UserDictionary.fileURL(in: SettingsStore.applicationSupportDirectory()))
         prepareSpeechEngine()
         if settings.textMode.usesModel(processing: settings.processingMode), let prompt = rewritePrompt(for: settings.textMode) {
             OnDeviceRewriter.prewarm(prompt: prompt)
@@ -405,14 +406,17 @@ final class DictationCoordinator {
 
     // MARK: - Speech-to-text
 
-    /// Returns the engine for the current settings, creating it if the model or prompt setting changed.
+    /// The owner's dictionary (`dictionary.json`), re-read at each recording start so edits apply without a restart.
+    private var dictionary: UserDictionary = .empty
+
+    /// Returns the engine for the current settings, creating it if the model or speech prompt changed.
     private func currentSpeechEngine() -> HelperSpeechEngine {
         let model = settings.sttModel
-        let key = "\(model.id)|\(settings.useVocabularyPrompt)"
+        let prompt = settings.useVocabularyPrompt ? dictionary.speechPrompt(base: DeveloperVocabulary.prompt()) : nil
+        let key = "\(model.id)|\(prompt ?? "")"
         if let engine = speechEngine, speechEngineKey == key { return engine }
         speechEngine?.unload()
-        let engine = HelperSpeechEngine(model: model, modelURL: STTModelManager.url(for: model),
-                                        prompt: settings.useVocabularyPrompt ? DeveloperVocabulary.prompt() : nil)
+        let engine = HelperSpeechEngine(model: model, modelURL: STTModelManager.url(for: model), prompt: prompt)
         speechEngine = engine
         speechEngineKey = key
         return engine
@@ -516,7 +520,7 @@ final class DictationCoordinator {
             pendingAudio = nil
             scheduleUnload()
             let mode = settings.textMode
-            let prepared = TextProcessingPlan.prepare(result.text, mode: mode)
+            let prepared = TextProcessingPlan.prepare(result.text, mode: mode, dictionary: dictionary)
             if prepared.isEmpty {
                 send(.transcriptionEmpty)
             } else {
@@ -551,7 +555,8 @@ final class DictationCoordinator {
             send(.processingFellBackToTranscript)
             return
         }
-        let terms = vocabularyTerms
+        let terms = vocabularyTerms + dictionary.protectedTerms
+        let dictionary = dictionary
         let start = DispatchTime.now().uptimeNanoseconds
         Task { [weak self] in
             var rewrite: String?
@@ -563,7 +568,8 @@ final class DictationCoordinator {
             }
             guard let self, self.machine.state == .processing else { return }
             let ms = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
-            let (text, verdict) = TextProcessingPlan.finalText(prepared: prepared, rewrite: rewrite, terms: terms, mode: mode)
+            let (text, verdict) = TextProcessingPlan.finalText(prepared: prepared, rewrite: rewrite, terms: terms, mode: mode,
+                                                               dictionary: dictionary)
             self.lastTranscript = text
             self.onSpeechInfoChange?(self.modelStatus, text)
             switch verdict {

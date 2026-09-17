@@ -267,6 +267,7 @@ func runModes(_ args: [String]) throws -> Int32 {
     func values(_ flag: String) -> [String] { args.indices.filter { args[$0] == flag && $0 + 1 < args.count }.map { args[$0 + 1] } }
     let flagged = Set(args.indices.filter { args[$0].hasPrefix("--") && args[$0] != "--show" }.map { $0 + 1 })
     let corpusFiles = args.dropFirst().indices.filter { !args[$0].hasPrefix("--") && !flagged.contains($0) }.map { args[$0] }
+    if args.first == "intel" { return try runIntel(corpusFiles) }
     var entries: [Entry] = []
     for file in corpusFiles { entries += try JSONDecoder().decode(Corpus.self, from: Data(contentsOf: URL(fileURLWithPath: file))).entries }
     let terms = RewriteGuard.terms(fromVocabulary: DeveloperVocabulary.prompt())
@@ -361,5 +362,34 @@ func runModes(_ args: [String]) throws -> Int32 {
         print("| \(run) | \(mode.guardPolicy) | \(rs.count) | \(accepted) | \(pct(Double(rs.count - accepted) / Double(max(rs.count, 1)))) | \(why.isEmpty ? "—" : why) | \(pct(before.rate)) → \(pct(after.rate)) | \(fmt(lat.isEmpty ? nil : lat.reduce(0, +) / Double(lat.count), 3)) | \(fmt(percentile(lat, 0.95), 3)) |")
     }
     if show, !details.isEmpty { print("\n## Details\n"); print(details.joined(separator: "\n")) }
+    return 0
+}
+
+/// `vf-bench modes intel <developer-intel.json>...` (Phase 9): exact match per category for Developer/Code mode entries;
+/// traps must equal Clean mode's output (any difference is an over-correction).
+func runIntel(_ files: [String]) throws -> Int32 {
+    struct Entry: Decodable { let id, category, mode, input, reference: String }
+    struct Corpus: Decodable { let entries: [Entry] }
+    var entries: [Entry] = []
+    for file in files { entries += try JSONDecoder().decode(Corpus.self, from: Data(contentsOf: URL(fileURLWithPath: file))).entries }
+    var byCategory: [String: (exact: Int, total: Int)] = [:]
+    var overCorrections = 0, failures: [String] = []
+    for e in entries {
+        let mode = TextMode(rawValue: e.mode) ?? .developer
+        let out = TextProcessingPlan.prepare(e.input, mode: mode)
+        let clean = TextProcessingPlan.prepare(e.input, mode: .clean)
+        var cell = byCategory[e.category] ?? (0, 0)
+        cell.total += 1
+        if out == e.reference { cell.exact += 1 }
+        byCategory[e.category] = cell
+        if e.category == "trap", out != clean { overCorrections += 1 }
+        if out != e.reference { failures.append("- `\(e.id)` (\(mode.rawValue))\n  - expected: \(e.reference)\n  - got:      \(out)") }
+    }
+    print("## Developer intelligence (\(entries.count) entries)\n")
+    print("| Category | Exact | Total |")
+    print("|---|---|---|")
+    for (category, cell) in byCategory.sorted(by: { $0.key < $1.key }) { print("| \(category) | \(cell.exact) | \(cell.total) |") }
+    print("\nOver-corrections (trap output differs from Clean): **\(overCorrections)**")
+    if !failures.isEmpty { print("\n## Not exact\n"); print(failures.joined(separator: "\n")) }
     return 0
 }

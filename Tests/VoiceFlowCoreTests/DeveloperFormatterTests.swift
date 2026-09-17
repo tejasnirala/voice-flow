@@ -11,7 +11,7 @@ import Testing
         ("It is defined in docker compose dot yml.", "It is defined in docker-compose.yml."),
         ("Run npm install dash dash save-dev.", "Run npm install --save-dev."),
         ("Run git checkout dash b feature slash login.", "Run git checkout -b feature/login."),
-        ("Set database underscore url in the environment.", "Set database_url in the environment."),
+        ("Set database underscore url in the environment.", "Set DATABASE_URL in the environment."),
         ("Rename it to user underscore session underscore id.", "Rename it to user_session_id."),
         ("We use next js with typescript and postgres q l.", "We use Next.js with TypeScript and PostgreSQL."),
         ("The graphql api uses jwt and oauth.", "The GraphQL API uses JWT and OAuth."),

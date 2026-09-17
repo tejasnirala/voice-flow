@@ -164,6 +164,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             .developer: "Developer — Clean + package.json, --flags, user_id",
             .prompt: "Prompt — clear prompt for an AI (on-device model)",
             .writing: "Writing — polished prose (on-device model)",
+            .code: "Code — terminals & editors: symbols, no sentence styling",
         ]
         for mode in TextMode.allCases {
             let item = NSMenuItem(title: descriptions[mode] ?? mode.displayName, action: #selector(selectTextMode(_:)), keyEquivalent: "")
@@ -191,6 +192,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let open = NSMenuItem(title: "Open Settings File…", action: #selector(openSettingsFile), keyEquivalent: ",")
         open.target = self
         menu.addItem(open)
+        let dictionaryItem = NSMenuItem(title: "Open Dictionary File…", action: #selector(openDictionaryFile), keyEquivalent: "")
+        dictionaryItem.target = self
+        menu.addItem(dictionaryItem)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit \(BuildInfo.name)", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
     }
@@ -247,6 +251,15 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func toggleSmartRewrite() {
         settings.processingMode = settings.processingMode == .smart ? .fast : .smart
         persist()
+    }
+
+    @objc private func openDictionaryFile() {
+        let url = UserDictionary.fileURL(in: settingsStore.fileURL.deletingLastPathComponent())
+        if !FileManager.default.fileExists(atPath: url.path) {
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? Data(UserDictionary.template.utf8).write(to: url, options: .atomic)
+        }
+        NSWorkspace.shared.open(url)
     }
 
     @objc private func openSettingsFile() {
