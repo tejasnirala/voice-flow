@@ -344,7 +344,9 @@ final class DictationCoordinator {
         unloadWork?.cancel()
         dictionary = UserDictionary.load(from: UserDictionary.fileURL(in: SettingsStore.applicationSupportDirectory()))
         prepareSpeechEngine()
-        if settings.textMode.usesModel(processing: settings.processingMode), let prompt = rewritePrompt(for: settings.textMode) {
+        // Prewarm for the mode of the app in front now; the final mode is chosen for the app that receives the text.
+        let startMode = TargetApp.detect(dictationApp ?? NSWorkspace.shared.frontmostApplication).resolve(settings).mode
+        if startMode.usesModel(processing: settings.processingMode), let prompt = rewritePrompt(for: startMode) {
             OnDeviceRewriter.prewarm(prompt: prompt)
         }
         cpuAtStart = ResourceUsage.cpuSeconds
@@ -519,7 +521,16 @@ final class DictationCoordinator {
                 """)
             pendingAudio = nil
             scheduleUnload()
-            let mode = settings.textMode
+            let detectStart = DispatchTime.now().uptimeNanoseconds
+            let receiver = settings.pasteInto == .currentApp ? NSWorkspace.shared.frontmostApplication : dictationApp
+            let target = TargetApp.detect(receiver)
+            let resolution = target.resolve(settings)
+            let mode = resolution.mode
+            let detectMs = Double(DispatchTime.now().uptimeNanoseconds - detectStart) / 1_000_000
+            Log.pipeline.notice("""
+                mode \(mode.rawValue, privacy: .public) (\(resolution.source.rawValue, privacy: .public)) for \(target.bundleID ?? "unknown", privacy: .public), \
+                detected in \(detectMs, format: .fixed(precision: 2), privacy: .public) ms
+                """)
             let prepared = TextProcessingPlan.prepare(result.text, mode: mode, dictionary: dictionary)
             if prepared.isEmpty {
                 send(.transcriptionEmpty)

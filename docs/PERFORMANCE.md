@@ -430,6 +430,11 @@ Developer mode rules with corrections, per transcript (release build): real tran
 in Phase 8), spoken forms 0.29 / 1.8 ms. Code mode is the same order. Dictionary: one small JSON read per recording start. No
 idle cost; no new threads or timers.
 
+### 5.2.2 Application awareness (Phase 10), 2026-09-17
+Per dictation: one `NSWorkspace.frontmostApplication` lookup and, for browsers only, two Accessibility calls (100 ms timeout).
+In-app detection time is logged per dictation (`mode … detected in … ms`); owner-use numbers pending. No idle cost: nothing
+observes app switches.
+
 ### 5.3 Phase 0 exploration, 2026-09-16 (for reference)
 llama.cpp `llama-bench`, Qwen2.5-1.5B Q4_K_M: Metal pp256 1,033 tok/s, tg64 85 tok/s; CPU 290 / 67 tok/s. A zero-shot
 prompt produced a TypeScript code block for a dictated sentence (the first sign of the contract problem in §5.1).

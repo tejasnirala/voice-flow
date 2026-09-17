@@ -155,7 +155,14 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
 
         let modelReason = OnDeviceRewriter.unavailableReason
-        let modeItem = NSMenuItem(title: "Mode: \(settings.textMode.displayName)", action: nil, keyEquivalent: "")
+        // The status menu doesn't activate VoiceFlow, so the frontmost app is the one the user was working in.
+        let front = NSWorkspace.shared.frontmostApplication
+        let frontApp = front?.bundleIdentifier == Bundle.main.bundleIdentifier ? nil : front
+        let target = TargetApp.detect(frontApp)
+        let resolved = target.resolve(settings)
+        let modeTitle = resolved.source == .manual ? "Mode: \(resolved.mode.displayName)"
+            : "Mode: \(resolved.mode.displayName) (for \(target.name ?? "this app"))"
+        let modeItem = NSMenuItem(title: modeTitle, action: nil, keyEquivalent: "")
         let modes = NSMenu()
         modes.autoenablesItems = false
         let descriptions: [TextMode: String] = [
@@ -166,6 +173,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             .writing: "Writing — polished prose (on-device model)",
             .code: "Code — terminals & editors: symbols, no sentence styling",
         ]
+        if settings.modeByApp {
+            modes.addItem(disabled("Default for other apps:"))
+        }
         for mode in TextMode.allCases {
             let item = NSMenuItem(title: descriptions[mode] ?? mode.displayName, action: #selector(selectTextMode(_:)), keyEquivalent: "")
             item.target = self
@@ -176,6 +186,33 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 item.isEnabled = false
             }
             modes.addItem(item)
+        }
+        modes.addItem(.separator())
+        let byApp = NSMenuItem(title: "Choose Mode by App", action: #selector(toggleModeByApp), keyEquivalent: "")
+        byApp.target = self
+        byApp.state = settings.modeByApp ? .on : .off
+        modes.addItem(byApp)
+        if settings.modeByApp, let bundleID = target.bundleID {
+            let appItem = NSMenuItem(title: "For \(target.name ?? bundleID)", action: nil, keyEquivalent: "")
+            let appMenu = NSMenu()
+            appMenu.autoenablesItems = false
+            let fallback = AppModePolicy.builtInMode(for: bundleID) ?? settings.textMode
+            let automatic = NSMenuItem(title: "Automatic (\(fallback.displayName))", action: #selector(selectAppMode(_:)), keyEquivalent: "")
+            automatic.target = self
+            automatic.representedObject = [bundleID, ""]
+            automatic.state = settings.appModes[bundleID] == nil ? .on : .off
+            appMenu.addItem(automatic)
+            appMenu.addItem(.separator())
+            for mode in TextMode.allCases {
+                let item = NSMenuItem(title: mode.displayName, action: #selector(selectAppMode(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = [bundleID, mode.rawValue]
+                item.state = settings.appModes[bundleID] == mode ? .on : .off
+                item.isEnabled = !(mode.requiresModel && modelReason != nil)
+                appMenu.addItem(item)
+            }
+            appItem.submenu = appMenu
+            modes.addItem(appItem)
         }
         modes.addItem(.separator())
         let smart = NSMenuItem(title: modelReason == nil ? "Smart Rewrite for Clean & Developer (on-device model, +~0.8 s)"
@@ -245,6 +282,17 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func selectTextMode(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String, let mode = TextMode(rawValue: raw), settings.textMode != mode else { return }
         settings.textMode = mode
+        persist()
+    }
+
+    @objc private func toggleModeByApp() {
+        settings.modeByApp.toggle()
+        persist()
+    }
+
+    @objc private func selectAppMode(_ sender: NSMenuItem) {
+        guard let pair = sender.representedObject as? [String], pair.count == 2 else { return }
+        settings.appModes[pair[0]] = TextMode(rawValue: pair[1])   // "" → nil: back to automatic
         persist()
     }
 

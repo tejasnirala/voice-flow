@@ -275,6 +275,32 @@ the prompt and the guard policy. `processingMode: smart` is now the **Smart Rewr
 | On-device model correction | Broad | Phase 7/8: models invent and change meaning; guard would reject corrections (word changes) | Rejected |
 | Larger Whisper prompt | Helps recognition | Prompt window limited; changes accuracy, needs re-gating | Owner terms only, capped |
 
+### 3.5.3 Application awareness (Phase 10)
+
+- **Which app:** the app that receives the paste. With `pasteInto: currentApp` (default) that's the app in front when the
+  transcript is ready, so switching apps mid-dictation gets the new app's mode; with `dictationApp`, the app at key press.
+  The on-device model is prewarmed at recording start for the mode of the app in front then.
+- **`AppModePolicy`** (Core): owner rule (`appModes[bundleID]`) → browser tab title → built-in bundle ID table → the menu's mode
+  (also used when `modeByApp` is off or the app is unknown).
+- **Built-in defaults:** Developer: VS Code, Cursor, Windsurf, Zed, Xcode, JetBrains, Sublime, **and terminals** (Terminal, iTerm2,
+  Warp, Ghostty, kitty, Alacritty; spec says Raw/Developer: Developer keeps prose to CLI agents readable while formatting
+  symbols; Code is one menu click per terminal). Clean: Slack, Discord, WhatsApp, Messages, Telegram, Teams, Mail, Outlook,
+  Zoom, browsers. Prompt: ChatGPT, Claude, Gemini, Perplexity apps, and browser tabs whose focused-window title names an
+  assistant (ChatGPT, Claude, Gemini, Perplexity, Copilot, DeepSeek, Grok). Writing: Notes, Notion, Obsidian, Pages, Word,
+  TextEdit, Bear, Ulysses.
+- **Browser tab detection:** Accessibility (`AXFocusedWindow` → `AXTitle`), already granted for pasting; 100 ms messaging timeout;
+  only for browser bundle IDs; the title is matched and discarded (never stored or logged). URL reading would need Automation
+  permission per browser, so it isn't used.
+- **Menu:** Mode ▸ shows the resolved mode for the app in front; "Choose Mode by App" toggle; "For <App> ▸ Automatic / six modes"
+  writes `appModes`. The mode list sets the default for other apps.
+
+| Option | Pros | Cons | Decision |
+|---|---|---|---|
+| Bundle ID table + owner overrides (chosen) | Instant, no permission, predictable | Browser = one app | **Adopted** |
+| + focused window title for browsers (chosen) | Detects AI chat tabs, no new permission | Title-based (a doc titled "Claude" matches) | **Adopted**, browsers only |
+| Browser URL via AppleScript | Exact site | Automation permission per browser; slower | Rejected |
+| Focused text field role/placeholder | Finer | Unreliable across Electron/web apps | Not now |
+
 - Prompt/Writing when the on-device model is unavailable: menu items disabled with the reason; if selected anyway (settings
   file), the rule-cleaned text is pasted.
 

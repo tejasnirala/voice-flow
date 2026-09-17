@@ -63,8 +63,13 @@ public struct Settings: Codable, Equatable, Sendable {
     public var sttUnloadAfterSeconds: Double
     /// Paste into the app focused when the transcript is ready (default) or only into the app focused at key press.
     public var pasteInto: InsertionPolicy.PasteTarget
-    /// How transcripts are turned into pasted text (Raw, Clean, Developer, Prompt, Writing).
+    /// How transcripts are turned into pasted text (Raw, Clean, Developer, Prompt, Writing, Code). With `modeByApp`, this
+    /// is the mode for apps without a rule.
     public var textMode: TextMode
+    /// Choose the text mode from the app receiving the dictation (`AppModePolicy`).
+    public var modeByApp: Bool
+    /// The owner's per-app modes by bundle ID; they override the built-in defaults.
+    public var appModes: [String: TextMode]
 
     public static let `default` = Settings(processingMode: .fast, hotkey: .optionSpace, maxRecordingSeconds: 120)
 
@@ -72,9 +77,11 @@ public struct Settings: Codable, Equatable, Sendable {
                 saveRecordingsForDebugging: Bool = false, sttModelID: String = STTModel.mediumEnQ8.id,
                 useVocabularyPrompt: Bool = true, sttUnloadAfterSeconds: Double = 60,
                 pasteInto: InsertionPolicy.PasteTarget = .currentApp, dictationTrigger: DictationTrigger = .option,
-                textMode: TextMode = .clean) {
+                textMode: TextMode = .clean, modeByApp: Bool = true, appModes: [String: TextMode] = [:]) {
         self.pasteInto = pasteInto
         self.textMode = textMode
+        self.modeByApp = modeByApp
+        self.appModes = appModes
         self.dictationTrigger = dictationTrigger
         self.processingMode = processingMode
         self.hotkey = hotkey
@@ -108,5 +115,9 @@ public struct Settings: Codable, Equatable, Sendable {
         // Before Phase 8, `cleanupTranscripts: false` meant no cleanup: that's Raw mode now.
         let legacyCleanup = try? decoder.container(keyedBy: LegacyKeys.self).decodeIfPresent(Bool.self, forKey: .cleanupTranscripts)
         textMode = (try? c.decodeIfPresent(TextMode.self, forKey: .textMode)) ?? (legacyCleanup == false ? .raw : d.textMode)
+        modeByApp = (try? c.decodeIfPresent(Bool.self, forKey: .modeByApp)) ?? d.modeByApp
+        // Entries with an unknown mode are dropped individually, not the whole table.
+        let rawAppModes = (try? c.decodeIfPresent([String: String].self, forKey: .appModes)) ?? [:]
+        appModes = rawAppModes.compactMapValues(TextMode.init(rawValue:))
     }
 }

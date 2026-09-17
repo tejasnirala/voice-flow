@@ -16,8 +16,8 @@
 | 6 | Fast path optimization | ✅ Complete (2026-09-17, owner verified in real use) |
 | 7 | Local LLM (Smart Mode) | ✅ Complete (2026-09-17) |
 | 8 | Text modes | ✅ Complete (2026-09-17, owner approved) |
-| 9 | Developer intelligence | 🟡 Implemented + benchmarked 2026-09-17; awaiting owner test & approval |
-| 10 | Application awareness | ⬜ |
+| 9 | Developer intelligence | ✅ Complete (2026-09-17, owner tested) |
+| 10 | Application awareness | 🟡 Implemented 2026-09-17; awaiting owner test |
 | 11 | Final performance optimization | ⬜ |
 | 12 | Packaging | ⬜ |
 | 13 | Final audit | ⬜ |
@@ -250,7 +250,7 @@ per 30–60 s, GPU 0, footprint 13 MB.
 - Not in Phase 8 (→ Phase 9): "engine x dot conf"/"nginx.com" → nginx.conf, "kube control" → kubectl, Helm; per-app automatic mode
   (→ Phase 10)
 
-## Phase 9 — Developer intelligence 🟡 (awaiting owner approval)
+## Phase 9 — Developer intelligence ✅
 - [x] Inspected owner-recording errors: nginx.com, kube control, help/Helm, spoken identifiers, env var casing
 - [x] `DeveloperCorrections` (context-gated rules; Developer + Code modes): kubectl, git, Helm, nginx.conf, React hooks, event
       props, verb-first function names, env vars, domains/localhost ports, explicit case cues
@@ -260,8 +260,20 @@ per 30–60 s, GPU 0, footprint 13 MB.
       0 over-corrections; real transcripts formatting 10.8% → 10.6%, spoken forms 14.3% → 12.3%
 - [x] Over-corrections found and fixed: "local host dot com event"; case cue crossing a comma in the owner's long-form transcript
 - [x] 134 core tests + 3 app tests pass; STT prompt unchanged with an empty dictionary (no STT re-gate needed)
-- [ ] **Owner:** try Developer corrections, Code mode in a terminal, and the dictionary; approve Phase 9
+- [x] Owner tested Developer corrections, Code mode and the dictionary; approved (2026-09-17)
 - Not handled (no safe context): "we don't need help for now", "forms" vs "form's", Hinglish
+
+## Phase 10 — Application awareness 🟡 (awaiting owner test)
+- [x] `AppModePolicy` (Core): owner rule → browser AI tab → built-in bundle table → menu mode; `modeByApp` (default on), `appModes`
+      (tolerant decoding); 6 tests
+- [x] `TargetApp` (app): receiving app (paste target), browser focused-window title via Accessibility (100 ms timeout, never logged)
+- [x] Pipeline: mode resolved when the transcript is ready; prewarm for the app in front at recording start; log line
+      `mode <m> (<source>) for <bundle id>, detected in <ms>`
+- [x] Menu: resolved mode for the app in front, "Choose Mode by App", "For <App> ▸ Automatic / modes"
+- [x] 139 core tests + 3 app tests pass
+- [ ] **Owner:** dictate in VS Code, a terminal, Slack/WhatsApp, a ChatGPT/Claude browser tab, Notes; set one per-app override;
+      then detection latency is read from the log (PERFORMANCE §5.2.2)
+- Decision to confirm: terminals default to Developer (spec allows Raw/Developer); Code is available per terminal
 
 ## Phases 6–13
 Per SPEC.md. Notes so far:
@@ -300,6 +312,7 @@ Per SPEC.md. Notes so far:
 | 2026-09-17 | Prompt/Writing guard = same content words in the same order; connectives, modals, quantifiers, "from" are content; pronouns may only be dropped | Hand review found swaps a set check would accept | ACCURACY §7.2 |
 | 2026-09-17 | Spoken enumerations become lists (Clean + Smart Rewrite, Prompt, Writing); guard accepts removing only counting words in front of 2+ items | Owner request after live test | ACCURACY §7.3 |
 | 2026-09-17 | Developer corrections = context-gated rules (no global lexicon, no model); Code mode (rules); owner dictionary file | Spec §13 conservative; held-out check 0 over-corrections | ARCHITECTURE §3.5.2, ACCURACY §8 |
+| 2026-09-17 | Mode chosen per receiving app: owner rule → browser AI tab (window title via Accessibility) → built-in table → menu mode; terminals → Developer | Spec §Phase 10; no new permission; title never logged | ARCHITECTURE §3.5.3 |
 | 2026-09-16 | Carbon RegisterEventHotKey; Esc cancel registered only while recording | Press+release, no permission, zero idle cost | ARCHITECTURE §3.3 |
 | 2026-09-16 | Clipboard + ⌘V with full snapshot/restore; never lose speech | Works in Electron/terminals/browsers | ARCHITECTURE §3.4 |
 | 2026-09-16 | llama.cpp in-process (provisional); Ollama rejected | No daemon/IPC; MLX re-evaluated in Phase 7 | ARCHITECTURE §3.5 |
@@ -307,8 +320,7 @@ Per SPEC.md. Notes so far:
 ## Session handoff notes
 _Overwrite at the end of every session._
 
-- **Last session (2026-09-17):** Phases 0–8 complete (owner approved). Phase 9 (developer intelligence) implemented, benchmarked and
-  documented; waiting for the owner's test and approval.
+- **Last session (2026-09-17):** Phases 0–9 complete (owner approved). Phase 10 (application awareness) implemented; awaiting owner test.
 - **Models on this machine** (`~/Library/Application Support/VoiceFlow/models/`): **in use:** whisper medium.en-q8_0 +
   ggml-medium.en-encoder.mlmodelc. Benchmark-only (deletable on request): whisper tiny.en, base.en, small.en, large-v3-turbo,
   large-v3-turbo-q8_0 (STT alternate), distil-large-v3; parakeet tdt-0.6b-v3-q8_0.
@@ -316,4 +328,4 @@ _Overwrite at the end of every session._
   `benchmarks-output/results/human/`. Rerunning `scripts/bench/stt.sh human` re-scores instantly.
 - **Mode benchmark data:** `benchmarks-output/results/modes/` (prepared inputs, model JSONL per mode, `report.md` with every
   accepted/rejected rewrite). Re-score after guard changes with `vf-bench modes report … --results …` (no model rerun needed).
-- **Next action:** owner tests Phase 9 (Developer corrections, Code mode, dictionary) and approves → Phase 10 (application awareness).
+- **Next action:** owner tests Phase 10 per-app modes; read detection latency from the log; then approval → Phase 11.
