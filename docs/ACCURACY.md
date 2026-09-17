@@ -500,7 +500,7 @@ spoken forms (Phase 8 vs Phase 9 Developer output, built from the Phase 8 commit
 | Set | Result |
 |---|---|
 | developer-intel: corrections / Code / traps exact | 17/17 · 10/10 · 22/22; **0 over-corrections** |
-| Real transcripts (57): outputs changed vs Phase 8 | 10, all toward the reference or an identifier the reference wrote as words |
+| Real transcripts (57): outputs changed vs Phase 8 | 9, all toward the reference or an identifier the reference wrote as words |
 | Phase 7/8 traps + mode traps (37): changed | 2 ("the get user by id function" → getUserById; "use effect hook" → useEffect), both identifiers |
 | Spoken forms (54): changed | 7, all toward the reference |
 | Formatting error, Developer mode, Phase 8 → 9 | real 10.8% → 10.6%; spoken forms 14.3% → 12.3% |
