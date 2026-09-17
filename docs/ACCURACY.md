@@ -302,3 +302,12 @@ changed natural-02 ("isLoading **It's** set") by cutting inside a 28 s clip; v2 
 pauses are removed; continuous speech > 29 s is cut at its quietest frame; regions are packed into ≤ 29 s chunks that
 end at the longest pause in the chunk's last 40%. Each chunk is transcribed independently and the texts are joined.
 8 unit tests.
+
+### 5.10 Phase 6 changes re-checked against the gate (2026-09-17)
+
+| Change | 50 clips (WER / terms / invented) | Long-form (WER / terms) | Decision |
+|---|---|---|---|
+| Baseline (medium.en q8_0 + vocab, Metal, full window) | 1.1% / 97.4% / 0 | 0.7% / 97.4% | — |
+| Fitted encoder window (`audio_ctx`, 3 variants) | 10.2–25.9% / 65.4–87.2% / 0 | 1.8–6.6% / 94.9% | **Rejected**: empty transcripts, truncation |
+| `best_of = 1` / no temperature fallback | identical transcripts | identical | Not adopted (no measured benefit) |
+| **Core ML encoder (Neural Engine)** | **1.1% / 97.4% / 0** (49/50 identical) | **0.7% / 97.4%** (7/7 identical) | **Adopted** (−17…25% latency) |

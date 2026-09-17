@@ -192,6 +192,17 @@ per 30–60 s, GPU 0, footprint 13 MB.
 - Phase 6 notes: footprint with model loaded grew 1,185 → ~1,500 MB during the owner session (investigate); restore delay
   250 ms unproblematic so far
 
+## Phase 6 — Fast path optimization 🟡
+- [x] Fitted encoder window (`audio_ctx`): 2–3× faster but failed the gate (empty/truncated transcripts) → rejected, switch removed
+- [x] **Core ML encoder on the Neural Engine: adopted.** Same accuracy (49/50 + 7/7 identical), −25% clip latency, live release → text
+      544–700 ms (was 914–1,015). `fetch-models.sh whisper-coreml medium.en`; the load log names the encoder
+- [x] Memory step (+292 MB once): decode-fallback hypothesis tested; not reproduced in 20 live dictations → watch, no change
+- [x] Fixed: model size check didn't follow symlinks (a symlinked model was reported as damaged)
+- [ ] Cold vs warm: measure dictation latency with the model unloaded before each dictation → choose `sttUnloadAfterSeconds`
+- [ ] Residual ~187 MB after unload: decide (accept / helper process / upstream)
+- [ ] Recording start latency (engine prepare) and ⌥ dispatch latency (from owner use)
+- [ ] Docs + commit + owner check
+
 ## Phases 6–13
 Per SPEC.md. Notes so far:
 - **5:** clipboard algorithm in ARCHITECTURE.md §3.4. Never lose speech on paste failure.
@@ -219,6 +230,7 @@ Per SPEC.md. Notes so far:
 | 2026-09-17 | Load STT model at recording start; idle unload via one-shot timer (300 s provisional) | Model ready at release; memory returned when idle (except ~170 MB whisper.cpp residue) | ARCHITECTURE §3.6 |
 | 2026-09-17 | Paste via clipboard snapshot → ⌘V → restore after 250 ms; paste only into the app focused at key press | Owner-tested in VS Code/WhatsApp; never loses text | ARCHITECTURE §3.4 |
 | 2026-09-17 | Paste into the app focused when the transcript is ready (switch apps while dictating); `pasteInto: dictationApp` keeps the old behavior | Owner request (Wispr Flow-style continuity); last transcript stays in the menu | ARCHITECTURE §3.4 |
+| 2026-09-17 | Core ML (Neural Engine) Whisper encoder | Same accuracy, −17…25% latency; `audio_ctx` fitting rejected (fails gate) | PERFORMANCE §3.5–3.6 |
 | 2026-09-17 | Trigger = ⌥ alone (hold; double-tap for hands-free), listen-only event taps; ⌥Space fallback | Owner request (Wispr Flow–style); no idle cost measured | ARCHITECTURE §3.3 |
 | 2026-09-17 | Segment dictations > 29 s at pauses into independent chunks | Owner's long dictation lost speech and invented a loop; long-form WER 22.7% → 0.7%, no short-clip regression | ACCURACY §5.9 |
 | 2026-09-16 | Carbon RegisterEventHotKey; Esc cancel registered only while recording | Press+release, no permission, zero idle cost | ARCHITECTURE §3.3 |
@@ -234,4 +246,4 @@ _Overwrite at the end of every session._
   llm qwen2.5-1.5b-instruct-q4_k_m.
 - **Owner recordings:** `benchmarks-output/audio/human/macbook-mic/` (50 clips + `spoken-overrides.json`, gitignored). Results cached in
   `benchmarks-output/results/human/`. Rerunning `scripts/bench/stt.sh human` re-scores instantly.
-- **Next action:** Phase 6 (fast path optimization), see its checklist.
+- **Next action:** continue the Phase 6 checklist (cold vs warm next).

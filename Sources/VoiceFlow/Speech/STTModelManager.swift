@@ -6,11 +6,22 @@ import VoiceFlowCore
 /// Never downloads anything: a missing model is reported with the setup command that installs it.
 enum STTModelManager {
     static var modelsDirectory: URL {
-        SettingsStore.applicationSupportDirectory().appendingPathComponent("models", isDirectory: true)
+        // Developer override for benchmark experiments (e.g. a copy of the model with a Core ML encoder beside it).
+        if let override = ProcessInfo.processInfo.environment["VOICEFLOW_MODELS_DIR"], !override.isEmpty {
+            return URL(fileURLWithPath: override, isDirectory: true)
+        }
+        return SettingsStore.applicationSupportDirectory().appendingPathComponent("models", isDirectory: true)
     }
 
     static func url(for model: STTModel) -> URL {
         modelsDirectory.appendingPathComponent(model.runtimeDirectory, isDirectory: true).appendingPathComponent(model.fileName)
+    }
+
+    /// Whether a Core ML encoder is installed next to the model (encoder runs on the Neural Engine).
+    static func hasCoreMLEncoder(for model: STTModel) -> Bool {
+        let dir = modelsDirectory.appendingPathComponent(model.runtimeDirectory, isDirectory: true)
+            .appendingPathComponent(model.coreMLEncoderDirectoryName)
+        return FileManager.default.fileExists(atPath: dir.resolvingSymlinksInPath().path)
     }
 
     private static var recordsURL: URL { modelsDirectory.appendingPathComponent("verified.json") }
@@ -45,7 +56,8 @@ enum STTModelManager {
     }
 
     private static func attributes(of model: STTModel) -> (size: Int64, modified: Double)? {
-        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url(for: model).path),
+        // Follow symlinks (e.g. models kept on another disk): attributes of the link itself are ~100 bytes.
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url(for: model).resolvingSymlinksInPath().path),
               let size = attrs[.size] as? NSNumber else { return nil }
         let modified = (attrs[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
         return (size.int64Value, modified)

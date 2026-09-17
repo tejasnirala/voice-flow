@@ -428,7 +428,8 @@ final class DictationCoordinator {
             guard status == .installed else { throw ModelUnavailable(status: status, model: model) }
             let start = DispatchTime.now().uptimeNanoseconds
             try engine.prepare()
-            Log.speech.notice("model loaded in \(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9, format: .fixed(precision: 2), privacy: .public) s (started at recording start)")
+            let encoder = STTModelManager.hasCoreMLEncoder(for: model) ? "Core ML (Neural Engine)" : "Metal"
+            Log.speech.notice("model loaded in \(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9, format: .fixed(precision: 2), privacy: .public) s (started at recording start), encoder: \(encoder, privacy: .public)")
         }
     }
 

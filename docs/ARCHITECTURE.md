@@ -39,7 +39,7 @@ MLX-Swift can't be built from source here.
 | **UI** | AppKit `NSStatusItem` + `NSMenu`. Optional tiny non-activating `NSPanel` recording indicator | Decided |
 | **Audio** | `AVAudioEngine` input tap → `AVAudioConverter` → in-memory 16 kHz mono Float32 buffer. No files | Decided (start latency measured in Phase 3) |
 | **Global hotkey** | Carbon `RegisterEventHotKey` (press + release events). Esc registered only while recording, for cancel | Decided |
-| **STT runtime** | **whisper.cpp** (prebuilt `whisper.xcframework`, Metal) behind a `SpeechEngine` protocol. The same framework also runs **Parakeet** | Decided, confirmed by measurement (§4) |
+| **STT runtime** | **whisper.cpp** (prebuilt `whisper.xcframework`) behind a `SpeechEngine` protocol: **encoder on the Neural Engine via Core ML** (optional `…-encoder.mlmodelc` beside the model; falls back to Metal), decoder on Metal | Decided by measurement (§4, PERFORMANCE.md §3.6) |
 | **STT model** | **Whisper medium.en q8_0 + developer vocabulary prompt** (alternate: large-v3-turbo q8_0 + prompt), §4.3 | Decided at Phase 4 gate (2026-09-17); second take to confirm |
 | **LLM runtime** | **llama.cpp**, in-process, lazily loaded, Smart Mode only | Provisional; MLX comparison in Phase 7 |
 | **LLM model** | Qwen2.5-1.5B-Instruct Q4_K_M as the starting candidate | Provisional; compared in Phase 7 |

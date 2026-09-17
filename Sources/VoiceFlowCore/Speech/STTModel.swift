@@ -27,6 +27,18 @@ public struct STTModel: Equatable, Sendable {
 
     public static func model(id: String) -> STTModel? { catalog.first { $0.id == id } }
 
+    /// Core ML encoder directory whisper.cpp looks for next to the model: "ggml-medium.en-q8_0.bin" →
+    /// "ggml-medium.en-encoder.mlmodelc" (extension and quantization suffix removed). When present, the encoder runs on
+    /// the Neural Engine; otherwise on Metal.
+    public var coreMLEncoderDirectoryName: String {
+        var base = fileName.hasSuffix(".bin") ? String(fileName.dropLast(4)) : fileName
+        if let dash = base.lastIndex(of: "-") {
+            let suffix = base[base.index(after: dash)...]
+            if suffix.count == 4, suffix.first == "q", suffix.dropFirst(2).first == "_" { base = String(base[..<dash]) }
+        }
+        return base + "-encoder.mlmodelc"
+    }
+
     /// Shell command that installs this model (shown to the user when it's missing).
     public var installCommand: String {
         "scripts/fetch-models.sh whisper \(id)"

@@ -68,6 +68,11 @@ import Testing
         #expect(!record.matches(.mediumEnQ8, sizeBytes: m.sizeBytes, modificationTime: 100))
     }
 
+    @Test func coreMLEncoderNameFollowsWhisperCppConvention() {
+        #expect(STTModel.mediumEnQ8.coreMLEncoderDirectoryName == "ggml-medium.en-encoder.mlmodelc")
+        #expect(STTModel.largeV3TurboQ8.coreMLEncoderDirectoryName == "ggml-large-v3-turbo-encoder.mlmodelc")
+    }
+
     @Test func catalogLookup() {
         #expect(STTModel.model(id: "large-v3-turbo-q8_0") == .largeV3TurboQ8)
         #expect(STTModel.model(id: "nope") == nil)

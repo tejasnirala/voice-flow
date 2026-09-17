@@ -29,6 +29,8 @@ final class WhisperEngine: SpeechEngine, @unchecked Sendable {
 
     private static let silenceLogs: Void = {
         // whisper.cpp logs verbosely to stderr; VoiceFlow logs its own metrics instead.
+        // VOICEFLOW_WHISPER_LOG=1 (developer experiments) keeps whisper.cpp's logs.
+        guard ProcessInfo.processInfo.environment["VOICEFLOW_WHISPER_LOG"] != "1" else { return }
         whisper_log_set({ _, _, _ in }, nil)
     }()
 

@@ -239,6 +239,33 @@ its last clause). Silently losing a dictation is unacceptable, so the switch was
 
 ---
 
+### 3.6 Phase 6: Core ML (Neural Engine) encoder, adopted, 2026-09-17
+whisper.cpp runs Whisper's encoder with Core ML when `ggml-medium.en-encoder.mlmodelc` (541 MB, float16) is next to the
+model; the prebuilt framework includes Core ML support and falls back to Metal when it's absent. The decoder stays
+q8_0 on Metal. In-app engine, variants run with 45 s cool-downs (and a second Metal run beside Core ML):
+
+| | Metal encoder | **Core ML encoder** |
+|---|---|---|
+| 50 clips: WER / terms / invented | 1.1% / 97.4% / 0 | **1.1% / 97.4% / 0** |
+| 50 clips: transcripts identical to Metal | — | **49/50** (files-05: "put" → "Put") |
+| Long-form: WER / terms; identical | 0.7% / 97.4% | **0.7% / 97.4%; 7/7** |
+| Mean latency, 50 clips | 0.808 s (rerun 0.809 s) | **0.602 s** (−25%) |
+| p95 latency, 50 clips | 1.248 s | **1.054 s** |
+| Mean latency, long-form | 2.536 s | **2.093 s** (−17%) |
+| Footprint after load / peak | 1,091 / 1,188 MB | 1,095 / 1,210 MB |
+| Model load | 0.31–0.39 s | 0.30 s; **first load ever 7.4 s** (Neural Engine compile, once per encoder location) |
+
+**Live dictation** (speaker playback, 5.2 s audio): release → text **544–700 ms** (Metal: 914–1,015 ms). After unload:
+187 MB footprint, CPU 0.00 s over 30 s, 32 wakeups. **Adopted** (`scripts/fetch-models.sh whisper-coreml medium.en`).
+
+### 3.7 Phase 6: memory growth and decode fallback, 2026-09-17
+The owner session and one 10-dictation playback run showed a one-time +292 MB step (1,185 → 1,478 MB) that then stayed
+flat. Hypothesis: whisper.cpp's temperature fallback allocating `best_of` = 5 decoders. Tests:
+- Benchmark sets with `best_of = 1` and with no temperature fallback: identical transcripts (50/50, 7/7), peak footprint
+  ~1,190 MB for all variants, so the fallback never triggered on these clips (no evidence either way).
+- 20 further live playback dictations (10 default, 10 `best_of = 1`): flat at 1,182–1,185 MB, **no step reproduced**.
+Decision: no decoding change without evidence. Watch for recurrence (the speech log records footprint per dictation).
+
 ## 4. Audio recording (Phase 3)
 
 ### 4.1 Start latency and cost, 2026-09-17

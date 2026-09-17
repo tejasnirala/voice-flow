@@ -9,6 +9,7 @@
 ```sh
 scripts/fetch-deps.sh     # whisper.cpp framework → Vendor/ (SHA-256 pinned)
 scripts/fetch-models.sh whisper medium.en-q8_0          # default STT model (ACCURACY.md §5.8)
+scripts/fetch-models.sh whisper-coreml medium.en        # Core ML encoder: ~25% faster, same accuracy (first load compiles ~7 s)
 ```
 Models go to `~/Library/Application Support/VoiceFlow/models/{whisper,parakeet,llm}/`. Each file is
 verified against Hugging Face's SHA-256 before use. Setup is the only step that uses the network.
@@ -117,6 +118,8 @@ benchmark → verify → review `git diff` → update docs + PROGRESS → commit
 - STT settings (settings.json): `sttModelID` (`medium.en-q8_0` default | `large-v3-turbo-q8_0`), `useVocabularyPrompt`,
   `sttUnloadAfterSeconds`, `pasteInto` (`currentApp` default: paste where focus is when the text is ready | `dictationApp`).
   `VOICEFLOW_METAL_RESIDENCY=1` re-enables ggml residency sets (A/B testing only).
+- Experiment overrides (developer only): `VOICEFLOW_MODELS_DIR=<dir>` loads models from another directory (e.g. a copy
+  with/without a Core ML encoder for A/B tests); `VOICEFLOW_WHISPER_LOG=1` shows whisper.cpp's own log (e.g. "Core ML model loaded").
 - Settings file: `~/Library/Application Support/VoiceFlow/settings.json` (menu → Open Settings File…). It's
   created only when first changed/opened. An invalid file is moved to `settings.invalid.json` and defaults
   are used (logged as an error).
