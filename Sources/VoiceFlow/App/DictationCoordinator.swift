@@ -29,7 +29,7 @@ final class DictationCoordinator {
 
     // MARK: Insertion state
     private let inserter = TextInserter()
-    /// App in front when the hotkey was pressed; the transcript is only pasted into this app.
+    /// App in front when the hotkey was pressed (used when `Settings.pasteInto` is `.dictationApp`, and for logging).
     private var dictationApp: NSRunningApplication?
     private var releaseUptimeNs: UInt64 = 0
     /// Measurement mode turns this off so automated runs never type into whatever app is in front.
@@ -406,19 +406,21 @@ final class DictationCoordinator {
             send(.insertionFinished)
             return
         }
-        let target = dictationApp
-        inserter.insert(text, dictationApp: target) { [weak self] outcome, metrics, restored in
+        let started = dictationApp
+        inserter.insert(text, dictationApp: started, target: settings.pasteInto) { [weak self] outcome, metrics, restored in
             guard let self else { return }
             if let restored {
                 Log.insertion.notice("clipboard \(restored ? "restored" : "left as is (changed by the user after the paste)", privacy: .public)")
                 return
             }
             let totalMs = Double(DispatchTime.now().uptimeNanoseconds - self.releaseUptimeNs) / 1_000_000
-            let app = target?.bundleIdentifier ?? "unknown"
+            let startedIn = started?.bundleIdentifier ?? "unknown"
             switch outcome {
-            case .pasted:
+            case .pasted(let pastedApp):
+                let app = pastedApp ?? "unknown"
+                let moved = app == startedIn ? "" : " (dictation started in \(startedIn))"
                 Log.insertion.notice("""
-                    pasted into \(app, privacy: .public): snapshot \(metrics.snapshotItems, privacy: .public) items \
+                    pasted into \(app, privacy: .public)\(moved, privacy: .public): snapshot \(metrics.snapshotItems, privacy: .public) items \
                     \(metrics.snapshotBytes / 1024, privacy: .public) KB in \(metrics.snapshotMs, format: .fixed(precision: 1), privacy: .public) ms, \
                     write \(metrics.writeMs, format: .fixed(precision: 1), privacy: .public) ms, ⌘V \(metrics.pasteEventMs, format: .fixed(precision: 1), privacy: .public) ms; \
                     release → pasted \(totalMs, format: .fixed(precision: 0), privacy: .public) ms

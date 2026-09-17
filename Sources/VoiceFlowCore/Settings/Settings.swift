@@ -49,12 +49,16 @@ public struct Settings: Codable, Equatable, Sendable {
     public var useVocabularyPrompt: Bool
     /// Unload the STT model after this many idle seconds (0 = unload right after each dictation).
     public var sttUnloadAfterSeconds: Double
+    /// Paste into the app focused when the transcript is ready (default) or only into the app focused at key press.
+    public var pasteInto: InsertionPolicy.PasteTarget
 
     public static let `default` = Settings(processingMode: .fast, hotkey: .optionSpace, maxRecordingSeconds: 120)
 
     public init(processingMode: ProcessingMode, hotkey: Hotkey, maxRecordingSeconds: Double,
                 saveRecordingsForDebugging: Bool = false, sttModelID: String = STTModel.mediumEnQ8.id,
-                useVocabularyPrompt: Bool = true, sttUnloadAfterSeconds: Double = 300) {
+                useVocabularyPrompt: Bool = true, sttUnloadAfterSeconds: Double = 300,
+                pasteInto: InsertionPolicy.PasteTarget = .currentApp) {
+        self.pasteInto = pasteInto
         self.processingMode = processingMode
         self.hotkey = hotkey
         self.maxRecordingSeconds = maxRecordingSeconds
@@ -80,5 +84,6 @@ public struct Settings: Codable, Equatable, Sendable {
         useVocabularyPrompt = (try? c.decodeIfPresent(Bool.self, forKey: .useVocabularyPrompt)) ?? d.useVocabularyPrompt
         let unload = (try? c.decodeIfPresent(Double.self, forKey: .sttUnloadAfterSeconds)) ?? d.sttUnloadAfterSeconds
         sttUnloadAfterSeconds = (0...86_400).contains(unload) ? unload : d.sttUnloadAfterSeconds
+        pasteInto = (try? c.decodeIfPresent(InsertionPolicy.PasteTarget.self, forKey: .pasteInto)) ?? d.pasteInto
     }
 }

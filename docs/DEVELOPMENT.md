@@ -115,7 +115,8 @@ benchmark → verify → review `git diff` → update docs + PROGRESS → commit
   then `swift run -c release vf-bench score benchmarks/corpus/developer-speech.json <file.jsonl>`.
   Alternate variants and cool down between runs: back-to-back runs throttle on the MacBook Air.
 - STT settings (settings.json): `sttModelID` (`medium.en-q8_0` default | `large-v3-turbo-q8_0`), `useVocabularyPrompt`,
-  `sttUnloadAfterSeconds`. `VOICEFLOW_METAL_RESIDENCY=1` re-enables ggml residency sets (A/B testing only).
+  `sttUnloadAfterSeconds`, `pasteInto` (`currentApp` default: paste where focus is when the text is ready | `dictationApp`).
+  `VOICEFLOW_METAL_RESIDENCY=1` re-enables ggml residency sets (A/B testing only).
 - Settings file: `~/Library/Application Support/VoiceFlow/settings.json` (menu → Open Settings File…). It's
   created only when first changed/opened. An invalid file is moved to `settings.invalid.json` and defaults
   are used (logged as an error).

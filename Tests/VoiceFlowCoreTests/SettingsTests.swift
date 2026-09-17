@@ -14,6 +14,14 @@ import Testing
         #expect(Settings.default.sttModel == .mediumEnQ8)
         #expect(Settings.default.useVocabularyPrompt)
         #expect(Settings.default.sttUnloadAfterSeconds == 300)
+        #expect(Settings.default.pasteInto == .currentApp)
+    }
+
+    @Test func pasteTargetDecodes() throws {
+        let s = try JSONDecoder().decode(Settings.self, from: Data(#"{"pasteInto":"dictationApp"}"#.utf8))
+        #expect(s.pasteInto == .dictationApp)
+        let bad = try JSONDecoder().decode(Settings.self, from: Data(#"{"pasteInto":"nowhere"}"#.utf8))
+        #expect(bad.pasteInto == .currentApp)
     }
 
     @Test func unknownModelIDFallsBackToDefault() throws {

@@ -2,13 +2,14 @@ import AppKit
 import Carbon.HIToolbox
 import VoiceFlowCore
 
-/// Inserts a transcript into the focused app: snapshot clipboard → write transcript → ⌘V → restore clipboard.
+/// Inserts a transcript into the app focused when it's ready (see `InsertionPolicy.PasteTarget`):
+/// snapshot clipboard → write transcript → ⌘V → restore clipboard.
 /// If pasting isn't allowed or safe (see `InsertionPolicy`), the transcript is left on the clipboard so it's never lost.
 @MainActor
 final class TextInserter {
     enum Outcome: Equatable {
-        /// ⌘V was posted; the clipboard restore is scheduled.
-        case pasted
+        /// ⌘V was posted into `app`; the clipboard restore is scheduled.
+        case pasted(app: String?)
         case leftOnClipboard(InsertionPolicy.NotPastedReason)
     }
 
@@ -30,13 +31,13 @@ final class TextInserter {
         self.clipboard = clipboard
     }
 
-    func insert(_ text: String, dictationApp: NSRunningApplication?,
+    func insert(_ text: String, dictationApp: NSRunningApplication?, target: InsertionPolicy.PasteTarget,
                 completion: @escaping (_ outcome: Outcome, _ metrics: Metrics, _ restored: Bool?) -> Void) {
         let current = NSWorkspace.shared.frontmostApplication
         let decision = InsertionPolicy.decide(
             accessibilityGranted: PermissionManager.isAccessibilityTrusted,
             dictationAppPID: dictationApp?.processIdentifier, dictationAppName: dictationApp?.localizedName,
-            currentAppPID: current?.processIdentifier, currentAppName: current?.localizedName)
+            currentAppPID: current?.processIdentifier, currentAppName: current?.localizedName, target: target)
 
         var metrics = Metrics(snapshotMs: 0, snapshotItems: 0, snapshotBytes: 0, writeMs: 0, pasteEventMs: 0)
 
@@ -65,14 +66,14 @@ final class TextInserter {
         t = DispatchTime.now().uptimeNanoseconds
         Self.postCommandV()
         metrics.pasteEventMs = Self.ms(since: t)
-        completion(.pasted, metrics, nil)
+        completion(.pasted(app: current?.bundleIdentifier), metrics, nil)
 
         let clipboard = self.clipboard
         DispatchQueue.main.asyncAfter(deadline: .now() + restoreDelaySeconds) {
             let restore = InsertionPolicy.shouldRestoreClipboard(changeCountAfterWrite: changeCountAfterWrite,
                                                                  currentChangeCount: clipboard.changeCount)
             if restore { clipboard.restore(saved) }
-            completion(.pasted, metrics, restore)
+            completion(.pasted(app: current?.bundleIdentifier), metrics, restore)
         }
     }
 

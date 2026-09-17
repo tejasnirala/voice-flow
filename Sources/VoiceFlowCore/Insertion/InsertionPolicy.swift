@@ -1,6 +1,15 @@
 /// Decisions for inserting a transcript into the focused app. The platform code (pasteboard, events) lives in the
 /// app target; the rules live here so they're unit-tested.
 public enum InsertionPolicy {
+    /// Where the transcript goes when the focused app changed during dictation.
+    public enum PasteTarget: String, Codable, Sendable, CaseIterable {
+        /// The app (and field) focused when the transcript is ready: dictate, click where the text should go, release.
+        /// Default (owner preference, 2026-09-17).
+        case currentApp
+        /// Only the app focused when the hotkey was pressed; if focus moved, leave the text on the clipboard.
+        case dictationApp
+    }
+
     /// Why the transcript was left on the clipboard instead of pasted.
     public enum NotPastedReason: Equatable, Sendable {
         /// VoiceFlow isn't allowed to send ⌘V (System Settings → Privacy & Security → Accessibility).
@@ -18,11 +27,13 @@ public enum InsertionPolicy {
 
     /// - Parameters:
     ///   - dictationAppPID / currentAppPID: frontmost app when the hotkey was pressed / now.
+    ///   - target: whether a focus change redirects the paste (`.currentApp`) or blocks it (`.dictationApp`).
     public static func decide(accessibilityGranted: Bool,
                               dictationAppPID: Int32?, dictationAppName: String?,
-                              currentAppPID: Int32?, currentAppName: String?) -> Decision {
+                              currentAppPID: Int32?, currentAppName: String?,
+                              target: PasteTarget = .currentApp) -> Decision {
         guard let currentAppPID else { return .leaveOnClipboard(.noFocusedApp) }
-        if let dictationAppPID, dictationAppPID != currentAppPID {
+        if target == .dictationApp, let dictationAppPID, dictationAppPID != currentAppPID {
             return .leaveOnClipboard(.focusChanged(from: dictationAppName ?? "the previous app",
                                                    to: currentAppName ?? "another app"))
         }

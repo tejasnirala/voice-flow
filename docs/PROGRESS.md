@@ -178,8 +178,10 @@ per 30–60 s, GPU 0, footprint 13 MB.
 - [x] **Bug found by owner: long dictations dropped speech and invented repeated text** (89.7 s, 54.6 s speech → 69 words).
       Built a long-form benchmark from owner recordings (`make-longform.py`) that reproduces the dropped speech (WER 22.7%).
       Fix: `SpeechSegmenter` (Core, 8 tests) → WER 0.7%, terms 97.4%, no regression on the 50-clip set (ACCURACY.md §5.9)
-- [ ] **Owner re-test:** a long dictation (60 s+ with natural pauses); Terminal, a browser field, Slack/Discord or Notes; clipboard
-      preserved with an image on the clipboard
+- [x] Owner request: paste into the app focused when the transcript is ready (start dictating in Terminal, switch to a browser field,
+      the text lands there). `InsertionPolicy.PasteTarget` (`currentApp` default, `dictationApp` optional) + tests; setting `pasteInto`
+- [ ] **Owner re-test:** a long dictation (60 s+ with natural pauses); switch apps while dictating → pasted into the new field;
+      Terminal, a browser field, Slack/Discord or Notes; clipboard preserved with an image on the clipboard
 - Phase 6 notes: footprint with model loaded grew 1,185 → ~1,500 MB during the owner session (investigate); restore delay
   250 ms unproblematic so far
 
@@ -209,6 +211,7 @@ Per SPEC.md. Notes so far:
 | 2026-09-17 | Disable ggml Metal residency sets (`GGML_METAL_NO_RESIDENCY`) | Otherwise a 5 ms polling thread runs for the process lifetime; A/B shows no latency cost | PERFORMANCE §3.4 |
 | 2026-09-17 | Load STT model at recording start; idle unload via one-shot timer (300 s provisional) | Model ready at release; memory returned when idle (except ~170 MB whisper.cpp residue) | ARCHITECTURE §3.6 |
 | 2026-09-17 | Paste via clipboard snapshot → ⌘V → restore after 250 ms; paste only into the app focused at key press | Owner-tested in VS Code/WhatsApp; never loses text | ARCHITECTURE §3.4 |
+| 2026-09-17 | Paste into the app focused when the transcript is ready (switch apps while dictating); `pasteInto: dictationApp` keeps the old behavior | Owner request (Wispr Flow-style continuity); last transcript stays in the menu | ARCHITECTURE §3.4 |
 | 2026-09-17 | Segment dictations > 29 s at pauses into independent chunks | Owner's long dictation lost speech and invented a loop; long-form WER 22.7% → 0.7%, no short-clip regression | ACCURACY §5.9 |
 | 2026-09-16 | Carbon RegisterEventHotKey; Esc cancel registered only while recording | Press+release, no permission, zero idle cost | ARCHITECTURE §3.3 |
 | 2026-09-16 | Clipboard + ⌘V with full snapshot/restore; never lose speech | Works in Electron/terminals/browsers | ARCHITECTURE §3.4 |

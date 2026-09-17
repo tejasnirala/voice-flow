@@ -161,10 +161,17 @@ Verified behavior (Phase 2, owner-tested 2026-09-17):
 **Implemented (Phase 5):** `Insertion/ClipboardManager.swift` and `TextInserter.swift`; rules in
 `VoiceFlowCore/Insertion/InsertionPolicy.swift`. Verified in VS Code and WhatsApp (PERFORMANCE.md §4.4).
 
+**Paste target (owner decision, 2026-09-17):** the transcript is pasted into the app **focused when it's ready**, so
+the user can start dictating in one app, switch to another app/field while speaking, and the text lands there
+(`Settings.pasteInto = currentApp`, default). `dictationApp` restores the stricter behavior (paste only into the app
+focused at key press, otherwise leave on clipboard). There's no check that a text field is focused: that would need
+Accessibility queries that switch Chrome/Electron into their expensive accessibility mode. The last transcript stays
+in the menu (Copy Last Transcript) if a paste lands where text can't go.
+
 Clipboard algorithm (Phase 5):
 1. Snapshot every `NSPasteboardItem` × every type's data (text, RTF, images, files, custom). Record `changeCount`.
 2. Write the text with the `org.nspasteboard.TransientType` and `ConcealedType` markers, so clipboard managers skip it.
-3. Check the frontmost app is still the one focused at key-down, then post ⌘V.
+3. Post ⌘V to the app focused now (or, with `pasteInto = dictationApp`, only if it's still the app focused at key-down).
 4. After a short, tuned delay, restore the snapshot **only if** `changeCount` is still ours (a user copy in between wins).
 5. If ⌘V can't be posted (no permission, focus changed, secure input), leave the text on the clipboard,
    don't restore, and tell the user. Speech is never lost.

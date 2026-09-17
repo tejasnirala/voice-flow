@@ -7,15 +7,22 @@ import Testing
                                        currentAppPID: 10, currentAppName: "Code") == .paste)
     }
 
-    @Test func focusChangeLeavesTextOnClipboard() {
-        #expect(InsertionPolicy.decide(accessibilityGranted: true, dictationAppPID: 10, dictationAppName: "Code",
-                                       currentAppPID: 11, currentAppName: "Slack")
-                == .leaveOnClipboard(.focusChanged(from: "Code", to: "Slack")))
+    @Test func focusChangePastesIntoCurrentAppByDefault() {
+        #expect(InsertionPolicy.decide(accessibilityGranted: true, dictationAppPID: 10, dictationAppName: "Terminal",
+                                       currentAppPID: 11, currentAppName: "Google Chrome") == .paste)
     }
 
-    @Test func focusChangeIsReportedBeforeMissingPermission() {
+    @Test func focusChangeWithoutPermissionStillLeavesTextOnClipboard() {
+        #expect(InsertionPolicy.decide(accessibilityGranted: false, dictationAppPID: 10, dictationAppName: "Terminal",
+                                       currentAppPID: 11, currentAppName: "Google Chrome") == .leaveOnClipboard(.accessibilityNotGranted))
+    }
+
+    @Test func dictationAppTargetBlocksPasteAfterFocusChange() {
+        #expect(InsertionPolicy.decide(accessibilityGranted: true, dictationAppPID: 10, dictationAppName: "Code",
+                                       currentAppPID: 11, currentAppName: "Slack", target: .dictationApp)
+                == .leaveOnClipboard(.focusChanged(from: "Code", to: "Slack")))
         #expect(InsertionPolicy.decide(accessibilityGranted: false, dictationAppPID: 10, dictationAppName: "Code",
-                                       currentAppPID: 11, currentAppName: "Slack")
+                                       currentAppPID: 11, currentAppName: "Slack", target: .dictationApp)
                 == .leaveOnClipboard(.focusChanged(from: "Code", to: "Slack")))
     }
 
