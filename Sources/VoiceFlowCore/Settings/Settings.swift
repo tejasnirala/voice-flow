@@ -56,7 +56,9 @@ public struct Settings: Codable, Equatable, Sendable {
     public var sttModelID: String
     /// Bias Whisper toward developer vocabulary via its initial prompt (decisive on real speech, ACCURACY.md §5.5).
     public var useVocabularyPrompt: Bool
-    /// Unload the STT model after this many idle seconds (0 = unload right after each dictation).
+    /// Unload the STT model after this many idle seconds (0 = unload right after each dictation). Default 60 s: loading
+    /// runs while the user speaks (0.3 s), so a cold dictation is as fast as a warm one, while each load/unload cycle
+    /// leaks ~0.7 MB inside whisper.cpp; a minute keeps a burst of dictations on one load (PERFORMANCE.md §3.8).
     public var sttUnloadAfterSeconds: Double
     /// Paste into the app focused when the transcript is ready (default) or only into the app focused at key press.
     public var pasteInto: InsertionPolicy.PasteTarget
@@ -65,7 +67,7 @@ public struct Settings: Codable, Equatable, Sendable {
 
     public init(processingMode: ProcessingMode, hotkey: Hotkey, maxRecordingSeconds: Double,
                 saveRecordingsForDebugging: Bool = false, sttModelID: String = STTModel.mediumEnQ8.id,
-                useVocabularyPrompt: Bool = true, sttUnloadAfterSeconds: Double = 300,
+                useVocabularyPrompt: Bool = true, sttUnloadAfterSeconds: Double = 60,
                 pasteInto: InsertionPolicy.PasteTarget = .currentApp, dictationTrigger: DictationTrigger = .option) {
         self.pasteInto = pasteInto
         self.dictationTrigger = dictationTrigger

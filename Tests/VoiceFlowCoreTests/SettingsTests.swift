@@ -13,7 +13,7 @@ import Testing
         #expect(Settings.default.saveRecordingsForDebugging == false)
         #expect(Settings.default.sttModel == .mediumEnQ8)
         #expect(Settings.default.useVocabularyPrompt)
-        #expect(Settings.default.sttUnloadAfterSeconds == 300)
+        #expect(Settings.default.sttUnloadAfterSeconds == 60)
         #expect(Settings.default.pasteInto == .currentApp)
         #expect(Settings.default.dictationTrigger == .option)
     }

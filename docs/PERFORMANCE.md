@@ -266,6 +266,26 @@ flat. Hypothesis: whisper.cpp's temperature fallback allocating `best_of` = 5 de
 - 20 further live playback dictations (10 default, 10 `best_of = 1`): flat at 1,182–1,185 MB, **no step reproduced**.
 Decision: no decoding change without evidence. Watch for recurrence (the speech log records footprint per dictation).
 
+### 3.8 Phase 6: cold vs warm model, 2026-09-17
+Core ML encoder, speaker playback, `sttUnloadAfterSeconds = 0` (model unloaded after every dictation, so each dictation
+loads it while recording):
+
+| Recording | Model load (during recording) | Release → text, cold | Warm reference (§3.6) |
+|---|---|---|---|
+| 5.2 s (×4) | 0.29–0.36 s | **656 / 754 / 706 / 686 ms** | 544–700 ms |
+| 1.5 s (×4) | 0.30–0.32 s | **573 / 603 / 573 / 583 ms** | — |
+
+**Cold = warm:** the load finishes before release for any dictation longer than ~0.35 s (shorter ones are discarded as too
+short). Keeping the model warm doesn't buy latency.
+
+**Load/unload cycles leak slowly.** Footprint after unload across 20 consecutive cycles (1.5 s dictations):
+210, 218, 220, 222, 223, 224, 224, 225, 225, 225, 225, 225, 227, 227, 230, 230, 230, 231, 232, 233 MB
+(+23 MB, ~0.7 MB per cycle after the first few), inside whisper.cpp/Core ML.
+
+**Decision:** default `sttUnloadAfterSeconds` 300 → **60 s**. Same latency; ~1 GB is returned a minute after a burst
+instead of five; a burst of dictations shares one load, so few leak cycles. Open: the ~190 MB after unload plus the slow
+per-cycle growth can only be fully avoided by running STT in a helper process that exits when idle (owner decision).
+
 ## 4. Audio recording (Phase 3)
 
 ### 4.1 Start latency and cost, 2026-09-17

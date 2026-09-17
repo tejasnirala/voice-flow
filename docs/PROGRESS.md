@@ -198,7 +198,7 @@ per 30–60 s, GPU 0, footprint 13 MB.
       544–700 ms (was 914–1,015). `fetch-models.sh whisper-coreml medium.en`; the load log names the encoder
 - [x] Memory step (+292 MB once): decode-fallback hypothesis tested; not reproduced in 20 live dictations → watch, no change
 - [x] Fixed: model size check didn't follow symlinks (a symlinked model was reported as damaged)
-- [ ] Cold vs warm: measure dictation latency with the model unloaded before each dictation → choose `sttUnloadAfterSeconds`
+- [x] Cold vs warm: cold = warm latency (load 0.3 s runs during speech); load/unload cycles leak ~0.7 MB each → default unload 300 → 60 s
 - [ ] Residual ~187 MB after unload: decide (accept / helper process / upstream)
 - [ ] Recording start latency (engine prepare) and ⌥ dispatch latency (from owner use)
 - [ ] Docs + commit + owner check
@@ -230,6 +230,7 @@ Per SPEC.md. Notes so far:
 | 2026-09-17 | Load STT model at recording start; idle unload via one-shot timer (300 s provisional) | Model ready at release; memory returned when idle (except ~170 MB whisper.cpp residue) | ARCHITECTURE §3.6 |
 | 2026-09-17 | Paste via clipboard snapshot → ⌘V → restore after 250 ms; paste only into the app focused at key press | Owner-tested in VS Code/WhatsApp; never loses text | ARCHITECTURE §3.4 |
 | 2026-09-17 | Paste into the app focused when the transcript is ready (switch apps while dictating); `pasteInto: dictationApp` keeps the old behavior | Owner request (Wispr Flow-style continuity); last transcript stays in the menu | ARCHITECTURE §3.4 |
+| 2026-09-17 | Unload STT model 60 s after last use (was 300 s) | Cold dictation as fast as warm; ~0.7 MB leak per load cycle favors bursts sharing a load | PERFORMANCE §3.8 |
 | 2026-09-17 | Core ML (Neural Engine) Whisper encoder | Same accuracy, −17…25% latency; `audio_ctx` fitting rejected (fails gate) | PERFORMANCE §3.5–3.6 |
 | 2026-09-17 | Trigger = ⌥ alone (hold; double-tap for hands-free), listen-only event taps; ⌥Space fallback | Owner request (Wispr Flow–style); no idle cost measured | ARCHITECTURE §3.3 |
 | 2026-09-17 | Segment dictations > 29 s at pauses into independent chunks | Owner's long dictation lost speech and invented a loop; long-form WER 22.7% → 0.7%, no short-clip regression | ACCURACY §5.9 |
