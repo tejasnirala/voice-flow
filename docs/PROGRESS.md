@@ -17,7 +17,7 @@
 | 7 | Local LLM (Smart Mode) | ✅ Complete (2026-09-17) |
 | 8 | Text modes | ✅ Complete (2026-09-17, owner approved) |
 | 9 | Developer intelligence | ✅ Complete (2026-09-17, owner tested) |
-| 10 | Application awareness | 🟡 Owner tested 2026-09-17; grammar fixes added, awaiting re-test & approval |
+| 10 | Application awareness | ✅ Complete (2026-09-17, owner approved) |
 | 11 | Final performance optimization | ⬜ |
 | 12 | Packaging | ⬜ |
 | 13 | Final audit | ⬜ |
@@ -263,7 +263,7 @@ per 30–60 s, GPU 0, footprint 13 MB.
 - [x] Owner tested Developer corrections, Code mode and the dictionary; approved (2026-09-17)
 - Not handled (no safe context): "we don't need help for now", "forms" vs "form's", Hinglish
 
-## Phase 10 — Application awareness 🟡 (owner tested; grammar fixes awaiting re-test)
+## Phase 10 — Application awareness ✅
 - [x] `AppModePolicy` (Core): owner rule → browser AI tab → built-in bundle table → menu mode; `modeByApp` (default on), `appModes`
       (tolerant decoding); 6 tests
 - [x] `TargetApp` (app): receiving app (paste target), browser focused-window title via Accessibility (100 ms timeout, never logged)
@@ -276,7 +276,7 @@ per 30–60 s, GPU 0, footprint 13 MB.
       sentence-opener allowances in the strict guard, one narrow prompt sentence; broad grammar prompt tried and reverted
       (more rejections) (ACCURACY §7.4)
 - [x] 143 core tests + 3 app tests pass
-- [ ] **Owner:** re-test grammar (possessives, contractions, "the tests is") and approve Phase 10
+- [x] Owner approved Phase 10 (2026-09-17)
 - Found for Phase 11: model modes take 3–4 s end to end (rewrite 1.9–2.6 s); rejected rewrites waste that time
 - Terminals default to Developer (spec allows Raw/Developer); Code available per terminal
 
@@ -325,7 +325,7 @@ Per SPEC.md. Notes so far:
 ## Session handoff notes
 _Overwrite at the end of every session._
 
-- **Last session (2026-09-17):** Phases 0–9 complete (owner approved). Phase 10 (application awareness) owner-tested; grammar fixes added; awaiting re-test.
+- **Last session (2026-09-17):** Phases 0–9 complete (owner approved). Phases 0–10 complete (owner approved). Next: Phase 11.
 - **Models on this machine** (`~/Library/Application Support/VoiceFlow/models/`): **in use:** whisper medium.en-q8_0 +
   ggml-medium.en-encoder.mlmodelc. Benchmark-only (deletable on request): whisper tiny.en, base.en, small.en, large-v3-turbo,
   large-v3-turbo-q8_0 (STT alternate), distil-large-v3; parakeet tdt-0.6b-v3-q8_0.
@@ -333,4 +333,4 @@ _Overwrite at the end of every session._
   `benchmarks-output/results/human/`. Rerunning `scripts/bench/stt.sh human` re-scores instantly.
 - **Mode benchmark data:** `benchmarks-output/results/modes/` (prepared inputs, model JSONL per mode, `report.md` with every
   accepted/rejected rewrite). Re-score after guard changes with `vf-bench modes report … --results …` (no model rerun needed).
-- **Next action:** owner re-tests grammar fixes and approves Phase 10 → Phase 11 (performance: model-mode latency first).
+- **Next action:** Phase 11 (final performance optimization), starting with model-mode latency (rewrite 1.9–2.6 s; rejected rewrites waste it).
