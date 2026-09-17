@@ -42,7 +42,9 @@ public enum TranscriptNormalizer {
         var cleaned = ""
         cleaned.reserveCapacity(text.count)
         for ch in text.lowercased() {
-            if ch.isLetter || ch.isNumber || ch == "'" { cleaned.append(ch) }
+            // Combining vowel signs and viramas (Devanagari matras) belong to their word, like letters.
+            let isMark = ch.unicodeScalars.allSatisfy { [.nonspacingMark, .spacingMark, .enclosingMark].contains($0.properties.generalCategory) }
+            if ch.isLetter || ch.isNumber || ch == "'" || isMark { cleaned.append(ch) }
             else if ch == "’" { cleaned.append("'") }
             else { cleaned.append(" ") }
         }
@@ -53,7 +55,30 @@ public enum TranscriptNormalizer {
             if let expansion = equivalents[token] { tokens.append(contentsOf: expansion) }
             else { tokens.append(token.replacingOccurrences(of: "'", with: "")) }
         }
-        return numbersToDigits(tokens)
+        let converted = numbersToDigits(tokens)
+        return romanizedHindi ? converted.map(romanizedHindiKey) : converted
+    }
+
+    /// Scoring option for romanized Hindi (Hinglish), which has no standard spelling: "nahi"/"nahin", "hain"/"hai",
+    /// "mein"/"main", "aa"/"a" are the same word. Applied to both reference and hypothesis, so it removes spelling
+    /// convention noise, not recognition errors. Off by default (English, German, Devanagari).
+    nonisolated(unsafe) public static var romanizedHindi = false
+
+    static let romanizedVariants: [String: String] = [
+        "main": "mein", "me": "mein", "mai": "mein", "mei": "mein", "nahin": "nahi", "nhi": "nahi", "nai": "nahi",
+        "hain": "hai", "he": "hai", "hei": "hai", "hay": "hai", "yah": "yeh", "ye": "yeh", "yeah": "yeh", "ham": "hum",
+        "kee": "ki", "kyaa": "kya", "lie": "liye", "thora": "thoda", "toh": "to", "bhee": "bhi", "wala": "vala",
+    ]
+
+    static func romanizedHindiKey(_ token: String) -> String {
+        guard token.allSatisfy({ $0.isASCII }) else { return token }
+        var t = romanizedVariants[token] ?? token
+        t = t.replacingOccurrences(of: "w", with: "v")
+        // Collapse doubled letters and long-vowel spellings: "baarish" = "barish", "chhutti" = "chuti", "ee" = "i".
+        for (from, to) in [("ee", "i"), ("oo", "u"), ("chh", "ch")] { t = t.replacingOccurrences(of: from, with: to) }
+        var collapsed = ""
+        for ch in t where collapsed.last != ch { collapsed.append(ch) }
+        return collapsed
     }
 
     static func numbersToDigits(_ tokens: [String]) -> [String] {

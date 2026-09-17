@@ -1,0 +1,1 @@
+Wir sprechen über Softwareentwicklung: Next.js, TypeScript, Node.js, Express, PostgreSQL, Redis, MongoDB, RabbitMQ, Docker, Kubernetes, GitHub Actions, GraphQL, JWT, OAuth, npm install, git rebase, docker compose up, package.json, .env.local, useEffect, getUserById.

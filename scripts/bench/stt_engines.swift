@@ -21,6 +21,10 @@ do {
 func opt(_ k: String) -> String { guard let v = opts[k] else { fatalError("missing --\(k)") }; return v }
 let engineName = opt("engine"), modelArg = opt("model"), runName = opt("run"), voice = opt("voice")
 let useGPU = (opts["backend"] ?? "metal") == "metal"
+/// Whisper language: a code ("en", "de", "hi") or "auto3" = detect among English, German and Hindi, then transcribe in it.
+let language = opts["language"] ?? "en"
+/// Set by an engine that detected the language for the last clip: ["detected": code, "p_en": …, "p_de": …, "p_hi": …].
+nonisolated(unsafe) var lastDetection: [String: Any]?
 let prompt = opts["prompt-file"].flatMap { try? String(contentsOfFile: $0, encoding: .utf8) }?
     .trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -91,7 +95,20 @@ final class WhisperEngine: Engine {
         p.n_threads = 4
         p.print_progress = false; p.print_realtime = false; p.print_timestamps = false; p.print_special = false
         p.no_timestamps = true
-        let lang = strdup("en"), promptC = prompt.map { strdup($0) }
+        var code = language
+        if language == "auto3" {
+            // Detection on the first 30 s, restricted to the three supported languages.
+            _ = pcm.withUnsafeBufferPointer { whisper_pcm_to_mel(ctx, $0.baseAddress, Int32($0.count), 4) }
+            var probs = [Float](repeating: 0, count: Int(whisper_lang_max_id()) + 1)
+            _ = probs.withUnsafeMutableBufferPointer { whisper_lang_auto_detect(ctx, 0, 4, $0.baseAddress) }
+            let candidates: [(String, Float)] = ["en", "de", "hi"].map { code in
+                let id = code.withCString { whisper_lang_id($0) }
+                return (code, probs[Int(id)])
+            }
+            code = candidates.max { $0.1 < $1.1 }!.0
+            lastDetection = ["detected": code] .merging(Dictionary(uniqueKeysWithValues: candidates.map { ("p_\($0.0)", Double($0.1)) })) { a, _ in a }
+        }
+        let lang = strdup(code), promptC = prompt.map { strdup($0) }
         defer { free(lang); promptC.map { free($0) } }
         p.language = UnsafePointer(lang)
         if let promptC { p.initial_prompt = UnsafePointer(promptC) }
@@ -129,6 +146,10 @@ final class AppleSpeechEngine: Engine {
     }
     func transcribe(_ pcm: [Float], url: URL) async throws -> String {
         let transcriber = SpeechTranscriber(locale: locale, transcriptionOptions: [], reportingOptions: [], attributeOptions: [])
+        if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+            // One-time system download of the locale's on-device model (setup, not app runtime).
+            try await request.downloadAndInstall()
+        }
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         if !vocabulary.isEmpty {
             let context = AnalysisContext()
@@ -187,12 +208,14 @@ func run() async throws {
     for (id, url) in clips {
         let pcm = try loadPCM16k(url)
         let gpu0 = gpuSeconds(), cpu0 = cpuSeconds(), s = now()
+        lastDetection = nil
         let text = try await engine.transcribe(pcm, url: url)
         let latency = now() - s, cpu = cpuSeconds() - cpu0, gpu = gpuSeconds() - gpu0
         var line: [String: Any] = ["type": "clip", "run": runName, "id": id, "voice": voice,
                                    "audio_s": Double(pcm.count) / 16000, "latency_s": latency,
                                    "text": text.trimmingCharacters(in: .whitespacesAndNewlines)]
         if engineName != "apple" { line["cpu_s"] = cpu; line["gpu_s"] = gpu }
+        if let lastDetection { line.merge(lastDetection) { a, _ in a } }
         out.write(Data((jsonLine(line) + "\n").utf8))
     }
     var summary: [String: Any] = ["type": "run", "run": runName, "load_s": loadS, "first_run_s": firstRunS,

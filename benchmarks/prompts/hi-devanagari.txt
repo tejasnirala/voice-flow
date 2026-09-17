@@ -1,0 +1,1 @@
+यह एक developer की बातचीत है। हम function, API, Redis, PostgreSQL, Next.js, TypeScript, Docker, Kubernetes, kubectl, git rebase, npm install, useEffect, handleSubmit और production bug की बात कर रहे हैं।

@@ -1,0 +1,62 @@
+{
+ "version": 1,
+ "notes": "Phase 14. German entries: `text` is both what is said and the ideal written form. Hindi entries are spoken once and scored in two scripts: `devanagari` (English words kept in Latin, owner decision 2026-09-17) and `hinglish` (romanized). `terms` are technical terms that must be recognized (Latin spelling; `a|b` = accepted spoken variants).",
+ "entries": [
+  {"id": "de-normal-01", "language": "de", "category": "normal", "terms": [], "text": "Ich schicke dem Kunden morgen früh eine E-Mail."},
+  {"id": "de-normal-02", "language": "de", "category": "normal", "terms": [], "text": "Kannst du bitte prüfen, ob die Rechnung letzte Woche bezahlt wurde?"},
+  {"id": "de-normal-03", "language": "de", "category": "normal", "terms": [], "text": "Danke für das Update, ich schaue es mir nach dem Mittagessen an."},
+  {"id": "de-normal-04", "language": "de", "category": "normal", "terms": [], "text": "Ich arbeite am Freitag von zu Hause, lass uns kurz telefonieren."},
+  {"id": "de-normal-05", "language": "de", "category": "normal", "terms": [], "text": "Bitte lies dieses Dokument bis zum Ende des Tages."},
+  {"id": "de-normal-06", "language": "de", "category": "normal", "terms": [], "text": "Die Präsentation für den Vorstand ist fast fertig."},
+  {"id": "de-normal-07", "language": "de", "category": "normal", "terms": [], "text": "Draußen regnet es stark, deshalb komme ich etwas später."},
+  {"id": "de-normal-08", "language": "de", "category": "normal", "terms": [], "text": "Der Kunde ist mit dem neuen Design sehr zufrieden."},
+
+  {"id": "de-technical-01", "language": "de", "category": "technical", "terms": ["Next.js", "TypeScript"], "text": "Wir verwenden Next.js mit TypeScript im Frontend."},
+  {"id": "de-technical-02", "language": "de", "category": "technical", "terms": ["Node.js", "Express"], "text": "Das Backend läuft auf Node.js und Express."},
+  {"id": "de-technical-03", "language": "de", "category": "technical", "terms": ["PostgreSQL", "Redis"], "text": "Die Datenbank ist PostgreSQL, und Redis nutzen wir als Cache."},
+  {"id": "de-technical-04", "language": "de", "category": "technical", "terms": ["Docker", "Kubernetes"], "text": "Die Services laufen in Docker-Containern auf Kubernetes."},
+  {"id": "de-technical-05", "language": "de", "category": "technical", "terms": ["JWT", "OAuth"], "text": "Die Authentifizierung nutzt JWT Access Tokens und OAuth für den Google-Login."},
+  {"id": "de-technical-06", "language": "de", "category": "technical", "terms": ["REST API", "GraphQL"], "text": "Wir migrieren von einer REST API zu GraphQL."},
+  {"id": "de-technical-07", "language": "de", "category": "technical", "terms": ["Nginx", "React"], "text": "Nginx steht als Reverse Proxy vor der React-App."},
+  {"id": "de-technical-08", "language": "de", "category": "technical", "terms": ["RabbitMQ", "MongoDB"], "text": "Der Worker liest Nachrichten aus RabbitMQ und schreibt die Ergebnisse in MongoDB."},
+
+  {"id": "de-commands-01", "language": "de", "category": "commands", "terms": ["npm install"], "text": "Führ zuerst npm install aus und starte dann den Server neu."},
+  {"id": "de-commands-02", "language": "de", "category": "commands", "terms": ["git rebase"], "text": "Mach vor dem Push einen git rebase auf main."},
+  {"id": "de-commands-03", "language": "de", "category": "commands", "terms": ["docker compose up"], "text": "Starte alles mit docker compose up."},
+  {"id": "de-files-01", "language": "de", "category": "files", "terms": ["package.json"], "text": "Füge das Skript zur package.json hinzu."},
+  {"id": "de-files-02", "language": "de", "category": "files", "terms": ["API", ".env.local"], "text": "Leg den API-Key in die .env.local-Datei."},
+  {"id": "de-identifiers-01", "language": "de", "category": "identifiers", "terms": ["getUserById|get user by id"], "text": "Die Funktion getUserById gibt null zurück, wenn der Benutzer nicht existiert."},
+
+  {"id": "de-natural-01", "language": "de", "category": "natural", "terms": ["Express", "Redis", "npm run dev"], "text": "Der Plan für das Refactoring ist folgender. Zuerst verschieben wir die Token-Validierung aus der Express-Middleware in einen eigenen Service. Danach speichern wir die Session in Redis, damit die API-Antwort gecacht werden kann, und prüfen mit npm run dev, ob lokal noch alles funktioniert."},
+  {"id": "de-natural-02", "language": "de", "category": "natural", "terms": ["useEffect", "handleSubmit"], "text": "Ich habe mir den Fehler auf der Checkout-Seite angesehen. handleSubmit wird zweimal aufgerufen, weil der useEffect-Hook kein Dependency-Array hat. Ich denke, wir sollten den API-Aufruf in eine eigene Funktion auslagern."},
+  {"id": "de-natural-03", "language": "de", "category": "natural", "terms": [], "text": "Kurzes Update zum Projekt: Das Design-Review lief gut, und der Kunde ist mit dem neuen Onboarding zufrieden. Wir müssen noch die Preisseite fertigstellen und ein paar Layout-Probleme auf dem Handy beheben."},
+  {"id": "de-natural-04", "language": "de", "category": "natural", "terms": ["GitHub Actions", "Docker", "Kubernetes"], "text": "Für das Deployment halten wir es einfach. Wir bauen das Docker-Image in GitHub Actions, pushen es in die Registry, und Kubernetes zieht den neuen Tag. Wenn der Health Check fehlschlägt, rollen wir auf die vorherige Version zurück."},
+
+  {"id": "hi-normal-01", "language": "hi", "category": "normal", "terms": [], "devanagari": "कल की meeting को postpone कर देते हैं, मुझे थोड़ा और time चाहिए।", "hinglish": "Kal ki meeting ko postpone kar dete hain, mujhe thoda aur time chahiye."},
+  {"id": "hi-normal-02", "language": "hi", "category": "normal", "terms": [], "devanagari": "मैं शुक्रवार को घर से काम करूँगा, शाम को call पर बात करते हैं।", "hinglish": "Main shukravaar ko ghar se kaam karunga, shaam ko call par baat karte hain."},
+  {"id": "hi-normal-03", "language": "hi", "category": "normal", "terms": [], "devanagari": "क्या तुम check कर सकते हो कि पिछले हफ़्ते का invoice pay हुआ या नहीं?", "hinglish": "Kya tum check kar sakte ho ki pichhle hafte ka invoice pay hua ya nahi?"},
+  {"id": "hi-normal-04", "language": "hi", "category": "normal", "terms": [], "devanagari": "Update के लिए धन्यवाद, मैं खाने के बाद देख लूँगा।", "hinglish": "Update ke liye dhanyavaad, main khaane ke baad dekh lunga."},
+  {"id": "hi-normal-05", "language": "hi", "category": "normal", "terms": [], "devanagari": "कृपया आज शाम तक यह document पढ़ लीजिए।", "hinglish": "Kripya aaj shaam tak yeh document padh lijiye."},
+  {"id": "hi-normal-06", "language": "hi", "category": "normal", "terms": [], "devanagari": "Client नए design से काफ़ी खुश है।", "hinglish": "Client naye design se kaafi khush hai."},
+  {"id": "hi-normal-07", "language": "hi", "category": "normal", "terms": [], "devanagari": "मुझे लगता है कि हमें इस हफ़्ते छुट्टी नहीं लेनी चाहिए।", "hinglish": "Mujhe lagta hai ki hamein is hafte chhutti nahi leni chahiye."},
+  {"id": "hi-normal-08", "language": "hi", "category": "normal", "terms": [], "devanagari": "बाहर बहुत बारिश हो रही है, मैं थोड़ी देर से पहुँचूँगा।", "hinglish": "Bahar bahut baarish ho rahi hai, main thodi der se pahunchunga."},
+
+  {"id": "hi-technical-01", "language": "hi", "category": "technical", "terms": ["getUserById|get user by id", "Redis"], "devanagari": "इस function में getUserById call करो और result को Redis में cache कर दो।", "hinglish": "Is function mein getUserById call karo aur result ko Redis mein cache kar do."},
+  {"id": "hi-technical-02", "language": "hi", "category": "technical", "terms": ["docker compose up", "API"], "devanagari": "Docker compose up चलाने के बाद भी API response नहीं आ रहा है।", "hinglish": "Docker compose up chalane ke baad bhi API response nahi aa raha hai."},
+  {"id": "hi-technical-03", "language": "hi", "category": "technical", "terms": [], "devanagari": "यह bug production में सिर्फ़ तब आता है जब user logged out होता है।", "hinglish": "Yeh bug production mein sirf tab aata hai jab user logged out hota hai."},
+  {"id": "hi-technical-04", "language": "hi", "category": "technical", "terms": ["Next.js", "TypeScript"], "devanagari": "हम frontend पर Next.js और TypeScript use कर रहे हैं।", "hinglish": "Hum frontend par Next.js aur TypeScript use kar rahe hain."},
+  {"id": "hi-technical-05", "language": "hi", "category": "technical", "terms": ["PostgreSQL", "Redis"], "devanagari": "Database PostgreSQL है और caching के लिए Redis है।", "hinglish": "Database PostgreSQL hai aur caching ke liye Redis hai."},
+  {"id": "hi-technical-06", "language": "hi", "category": "technical", "terms": ["git rebase"], "devanagari": "Push करने से पहले main पर git rebase कर लेना।", "hinglish": "Push karne se pehle main par git rebase kar lena."},
+  {"id": "hi-technical-07", "language": "hi", "category": "technical", "terms": ["npm install"], "devanagari": "Server restart करने से पहले npm install चला दो।", "hinglish": "Server restart karne se pehle npm install chala do."},
+  {"id": "hi-technical-08", "language": "hi", "category": "technical", "terms": ["API", ".env.local"], "devanagari": "API key को .env.local file में रखो, उसे commit मत करना।", "hinglish": "API key ko .env.local file mein rakho, use commit mat karna."},
+  {"id": "hi-technical-09", "language": "hi", "category": "technical", "terms": ["Kubernetes", "kubectl get pods|kube control get pods"], "devanagari": "Kubernetes पर pods बार-बार crash हो रहे हैं, kubectl get pods से check करो।", "hinglish": "Kubernetes par pods baar-baar crash ho rahe hain, kubectl get pods se check karo."},
+  {"id": "hi-technical-10", "language": "hi", "category": "technical", "terms": ["useEffect|use effect", "handleSubmit|handle submit"], "devanagari": "useEffect hook में dependency array नहीं है, इसलिए handleSubmit दो बार call हो रहा है।", "hinglish": "useEffect hook mein dependency array nahi hai, isliye handleSubmit do baar call ho raha hai."},
+  {"id": "hi-technical-11", "language": "hi", "category": "technical", "terms": ["JWT", "OAuth"], "devanagari": "Login के लिए हम JWT token और Google OAuth use करते हैं।", "hinglish": "Login ke liye hum JWT token aur Google OAuth use karte hain."},
+  {"id": "hi-technical-12", "language": "hi", "category": "technical", "terms": [], "devanagari": "इस endpoint का timeout थोड़ा बढ़ा दो।", "hinglish": "Is endpoint ka timeout thoda badha do."},
+
+  {"id": "hi-natural-01", "language": "hi", "category": "natural", "terms": ["Express", "Redis", "API"], "devanagari": "तो plan यह है कि पहले token validation को Express middleware से निकालकर एक अलग service में डालेंगे। फिर session को Redis में store करेंगे ताकि API response cache हो सके, और pull request खोलने से पहले सब कुछ locally test कर लेंगे।", "hinglish": "To plan yeh hai ki pehle token validation ko Express middleware se nikaalkar ek alag service mein daalenge. Phir session ko Redis mein store karenge taaki API response cache ho sake, aur pull request kholne se pehle sab kuch locally test kar lenge."},
+  {"id": "hi-natural-02", "language": "hi", "category": "natural", "terms": ["useEffect|use effect", "API"], "devanagari": "मैंने checkout page वाला bug देखा। useEffect में dependency array नहीं है, इसलिए API दो बार call हो रही है। मुझे लगता है कि इसे एक अलग function में ले जाना चाहिए।", "hinglish": "Maine checkout page wala bug dekha. useEffect mein dependency array nahi hai, isliye API do baar call ho rahi hai. Mujhe lagta hai ki ise ek alag function mein le jaana chahiye."},
+  {"id": "hi-natural-03", "language": "hi", "category": "natural", "terms": [], "devanagari": "Project का quick update: design review अच्छा रहा और client नए onboarding flow से खुश है। अभी pricing page और mobile के कुछ layout issues बाकी हैं, उम्मीद है अगले हफ़्ते तक सब ship कर देंगे।", "hinglish": "Project ka quick update: design review achha raha aur client naye onboarding flow se khush hai. Abhi pricing page aur mobile ke kuch layout issues baaki hain, ummeed hai agle hafte tak sab ship kar denge."},
+  {"id": "hi-natural-04", "language": "hi", "category": "natural", "terms": ["GitHub Actions", "Docker", "Kubernetes"], "devanagari": "Deployment simple रखते हैं। GitHub Actions में Docker image build होगी, registry में push होगी, और Kubernetes नया tag pull कर लेगा। अगर health check fail हुआ तो पिछले version पर rollback कर देंगे।", "hinglish": "Deployment simple rakhte hain. GitHub Actions mein Docker image build hogi, registry mein push hogi, aur Kubernetes naya tag pull kar lega. Agar health check fail hua to pichhle version par rollback kar denge."}
+ ]
+}

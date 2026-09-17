@@ -39,7 +39,26 @@ func percentile(_ xs: [Double], _ p: Double) -> Double? {
     let s = xs.sorted(); return s[min(s.count - 1, Int((Double(s.count - 1) * p).rounded()))]
 }
 
-let args = Array(CommandLine.arguments.dropFirst())
+var args = Array(CommandLine.arguments.dropFirst())
+// --hinglish: tolerate romanized Hindi spelling variants when scoring (TranscriptNormalizer.romanizedHindi).
+if let index = args.firstIndex(of: "--hinglish") { TranscriptNormalizer.romanizedHindi = true; args.remove(at: index) }
+// `vf-bench hindi-script <results.jsonl> --to hinglish|devanagari --run <name>`: rewrites transcripts with the Phase 14
+// conversions (Devanagari → Hinglish, or Devanagari loanwords → Latin) so they can be scored against the other corpus.
+if args.first == "hindi-script" {
+    let file = args[1]
+    let to = args.firstIndex(of: "--to").map { args[$0 + 1] } ?? "hinglish"
+    let run = args.firstIndex(of: "--run").map { args[$0 + 1] }
+    for raw in try String(contentsOfFile: file, encoding: .utf8).split(separator: "\n") where !raw.isEmpty {
+        guard var object = try JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any] else { continue }
+        if let text = object["text"] as? String {
+            object["text"] = to == "hinglish" ? HindiTransliteration.hinglish(text) : HindiTransliteration.latinizeLoanwords(text)
+        }
+        if let run { object["run"] = run }
+        print(String(data: try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]), encoding: .utf8)!)
+    }
+    exit(0)
+}
+
 if args.first == "modes" {
     exit(try runModes(Array(args.dropFirst())))
 }
