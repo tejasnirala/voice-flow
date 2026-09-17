@@ -75,7 +75,8 @@ benchmark → fix → review → CPU/RAM check → docs + this file → show cha
   D5 ✅ Helm confirmed (genuine error in all models). Add an inserted/repeated n-gram guard to the engine.
 - Hinglish: needs human recordings plus a multilingual model run (large-v3-turbo with language auto/hi).
 - MLX and Apple Foundation Models LLM comparison: Phase 7.
-- "VoiceFlow Dev" signing identity: create before Phase 3 (DEVELOPMENT.md).
+- ✅ "VoiceFlow Dev" signing identity created by owner (2026-09-17); build script fixed to use untrusted self-signed identities
+  by hash and to drop the hardened runtime. Designated requirement is certificate-leaf based (stable across rebuilds).
 - Phase 3: `AVAudioNode.installTap(onBus:bufferSize:format:block:)` is **deprecated in macOS 27**. Use
   `installAudioTap(onBus:bufferSize:format:tapProvider:) throws` behind `#available(macOS 27, *)` (the app
   targets macOS 14+). `scripts/bench/record.swift` still uses the old API (dev tool; warning only).

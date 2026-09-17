@@ -72,9 +72,14 @@ macOS ties Microphone and Accessibility grants to the code signature. Ad-hoc sig
 build, so macOS asks again. Create a self-signed identity once:
 1. Keychain Access → Certificate Assistant → **Create a Certificate…**
 2. Name `VoiceFlow Dev`, Identity Type **Self Signed Root**, Certificate Type **Code Signing** → Create.
-3. `security find-identity -v -p codesigning` lists `"VoiceFlow Dev"`.
+3. `security find-identity -p codesigning` lists `"VoiceFlow Dev"`. It shows `CSSMERR_TP_NOT_TRUSTED`,
+   which is expected for self-signed and doesn't matter for local signing. It's absent from the `-v` (valid-only) list.
 
-`scripts/build-app.sh` uses it automatically (override with `VOICEFLOW_SIGN_IDENTITY`).
+`scripts/build-app.sh` uses it automatically (override with `VOICEFLOW_SIGN_IDENTITY`). Check with
+`codesign -dr - build/VoiceFlow.app`: the designated requirement must be
+`identifier "local.voiceflow.VoiceFlow" and certificate leaf = H"…"`, which is stable across rebuilds.
+The build doesn't enable the hardened runtime (only needed for notarized distribution; it would need
+microphone and library-validation entitlements).
 
 ## Known toolchain gotchas
 - **No Xcode:** no `xcodebuild`, no offline `metal` compiler. whisper.cpp ships Metal shaders as source,

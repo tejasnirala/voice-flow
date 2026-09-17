@@ -5,6 +5,9 @@
 # Signing: uses the "VoiceFlow Dev" identity from the login keychain when present
 # (stable signature => macOS keeps Microphone/Accessibility grants across rebuilds),
 # otherwise ad-hoc (grants may need re-approval after each rebuild).
+# A self-signed identity is reported as "not trusted"; that's fine for signing a local build, so the lookup
+# doesn't filter on validity. No hardened runtime: that's for notarized distribution, and it would require
+# extra entitlements for the microphone and for loading the separately signed whisper framework.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -30,9 +33,10 @@ for fw in Vendor/*.xcframework; do
   cp -R "$slice/$name.framework" "$APP/Contents/Frameworks/"
 done
 
-if security find-identity -v -p codesigning | grep -q "\"$IDENTITY\""; then
-  codesign --force --deep --options runtime --sign "$IDENTITY" "$APP"
-  echo "Signed with: $IDENTITY"
+IDENTITY_HASH="$(security find-identity -p codesigning | awk -v name="\"$IDENTITY\"" 'index($0, name) {print $2; exit}')"
+if [[ -n "$IDENTITY_HASH" ]]; then
+  codesign --force --deep --sign "$IDENTITY_HASH" "$APP"
+  echo "Signed with: $IDENTITY ($IDENTITY_HASH)"
 else
   codesign --force --deep --sign - "$APP"
   echo "Signed ad-hoc (create a 'VoiceFlow Dev' identity to keep permission grants; see docs/development.md)"
