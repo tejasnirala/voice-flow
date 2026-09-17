@@ -58,6 +58,11 @@ scripts/bench/stt.sh synthetic
 scripts/bench/record.sh macbook-mic                 # add --include-hinglish to record Hinglish too
 scripts/bench/stt.sh human
 
+# Long dictations (built from your recordings + pauses), transcribed by the app's own engine
+python3 scripts/bench/make-longform.py macbook-mic
+build/VoiceFlow.app/Contents/MacOS/VoiceFlow --transcribe-benchmark benchmarks-output/audio/longform/macbook-mic \
+  --corpus benchmarks-output/longform-corpus.json --out benchmarks-output/results/longform/run.jsonl
+
 # Subset of runs: regex filter on run names
 scripts/bench/stt.sh human 'large-v3-turbo|parakeet'
 ```

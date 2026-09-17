@@ -1,7 +1,7 @@
 import AppKit
 import AVFoundation
 
-/// Microphone permission. Accessibility (needed to paste) is added in Phase 5.
+/// Microphone (recording) and Accessibility (posting ⌘V to paste) permissions.
 @MainActor
 enum PermissionManager {
     enum Microphone { case authorized, notDetermined, denied }
@@ -18,6 +18,25 @@ enum PermissionManager {
     static func requestMicrophone(completion: @escaping @MainActor (Bool) -> Void) {
         AVCaptureDevice.requestAccess(for: .audio) { granted in
             DispatchQueue.main.async { completion(granted) }
+        }
+    }
+
+    /// Whether VoiceFlow may post keyboard events (required to paste).
+    static var isAccessibilityTrusted: Bool { AXIsProcessTrusted() }
+
+    private static var accessibilityPromptShown = false
+
+    /// Shows the system's "allow in Accessibility" prompt, at most once per launch.
+    static func requestAccessibility() {
+        guard !accessibilityPromptShown else { return }
+        accessibilityPromptShown = true
+        let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(options)
+    }
+
+    static func openAccessibilitySettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
         }
     }
 

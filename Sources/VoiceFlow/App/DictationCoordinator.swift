@@ -1,8 +1,8 @@
-import Foundation
+import AppKit
 import VoiceFlowCore
 
 /// Connects hardware/OS events to the `PipelineStateMachine` and performs the side effects of each
-/// accepted transition. Phase 4: hotkey → recording → local STT. Insertion is attached in Phase 5.
+/// accepted transition: hotkey → recording → local STT → paste into the focused app.
 @MainActor
 final class DictationCoordinator {
     private(set) var machine = PipelineStateMachine()
@@ -26,6 +26,14 @@ final class DictationCoordinator {
     /// Model load started when recording begins, so the model is ready (or nearly) at release.
     private var prepareTask: Task<Void, Error>?
     private var unloadWork: DispatchWorkItem?
+
+    // MARK: Insertion state
+    private let inserter = TextInserter()
+    /// App in front when the hotkey was pressed; the transcript is only pasted into this app.
+    private var dictationApp: NSRunningApplication?
+    private var releaseUptimeNs: UInt64 = 0
+    /// Measurement mode turns this off so automated runs never type into whatever app is in front.
+    var insertionEnabled = true
 
     /// Most recent transcript, kept in memory only (shown in the menu, cleared on quit).
     private(set) var lastTranscript: String?
@@ -108,6 +116,7 @@ final class DictationCoordinator {
     /// Starts a recording without the hotkey (measurement mode). Returns false if it couldn't start.
     func startRecordingProgrammatically() -> Bool {
         pressUptimeNs = DispatchTime.now().uptimeNanoseconds
+        dictationApp = NSWorkspace.shared.frontmostApplication
         send(.hotkeyPressed)
         return machine.state == .recording
     }
@@ -131,6 +140,7 @@ final class DictationCoordinator {
         case (.dictation, .pressed):
             Log.hotkey.notice("pressed, dispatch latency \(latencyMs, format: .fixed(precision: 2), privacy: .public) ms")
             pressUptimeNs = DispatchTime.now().uptimeNanoseconds - UInt64(max(0, latencyMs) * 1_000_000)
+            dictationApp = NSWorkspace.shared.frontmostApplication
             send(.hotkeyPressed)
         case (.dictation, .released):
             Log.hotkey.notice("released, dispatch latency \(latencyMs, format: .fixed(precision: 2), privacy: .public) ms")
@@ -180,9 +190,7 @@ final class DictationCoordinator {
         case .transcribing:
             transcribePendingAudio()
         case .inserting:
-            // Phase 4 stub: text insertion arrives in Phase 5. The transcript is available in the menu.
-            Log.pipeline.notice("insertion not implemented yet (Phase 5); transcript kept in menu")
-            send(.insertionFinished)
+            insertLastTranscript()
         case .idle:
             pendingAudio = nil
         case .error(let failure) where failure.recovery != .retryTranscription:
@@ -328,6 +336,7 @@ final class DictationCoordinator {
         let preparation = prepareTask
         let speechSeconds = pendingSpeechSeconds
         let releasedAt = DispatchTime.now().uptimeNanoseconds
+        releaseUptimeNs = releasedAt
         let cpuBefore = ResourceUsage.cpuSeconds
 
         Task { [weak self] in
@@ -363,6 +372,7 @@ final class DictationCoordinator {
             let words = result.text.split(whereSeparator: \.isWhitespace).count
             Log.speech.notice("""
                 stt: audio \(result.audioSeconds, format: .fixed(precision: 2), privacy: .public) s, \
+                \(result.chunkCount, privacy: .public) chunk(s) / \(result.transcribedAudioSeconds, format: .fixed(precision: 1), privacy: .public) s sent, \
                 transcribe \(result.transcribeSeconds, format: .fixed(precision: 3), privacy: .public) s \
                 (RTF \(result.transcribeSeconds / max(result.audioSeconds, 0.001), format: .fixed(precision: 3), privacy: .public)), \
                 \(result.coldStart ? "cold" : "warm", privacy: .public), load in call \(result.loadSeconds, format: .fixed(precision: 2), privacy: .public) s, \
@@ -380,6 +390,45 @@ final class DictationCoordinator {
                 lastTranscript = result.text
                 onSpeechInfoChange?(modelStatus, lastTranscript)
                 send(.transcriptionSucceeded(needsProcessing: false))
+            }
+        }
+    }
+
+    // MARK: - Insertion
+
+    private func insertLastTranscript() {
+        guard let text = lastTranscript else {
+            send(.insertionFinished)
+            return
+        }
+        guard insertionEnabled else {
+            Log.insertion.notice("insertion disabled (measurement mode)")
+            send(.insertionFinished)
+            return
+        }
+        let target = dictationApp
+        inserter.insert(text, dictationApp: target) { [weak self] outcome, metrics, restored in
+            guard let self else { return }
+            if let restored {
+                Log.insertion.notice("clipboard \(restored ? "restored" : "left as is (changed by the user after the paste)", privacy: .public)")
+                return
+            }
+            let totalMs = Double(DispatchTime.now().uptimeNanoseconds - self.releaseUptimeNs) / 1_000_000
+            let app = target?.bundleIdentifier ?? "unknown"
+            switch outcome {
+            case .pasted:
+                Log.insertion.notice("""
+                    pasted into \(app, privacy: .public): snapshot \(metrics.snapshotItems, privacy: .public) items \
+                    \(metrics.snapshotBytes / 1024, privacy: .public) KB in \(metrics.snapshotMs, format: .fixed(precision: 1), privacy: .public) ms, \
+                    write \(metrics.writeMs, format: .fixed(precision: 1), privacy: .public) ms, ⌘V \(metrics.pasteEventMs, format: .fixed(precision: 1), privacy: .public) ms; \
+                    release → pasted \(totalMs, format: .fixed(precision: 0), privacy: .public) ms
+                    """)
+                self.send(.insertionFinished)
+            case .leftOnClipboard(let reason):
+                Log.insertion.notice("not pasted (\(String(describing: reason), privacy: .public)); transcript left on clipboard")
+                self.send(.failed(PipelineFailure(
+                    stage: .insertion, message: InsertionPolicy.message(for: reason),
+                    recovery: reason == .accessibilityNotGranted ? .openAccessibilitySettings : nil)))
             }
         }
     }

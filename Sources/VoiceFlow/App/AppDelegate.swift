@@ -50,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let runs = max(1, Int(value("--runs") ?? 1))
         let stay = args.contains("--stay")
         coordinator.reuseAudioEngine = !args.contains("--fresh-engine")
+        coordinator.insertionEnabled = false
         Log.lifecycle.notice("measurement mode: \(runs, privacy: .public) × \(seconds, format: .fixed(precision: 1), privacy: .public) s, reuse engine \(coordinator.reuseAudioEngine, privacy: .public)")
 
         var remaining = runs

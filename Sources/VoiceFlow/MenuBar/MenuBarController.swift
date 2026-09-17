@@ -70,7 +70,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         case .recording: "🎙 Recording… (Esc to cancel)"
         case .transcribing: "Transcribing on this Mac…"
         case .processing: "Processing…"
-        case .inserting: "Inserting…"
+        case .inserting: "Pasting…"
         case .error(let failure): "⚠︎ \(failure.message)"
         }
     }
@@ -96,11 +96,22 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         if state == .idle, modelStatus != .installed {
             menu.addItem(disabled("⚠︎ Speech model \(modelStatusText) — run \(settings.sttModel.installCommand)"))
         }
+        if !PermissionManager.isAccessibilityTrusted, !(state.isErrorWithRecovery(.openAccessibilitySettings)) {
+            menu.addItem(disabled("⚠︎ Accessibility not allowed — text is copied, not pasted"))
+            let open = NSMenuItem(title: "Open Accessibility Settings…", action: #selector(openAccessibilitySettings), keyEquivalent: "")
+            open.target = self
+            menu.addItem(open)
+        }
         if case .error(let failure) = state {
             if failure.recovery == .retryTranscription {
                 let retry = NSMenuItem(title: "Retry Transcription", action: #selector(retryTranscription), keyEquivalent: "")
                 retry.target = self
                 menu.addItem(retry)
+            }
+            if failure.recovery == .openAccessibilitySettings {
+                let open = NSMenuItem(title: "Open Accessibility Settings…", action: #selector(openAccessibilitySettings), keyEquivalent: "")
+                open.target = self
+                menu.addItem(open)
             }
             if failure.recovery == .openMicrophoneSettings {
                 let open = NSMenuItem(title: "Open Microphone Settings…", action: #selector(openMicrophoneSettings), keyEquivalent: "")
@@ -170,6 +181,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         NSPasteboard.general.setString(lastTranscript, forType: .string)
     }
 
+    @objc private func openAccessibilitySettings() {
+        PermissionManager.openAccessibilitySettings()
+    }
+
     @objc private func openMicrophoneSettings() {
         PermissionManager.openMicrophoneSettings()
     }
@@ -202,5 +217,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             alert.informativeText = "\(settingsStore.fileURL.path)\n\n\(error.localizedDescription)"
             alert.runModal()
         }
+    }
+}
+
+private extension PipelineState {
+    func isErrorWithRecovery(_ recovery: PipelineFailure.Recovery) -> Bool {
+        if case .error(let failure) = self { return failure.recovery == recovery }
+        return false
     }
 }

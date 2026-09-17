@@ -11,6 +11,10 @@ public struct TranscriptionResult: Equatable, Sendable {
     public var waitedForModelSeconds: Double
     /// What `TranscriptGuard` changed or flagged.
     public var guardFlags: Set<TranscriptGuard.Flag>
+    /// Chunks transcribed (1 for audio up to `SpeechSegmenter` max chunk length).
+    public var chunkCount: Int = 1
+    /// Seconds of audio actually sent to the model after removing long silences.
+    public var transcribedAudioSeconds: Double = 0
 
     public init(text: String, audioSeconds: Double, transcribeSeconds: Double, coldStart: Bool, loadSeconds: Double,
                 waitedForModelSeconds: Double = 0, guardFlags: Set<TranscriptGuard.Flag> = []) {

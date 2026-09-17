@@ -69,7 +69,8 @@ ANY ──failure──▶ ERROR (message shown; transcript kept on clipboard if
 ```
 Sources/VoiceFlowCore/          (no AppKit/AVFoundation; unit-tested)
   State/        PipelineStateMachine, PipelineFailure (with recovery hints)
-  Audio/        RecordingGate (level analysis, keep/tooShort/silent)
+  Audio/        RecordingGate (level analysis, keep/tooShort/silent), SpeechSegmenter (long-dictation chunks)
+  Insertion/    InsertionPolicy (paste vs leave on clipboard, restore rule)
   Settings/     Settings model + persistence (Codable JSON)
   Speech/       SpeechEngine protocol, TranscriptionResult, STTModel catalog/status/verification record,
                 TranscriptGuard, Accuracy/ (corpus, normalizer, scorer)
@@ -82,7 +83,7 @@ Sources/VoiceFlow/              (app; OS & native runtime boundaries)
   Audio/        AudioRecorder (AVAudioEngine), DebugRecordingWriter (opt-in WAV)
   Speech/       WhisperEngine (whisper.cpp, Metal), STTModelManager (locate, SHA-256 verify, vocabulary prompt)
   Processing/   LocalLLMEngine (llama.cpp)
-  Insertion/    ClipboardManager, TextInserter
+  Insertion/    ClipboardManager (full snapshot/restore), TextInserter (⌘V, focus check)
   Permissions/  PermissionManager (microphone; Accessibility in Phase 5)
   Diagnostics/  Log (os.Logger categories), process start time
 Sources/vf-bench/               Benchmark scoring CLI
@@ -156,6 +157,9 @@ Verified behavior (Phase 2, owner-tested 2026-09-17):
 | **Pasteboard + synthetic ⌘V** | Works nearly everywhere; fast for any length | Touches the clipboard (mitigated by snapshot/restore) | Native, Electron (VS Code, Cursor, Slack, Discord), Terminal, browsers | Accessibility (to post ⌘V) | **Chosen** |
 | AX `kAXSelectedTextAttribute` | No clipboard use | Unreliable in Electron, terminals, web content | Native Cocoa text views | Accessibility | Possible later fast path, not primary |
 | Unicode keystroke typing (`CGEventKeyboardSetUnicodeString`) | No clipboard use | Slow for long text; fights autocomplete/IME | Most | Accessibility | Rejected |
+
+**Implemented (Phase 5):** `Insertion/ClipboardManager.swift` and `TextInserter.swift`; rules in
+`VoiceFlowCore/Insertion/InsertionPolicy.swift`. Verified in VS Code and WhatsApp (PERFORMANCE.md §4.4).
 
 Clipboard algorithm (Phase 5):
 1. Snapshot every `NSPasteboardItem` × every type's data (text, RTF, images, files, custom). Record `changeCount`.
@@ -257,6 +261,10 @@ threshold (ACCURACY.md §3, §5.6–5.8):
 large-v3-turbo. Trade-offs: English-only, and weaker on the file name nginx.conf ("nginx.com"). In-app output is
 identical to the benchmark (50/50 clips). A second scripted take is recommended to confirm (n = 50; the finalists
 differ by one event).
+
+**Long dictations:** audio longer than 29 s is split by `SpeechSegmenter` (long pauses removed, ≤ 29 s chunks cut at
+pauses, transcribed independently). Without it, an 89.7 s owner dictation lost most of its speech and invented a loop.
+Long-form benchmark WER 22.7% → 0.7% (ACCURACY.md §5.9).
 
 **Consequence for the design:** the developer vocabulary prompt (`initial_prompt`) is part of the STT configuration,
 not an optional extra. It's decode-time biasing toward terms present in the audio, not post-hoc correction, so it's

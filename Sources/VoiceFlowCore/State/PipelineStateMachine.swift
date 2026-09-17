@@ -6,6 +6,8 @@ public struct PipelineFailure: Equatable, Sendable {
         case openMicrophoneSettings
         /// The recording is still held in memory; transcription can be retried (e.g. after installing the model).
         case retryTranscription
+        /// The transcript was left on the clipboard because pasting needs Accessibility permission.
+        case openAccessibilitySettings
     }
 
     public var stage: Stage

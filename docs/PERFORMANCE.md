@@ -193,6 +193,13 @@ parallel, with no audio lost (recording length = press → release). It didn't r
 | Footprint after unload (`sttUnloadAfterSeconds`) | **141–184 MB**: ~170 MB stays allocated inside whisper.cpp/ggml after `whisper_free` (Malloc Large 133 MB + Small 40 MB; GPU memory < 1 MB). `malloc_zone_pressure_relief` frees 0 MB, so it's live allocations, not caching |
 | Bug fixed during measurement | SHA-256 hashing without an autorelease pool kept ~850 MB resident (footprint after load 1,900 MB → 1,057 MB after fix) |
 
+**Long dictations (segmented, ACCURACY.md §5.9):** long-form clips of 66–122 s → 2–3 chunks, 36–67 s of audio sent,
+transcribe **2.18–3.52 s** (whole recording before: 2.38–4.92 s, with dropped speech). Owner's live 89.7 s dictation
+(before the fix): transcribe 3.13 s.
+
+**Memory growth to watch (Phase 6):** in the owner's session, footprint with the model loaded rose from 1,185 MB to
+1,490–1,518 MB after dictating in several apps (including the 89.7 s dictation). Not yet investigated.
+
 **Metal residency sets (decision: off).** With residency sets on (ggml default), ggml starts a thread that wakes
 every 5 ms for the process lifetime: **~3,000 idle wakeups per 30 s** measured after unload, from
 `ggml_metal_rsets_init` (`ggml-metal-device.m:984–997`). `GGML_METAL_NO_RESIDENCY=1` (set in `main.swift`) prevents
@@ -269,6 +276,21 @@ then drops back. After the microphone has been used once, macOS audio services a
 - **Max duration:** limit set to 3 s, recording requested for 6 s → stopped at 3.00 s, audio kept.
 - **Silence gate:** 12 silent 2 s recordings (room noise, peaks −41…−65 dBFS) → all `silent`; owner tap
   (0.17 s) → `tooShort`; owner speech (10.3 s) → `keep`.
+
+### 4.4 Text insertion (Phase 5), 2026-09-17
+Owner session (release build, medium.en q8_0 + vocab), from the `insertion` log:
+
+| Target app | Outcome | Snapshot | ⌘V event | Release → pasted |
+|---|---|---|---|---|
+| VS Code (first dictation, Accessibility not yet granted) | Left on clipboard, prompt shown | — | — | — |
+| VS Code | Pasted, clipboard restored | 1 item, 0.8 ms | 10.7 ms (first) | 860 ms |
+| VS Code | Pasted, clipboard restored | 1 item, 0.1 ms | 0.3 ms | 757 ms |
+| VS Code → switched to Google Chrome during transcription | Left on clipboard (focus changed) | — | — | — |
+| WhatsApp (×4) | Pasted, clipboard restored each time | 1 item, 0.1 ms | 0.3–0.4 ms | 798–1,596 ms |
+| VS Code (89.7 s dictation) | Pasted, clipboard restored | 1 item, 0.1 ms | 0.3 ms | 3,133 ms |
+
+Insertion itself costs < 1 ms after the first event; release → pasted is dominated by transcription. The clipboard
+is restored 250 ms after ⌘V (no app pasted the old content in these tests).
 
 ## 5. LLM (Smart Mode), preliminary
 

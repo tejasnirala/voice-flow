@@ -273,3 +273,32 @@ terms 97.4%, 0 invented phrases.
 is recommended to confirm** (`scripts/bench/record.sh macbook-mic-take2`, or with AirPods). If it changes the outcome,
 switching is a one-line settings change (`sttModelID`).
 
+
+### 5.9 Long dictations: failure found in use and fixed (2026-09-17)
+
+**Owner report (Phase 5 testing):** a long dictation came out with repeated invented text ("I have used it in the past,
+but I have used it in the past…"). Log: **89.7 s audio, 54.6 s of speech (35 s of pauses) → only 69 words**, so
+large parts of the speech were dropped *and* text was invented. The 50-clip benchmark never exercised this (longest
+clip 39 s, no thinking pauses).
+
+**Long-form benchmark** (`scripts/bench/make-longform.py macbook-mic`): 7 clips (66–122 s, plus an 11 s control) built
+from the owner's own recordings in sequence with 1.5–4 s pauses of −58 dBFS room-level noise; reference = the
+concatenated reviewed spoken text. Transcribed with the in-app engine (medium.en q8_0 + vocab).
+
+| Engine version | WER | Terms (78) | Invented phrases | Words recovered (worst clip) |
+|---|---|---|---|---|
+| Whole recording in one `whisper_full` call (before) | **22.7%** | 80.8% | 0 | 40 of 101 |
+| `SpeechSegmenter` v1 (25 s chunks, greedy packing) | 0.8% | 96.2% | 0 | 98 of 101 |
+| **`SpeechSegmenter` v2 (29 s chunks, cut at longest pause)**, shipped | **0.7%** | **97.4%** | 0 | 98 of 101 |
+
+The benchmark reproduces the **dropped speech** but not the exact **repetition loop**, so the loop fix is confirmed by
+the mechanism (no long silence or 30 s window seeking is left in a chunk), and still needs a live owner re-test.
+
+**Regression check** on the 50-clip decision set with v2: WER 1.1% (unchanged), terms 97.4% (unchanged), 0 invented
+phrases; 49/50 transcripts identical (natural-01, 39 s → 2 chunks: punctuation differs at the boundary). v1 had
+changed natural-02 ("isLoading **It's** set") by cutting inside a 28 s clip; v2 leaves audio ≤ 29 s untouched.
+
+**Design:** frames above −45 dBFS form speech regions (gaps < 0.5 s bridged), padded by 0.3 s of real audio; long
+pauses are removed; continuous speech > 29 s is cut at its quietest frame; regions are packed into ≤ 29 s chunks that
+end at the longest pause in the chunk's last 40%. Each chunk is transcribed independently and the texts are joined.
+8 unit tests.

@@ -57,7 +57,8 @@ enum BenchmarkMode {
                 let cleaned = TranscriptGuard.clean(result.text, speechSeconds: analysis.speechSeconds)
                 let line: [String: Any] = ["type": "clip", "run": run, "id": entry.id, "voice": voice,
                                            "audio_s": result.audioSeconds, "latency_s": result.transcribeSeconds,
-                                           "text": cleaned.text, "guard": cleaned.flags.map(\.rawValue).sorted()]
+                                           "text": cleaned.text, "guard": cleaned.flags.map(\.rawValue).sorted(),
+                                           "chunks": result.chunkCount, "transcribed_audio_s": result.transcribedAudioSeconds]
                 try out.write(contentsOf: JSONSerialization.data(withJSONObject: line, options: [.sortedKeys]) + Data("\n".utf8))
                 count += 1
             }

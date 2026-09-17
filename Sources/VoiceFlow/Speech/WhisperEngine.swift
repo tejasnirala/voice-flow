@@ -87,18 +87,31 @@ final class WhisperEngine: SpeechEngine, @unchecked Sendable {
         params.language = UnsafePointer(language)
         if let promptCString { params.initial_prompt = UnsafePointer(promptCString) }
 
+        // Long recordings: drop long pauses and transcribe ≤ 25 s chunks independently (SpeechSegmenter).
+        let chunks = SpeechSegmenter.chunks(for: samples, sampleRate: AudioRecorder.sampleRate)
+        var texts: [String] = []
+        var transcribedSamples = 0
         let start = DispatchTime.now().uptimeNanoseconds
-        let status = samples.withUnsafeBufferPointer { whisper_full(ctx, params, $0.baseAddress, Int32($0.count)) }
+        for chunk in chunks {
+            let audio = chunk == [0..<samples.count] ? samples : SpeechSegmenter.audio(for: chunk, in: samples)
+            transcribedSamples += audio.count
+            let status = audio.withUnsafeBufferPointer { whisper_full(ctx, params, $0.baseAddress, Int32($0.count)) }
+            guard status == 0 else { throw EngineError.inferenceFailed(status) }
+            let text = (0..<whisper_full_n_segments(ctx))
+                .map { String(cString: whisper_full_get_segment_text(ctx, $0)) }
+                .joined()
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !text.isEmpty { texts.append(text) }
+        }
         let seconds = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9
-        guard status == 0 else { throw EngineError.inferenceFailed(status) }
 
-        let text = (0..<whisper_full_n_segments(ctx))
-            .map { String(cString: whisper_full_get_segment_text(ctx, $0)) }
-            .joined()
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return TranscriptionResult(text: text, audioSeconds: Double(samples.count) / AudioRecorder.sampleRate,
-                                   transcribeSeconds: seconds, coldStart: cold, loadSeconds: loadSeconds,
-                                   waitedForModelSeconds: waited)
+        var result = TranscriptionResult(text: texts.joined(separator: " "),
+                                         audioSeconds: Double(samples.count) / AudioRecorder.sampleRate,
+                                         transcribeSeconds: seconds, coldStart: cold, loadSeconds: loadSeconds,
+                                         waitedForModelSeconds: waited)
+        result.chunkCount = chunks.count
+        result.transcribedAudioSeconds = Double(transcribedSamples) / AudioRecorder.sampleRate
+        return result
     }
 
     func unload() {

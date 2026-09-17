@@ -26,5 +26,7 @@ let package = Package(
         ),
         .executableTarget(name: "vf-bench", dependencies: ["VoiceFlowCore"]),
         .testTarget(name: "VoiceFlowCoreTests", dependencies: ["VoiceFlowCore"]),
+        // App-level tests for AppKit boundaries that can run without hardware (e.g. private pasteboards).
+        .testTarget(name: "VoiceFlowTests", dependencies: ["VoiceFlow"]),
     ]
 )
