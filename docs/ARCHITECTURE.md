@@ -74,14 +74,15 @@ Sources/VoiceFlowCore/          (no AppKit/AVFoundation; unit-tested)
   Processing/   TextProcessor, DeveloperVocabulary, prompt templates, LLM output guard
   Diagnostics/  PerformanceMonitor spans
 Sources/VoiceFlow/              (app; OS & native runtime boundaries)
-  App/          AppDelegate, MenuBar, coordinator
+  App/          main, AppDelegate, coordinator
+  MenuBar/      MenuBarController (status item; menu built on demand)
   Hotkey/       GlobalHotkeyManager (Carbon)
   Audio/        AudioRecorder (AVAudioEngine)
   Speech/       WhisperEngine, ParakeetEngine, STTModelManager
   Processing/   LocalLLMEngine (llama.cpp)
   Insertion/    ClipboardManager, TextInserter
   Permissions/  PermissionManager
-  Diagnostics/  Logger
+  Diagnostics/  Log (os.Logger categories), process start time
 Sources/vf-bench/               Benchmark scoring CLI
 ```
 

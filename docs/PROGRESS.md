@@ -8,8 +8,8 @@
 | Phase | Name | Status |
 |---|---|---|
 | 0 | Machine & architecture discovery | ✅ Complete (2026-09-17; STT model final at Phase 4 gate) |
-| 1 | Native macOS shell | ⏭️ **Next** |
-| 2 | Global hotkey | ⬜ |
+| 1 | Native macOS shell | 🟡 **Implemented, awaiting owner menu check & approval** (2026-09-17) |
+| 2 | Global hotkey | ⏭️ Next |
 | 3 | Audio recording | ⬜ |
 | 4 | STT integration (+ accuracy gate) | ⬜ |
 | 5 | Text insertion (first usable product) | ⬜ |
@@ -84,16 +84,27 @@ benchmark → fix → review → CPU/RAM check → docs + this file → show cha
   an unchanged human-set accuracy. Handle the one-time Metal shader compile per new binary.
 - Vocabulary prompt: decisive on real speech (+4 terms, +11–14% latency) but produced one unspoken insertion with large-v3-turbo. Keep, guard, and re-measure.
 
-## Phase 1 — Native macOS shell ⏭️
-- [ ] Menu bar item + minimal menu (state line, Fast/Smart toggle placeholder, Settings…, Quit)
-- [ ] App lifecycle; `os.Logger` logging (no content), subsystem `local.voiceflow.VoiceFlow`
-- [ ] Settings foundation: Codable model + JSON persistence in Application Support, defaults, tests
-- [ ] `PipelineState` enum + explicit transition function with exhaustive tests (no behavior yet)
-- [ ] Validate: build, launch, quit, menu bar; measure startup time, idle footprint, idle CPU/GPU (`scripts/measure-idle.sh`)
+## Phase 1 — Native macOS shell 🟡
+- [x] Menu bar item (template mic icon) + menu built on demand: version, "● Ready", Mode (Fast ✓ / Smart
+      disabled), Open Settings File… (⌘,), Quit (⌘Q) — `Sources/VoiceFlow/MenuBar/MenuBarController.swift`
+- [x] Lifecycle: accessory app, launch time logged from kernel process start, terminate logged
+- [x] Logging: `Log` categories (lifecycle, settings) under `local.voiceflow.VoiceFlow`; no content
+- [x] Settings foundation (`VoiceFlowCore/Settings`): `Settings` (processingMode, hotkey ⌥Space,
+      maxRecordingSeconds) with per-key default fallback; `SettingsStore` JSON with atomic writes; invalid file
+      preserved as `settings.invalid.json` → defaults. 6 new tests (21 total)
+- [x] `scripts/measure-idle.sh`: launch, idle CPU / wakeups / GPU / footprint, quit → PERFORMANCE.md §2.1
+- [x] Verified: build, tests, launch ×5, quit ×3 (~225 ms), corrupt-settings path end to end (logged, preserved, app keeps running)
+- [ ] **Owner check:** click the menu-bar mic icon and confirm the menu items, the Fast ✓ checkmark, that
+      Open Settings File… opens the JSON, and that Quit works (automated clicking needs Accessibility for Terminal, not granted)
+- Moved to Phase 2: `PipelineState` state machine (spec v2 pairs state transitions with the hotkey phase)
+
+Measured: launch 85–110 ms (653 ms on the first run of a new build), idle CPU 0.00 s over 60 s, 2–5 wakeups
+per 30–60 s, GPU 0, footprint 13 MB.
 
 ## Phase 2 — Global hotkey
-Carbon ⌥Space press/release; Esc cancel registered only while recording; duplicate/auto-repeat
-handling; state transitions; tests. Measure hotkey latency.
+`PipelineState` + explicit transition function (exhaustive tests); Carbon ⌥Space press/release from
+`Settings.hotkey`; Esc cancel registered only while recording; duplicate/auto-repeat handling; menu status
+line reflects state; registration-failure handling (hotkey taken by another app). Measure hotkey latency.
 
 ## Phase 3 — Audio recording
 AVAudioEngine tap → one resample to 16 kHz mono Float32 in memory; max duration; cancellation; silence
@@ -131,10 +142,10 @@ Per SPEC.md. Notes so far:
 ## Session handoff notes
 _Overwrite at the end of every session._
 
-- **Last session (2026-09-17):** Phase 0 closed after the owner-voice benchmark; starting Phase 1.
+- **Last session (2026-09-17):** Phase 0 closed; Phase 1 implemented and measured, awaiting owner menu check and approval.
 - **Models on this machine** (`~/Library/Application Support/VoiceFlow/models/`): whisper tiny.en, base.en,
   small.en, medium.en-q8_0, large-v3-turbo, large-v3-turbo-q8_0, distil-large-v3; parakeet tdt-0.6b-v3-q8_0;
   llm qwen2.5-1.5b-instruct-q4_k_m.
 - **Owner recordings:** `benchmarks-output/audio/human/macbook-mic/` (50 clips, gitignored). Results cached in
   `benchmarks-output/results/human/`. Rerunning `scripts/bench/stt.sh human` re-scores instantly.
-- **Next action:** Phase 1 checklist above. The Phase 4 gate items (D1–D5) are waiting on the owner.
+- **Next action:** owner confirms the menu → Phase 2. The Phase 4 gate items (D1–D5) are waiting on the owner.

@@ -87,6 +87,12 @@ Phase status, leftovers and handoff notes: `docs/PROGRESS.md`. After each phase:
 benchmark → verify → review `git diff` → update docs + PROGRESS → commit → **stop for approval**.
 
 ## Debugging
-- Logs (from Phase 1): `log stream --predicate 'subsystem == "local.voiceflow.VoiceFlow"'`
+- Logs: `/usr/bin/log stream --predicate 'subsystem == "local.voiceflow.VoiceFlow"'`
+  (or `log show --last 10m --style compact --predicate …`). **Use the full path in zsh:** zsh's built-in `log`
+  command shadows `/usr/bin/log` and fails silently or with "too many arguments".
+- Startup & idle measurement: `scripts/build-app.sh && scripts/measure-idle.sh 60`
+- Settings file: `~/Library/Application Support/VoiceFlow/settings.json` (menu → Open Settings File…). It's
+  created only when first changed/opened. An invalid file is moved to `settings.invalid.json` and defaults
+  are used (logged as an error).
 - Quit: menu → Quit, or `pkill -x VoiceFlow`
 - Reset permissions: `tccutil reset Microphone local.voiceflow.VoiceFlow` / `tccutil reset Accessibility local.voiceflow.VoiceFlow`

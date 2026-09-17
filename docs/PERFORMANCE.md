@@ -36,16 +36,29 @@ release→text end-to-end latency. The in-app `PerformanceMonitor` uses monotoni
 
 ## 2. Application shell
 
-**2026-09-16**, release build of the v1 Phase 0 shell (status item + 2-item menu), ~3 s after launch:
+### 2.1 Phase 1 shell, 2026-09-17
+Release build: status item, menu built on demand, settings load, unified logging. Ad-hoc signed.
+`scripts/build-app.sh && scripts/measure-idle.sh [seconds]`.
 
-| Metric | Value | Tool |
-|---|---|---|
-| Physical footprint | 13–14 MB (two launches) | `footprint <pid>` |
-| RSS (includes shared system frameworks) | 55.0 MB | `ps -o rss` |
-| CPU | 0.0 % (single sample) | `ps -o %cpu` |
-| Bundle size | 68 KB (executable 60 KB) | `du -sh` |
+| Metric | Run 1 (60 s idle) | Run 2 (30 s) | Run 3 (30 s) | Method |
+|---|---|---|---|---|
+| Launch: kernel process start → `applicationDidFinishLaunching` | **652.6 ms** (first launch after build) | 85.2 ms | 106.3 ms | App's own log line (`kinfo_proc` start time) |
+| Idle CPU | 0.00 s (0.000 %) | 0.00 s | 0.00 s | `ps` CPU-time delta over the window |
+| Idle wakeups | 2 / 60 s | 4 / 30 s | 5 / 30 s | `top` IDLEW |
+| Idle GPU time | 0.000 ms | 0.000 ms | 0.000 ms | ioreg per-process accounting |
+| Physical footprint | 13 MB | 13 MB | 13 MB | `footprint` |
+| RSS (includes shared frameworks) | 49.8 MB | — | — | `ps` |
+| Quit (AppleScript quit → process gone) | 240 ms | 226 ms | 222 ms | script |
 
-Formal startup and idle measurement is part of Phase 1.
+Further launches in the same session measured 93.6 ms and 109.4 ms (log). Bundle: 296 KB (executable 288 KB).
+
+**Observations:** the first launch of a freshly built, ad-hoc-signed binary is ~0.65 s (macOS assesses the
+new signature on first run); after that ~85–110 ms. Idle cost is effectively zero: no measurable CPU time,
+no GPU client, a handful of run-loop wakeups per minute (system/AppKit, no app timers). Settings are read
+only at launch and when the menu opens; nothing is written unless the user changes a setting.
+
+### 2.2 Phase 0 shell, 2026-09-16 (for reference)
+Empty status item: 13–14 MB footprint, 0.0 % CPU (single `ps` sample), bundle 68 KB.
 
 ---
 
@@ -159,7 +172,6 @@ prompt-eval time. ~1.26 GB while loaded, so load lazily and unload when idle. ML
 
 | Measurement | Phase |
 |---|---|
-| Startup time, idle footprint/CPU/GPU of the real shell | 1 |
 | Hotkey detection latency | 2 |
 | Recording start latency per input device; recording CPU/memory | 3 |
 | In-app STT latency, cold vs warm, human-voice set | 4, 6 |
