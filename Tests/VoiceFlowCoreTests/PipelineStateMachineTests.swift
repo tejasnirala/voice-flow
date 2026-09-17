@@ -103,6 +103,28 @@ import Testing
         #expect(m.handle(.errorDismissed) == .idle)
     }
 
+    /// Microphone permission denied: recording fails with a recovery that opens System Settings; the next press works
+    /// once access is granted, and nothing is left half-recorded.
+    @Test func microphoneDeniedRecoversAfterAccessIsGranted() {
+        var m = PipelineStateMachine()
+        m.handle(.hotkeyPressed)
+        let denied = PipelineFailure(stage: .recording, message: "Microphone access is off for VoiceFlow", recovery: .openMicrophoneSettings)
+        #expect(m.handle(.failed(denied)) == .error(denied))
+        #expect(m.handle(.hotkeyReleased) == nil)
+        #expect(m.handle(.hotkeyPressed) == .recording)
+    }
+
+    /// Paste failure (no Accessibility): an insertion-stage error; dismissing it returns to idle.
+    @Test func pasteFailureIsReportedAndDismissible() {
+        var m = PipelineStateMachine()
+        m.handle(.hotkeyPressed)
+        m.handle(.hotkeyReleased)
+        m.handle(.transcriptionSucceeded(needsProcessing: false))
+        let paste = PipelineFailure(stage: .insertion, message: "Copied to the clipboard", recovery: .openAccessibilitySettings)
+        #expect(m.handle(.failed(paste)) == .error(paste))
+        #expect(m.handle(.errorDismissed) == .idle)
+    }
+
     @Test func nonHotkeyFailureWhileIdleIsIgnored() {
         var m = PipelineStateMachine()
         #expect(m.handle(.failed(Self.failure)) == nil)

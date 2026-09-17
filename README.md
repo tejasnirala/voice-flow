@@ -6,7 +6,7 @@ A local-only macOS menu-bar dictation utility built for software development.
 Speech recognition and optional cleanup run entirely on your Mac. No cloud, no telemetry, no stored audio
 or transcripts.
 
-> **Status:** Phase 6 complete: hold ⌥ (or double-tap for hands-free) → speak → text pasted in ~0.6–1.1 s, clipboard preserved. The app uses ~13–27 MB; speech recognition runs in an on-demand helper process. Phase 7 complete: rule-based cleanup by default, optional guarded Smart Mode. Phase 8: Raw / Clean / Developer / Prompt / Writing text modes. Phase 9: developer corrections, Code mode, personal dictionary. Phase 10: mode chosen per app. Phase 11: performance audit. Phase 12: version 1.0.0 packaging (install script, login item, diagnostics).
+> **Status:** 1.0.0, all 13 phases done; final audit passed ([docs/AUDIT.md](docs/AUDIT.md)). Hold ⌥ (or double-tap for hands-free) → speak → text pasted in ~0.6–0.9 s (+0.6–2.6 s in model modes), all on this Mac. Idle: 13 MB, no CPU.
 > See [`docs/PROGRESS.md`](docs/PROGRESS.md).
 
 ## Priorities
@@ -69,6 +69,7 @@ See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md), including how to run the accur
 |---|---|
 | [`docs/SPEC.md`](docs/SPEC.md) | Requirements (v2) |
 | [`docs/PROGRESS.md`](docs/PROGRESS.md) | Phase status, next steps, decision log, session handoff |
+| [`docs/AUDIT.md`](docs/AUDIT.md) | Final audit: accuracy, performance, privacy, reliability, UX, known limitations |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Machine, stack, alternatives, STT decision, privacy, dependencies |
 | [`docs/ACCURACY.md`](docs/ACCURACY.md) | Benchmark corpus, metrics, threshold, results |
 | [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) | Measurement methodology and results |

@@ -19,8 +19,8 @@
 | 9 | Developer intelligence | ✅ Complete (2026-09-17, owner tested) |
 | 10 | Application awareness | ✅ Complete (2026-09-17, owner approved) |
 | 11 | Final performance optimization | ✅ Complete (2026-09-17, owner approved) |
-| 12 | Packaging | 🟡 Implemented + tested 2026-09-17; awaiting owner install & approval |
-| 13 | Final audit | ⬜ |
+| 12 | Packaging | ✅ Complete (2026-09-17, installed, owner approved) |
+| 13 | Final audit | 🟡 Audit complete 2026-09-17 (all areas pass, docs/AUDIT.md); awaiting owner approval |
 
 Legend: ✅ complete · 🟡 in progress / awaiting approval · ⏭️ next · ⬜ not started · ⚠️ blocked
 
@@ -292,7 +292,7 @@ per 30–60 s, GPU 0, footprint 13 MB.
 - [x] Owner: working fine in use; approved (2026-09-17). Ollama gemma2:9b discussed and not pursued (memory/latency, localhost server)
 - Optional (owner's call): delete 5.0 GB of benchmark-only STT models
 
-## Phase 12 — Packaging 🟡 (awaiting owner approval)
+## Phase 12 — Packaging ✅
 - [x] Bundle: version 1.0.0, build number from git, app icon (`scripts/assets/make-icon.swift`), category, microphone text covers
       hands-free; `BuildInfo` reads the bundle
 - [x] `scripts/install.sh` (framework check, `--with-models`, build, tests, ~/Applications or `--applications`, launch) and
@@ -307,8 +307,18 @@ per 30–60 s, GPU 0, footprint 13 MB.
       open 0.23 % CPU / 31 MB; 147 core + 5 app tests pass (incl. saved-position fallback)
 - [x] Installed to ~/Applications/VoiceFlow.app (2026-09-17, owner request after seeing two Spotlight results): development builds
       now go to `build/Products.noindex/` (not indexed) with a `build/VoiceFlow.app` symlink; build copy unregistered
-- [ ] **Owner:** try the window and the pill (drag it, dictate again: it should reappear there), then `scripts/install.sh`
-      (moves VoiceFlow to ~/Applications; macOS may ask for permissions again); approve Phase 12
+- [x] Owner installed and approved Phase 12 (2026-09-17)
+
+## Phase 13 — Final audit 🟡 (awaiting owner approval)
+- [x] Accuracy: installed helper on owner recordings WER 1.1%, terms 97.4%, 0 invented; identical to the gate (50/50, 7/7); text modes
+      and developer corrections unchanged (0 unsafe, 0 over-corrections)
+- [x] Performance: idle 13 MB / 0.01 s CPU per minute / 0 GPU; launch 101 ms; STT mean 0.63 s per clip
+- [x] Privacy: no network code or frameworks; 0 sockets and 0 files during a full dictation with rewrite; 0 log lines with spoken words
+- [x] Reliability: damaged model (live, with speech), missing model (live), helper crash (Phase 12), rewrite/paste/permission failures
+      (tests; added `microphoneDeniedRecoversAfterAccessIsGranted`, `pasteFailureIsReportedAndDismissible`)
+- [x] UX checklist; known limitations listed in docs/AUDIT.md
+- [x] 149 core + 5 app tests pass
+- [ ] **Owner:** review docs/AUDIT.md and approve (project complete)
 
 ## Phases 6–13
 Per SPEC.md. Notes so far:
@@ -358,7 +368,7 @@ Per SPEC.md. Notes so far:
 ## Session handoff notes
 _Overwrite at the end of every session._
 
-- **Last session (2026-09-17):** Phases 0–10 complete (owner approved). Phases 0–11 complete. Phase 12 (packaging) implemented; awaiting owner install & approval.
+- **Last session (2026-09-17):** Phases 0–10 complete (owner approved). Phases 0–11 complete. Phase 12 complete and installed. Phase 13 audit complete; awaiting approval.
 - **Models on this machine** (`~/Library/Application Support/VoiceFlow/models/`): **in use:** whisper medium.en-q8_0 +
   ggml-medium.en-encoder.mlmodelc. Benchmark-only (deletable on request): whisper tiny.en, base.en, small.en, large-v3-turbo,
   large-v3-turbo-q8_0 (STT alternate), distil-large-v3; parakeet tdt-0.6b-v3-q8_0.
@@ -366,4 +376,4 @@ _Overwrite at the end of every session._
   `benchmarks-output/results/human/`. Rerunning `scripts/bench/stt.sh human` re-scores instantly.
 - **Mode benchmark data:** `benchmarks-output/results/modes/` (prepared inputs, model JSONL per mode, `report.md` with every
   accepted/rejected rewrite). Re-score after guard changes with `vf-bench modes report … --results …` (no model rerun needed).
-- **Next action:** owner tries the window and pill, installs with `scripts/install.sh`, approves Phase 12 → Phase 13 (final audit).
+- **Next action:** owner reviews docs/AUDIT.md and approves Phase 13. After that: maintenance only (re-run benchmarks after macOS updates).
