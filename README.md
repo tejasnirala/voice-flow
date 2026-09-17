@@ -6,7 +6,7 @@ A local-only macOS menu-bar dictation utility built for software development.
 Speech recognition and optional cleanup run entirely on your Mac. No cloud, no telemetry, no stored audio
 or transcripts.
 
-> **Status:** Phase 6 complete: hold ⌥ (or double-tap for hands-free) → speak → text pasted in ~0.6–1.1 s, clipboard preserved. The app uses ~13–27 MB; speech recognition runs in an on-demand helper process. Phase 7 complete: rule-based cleanup by default, optional guarded Smart Mode. Phase 8: Raw / Clean / Developer / Prompt / Writing text modes. Phase 9: developer corrections, Code mode, personal dictionary. Phase 10: mode chosen per app.
+> **Status:** Phase 6 complete: hold ⌥ (or double-tap for hands-free) → speak → text pasted in ~0.6–1.1 s, clipboard preserved. The app uses ~13–27 MB; speech recognition runs in an on-demand helper process. Phase 7 complete: rule-based cleanup by default, optional guarded Smart Mode. Phase 8: Raw / Clean / Developer / Prompt / Writing text modes. Phase 9: developer corrections, Code mode, personal dictionary. Phase 10: mode chosen per app. Phase 11: performance audit. Phase 12: version 1.0.0 packaging (install script, login item, diagnostics).
 > See [`docs/PROGRESS.md`](docs/PROGRESS.md).
 
 ## Priorities
@@ -36,15 +36,26 @@ guard, and a rejected rewrite falls back to the rule-based text.
   Prompt and Writing use a content-preserving guard: sentences may be restructured, but no content word may be added,
   dropped or replaced.
 
-## Quick start (development)
+## Install (this Mac)
 ```sh
-scripts/fetch-deps.sh
-scripts/fetch-models.sh whisper medium.en-q8_0
+scripts/install.sh --with-models   # first time: whisper.cpp framework, speech model (1.4 GB, verified), build, tests, ~/Applications
+scripts/install.sh                 # later updates (keeps models, settings, dictionary)
+scripts/uninstall.sh [--purge]     # remove the app (--purge also deletes models/settings after asking)
+```
+Needs only the Command Line Tools. On first use macOS asks for Microphone, Input Monitoring (⌥ trigger) and
+Accessibility (paste). Menu bar → **Open at Login** to start with your Mac; **Copy Diagnostics** for troubleshooting
+(no transcripts are ever logged).
+
+Everything VoiceFlow stores lives in `~/Library/Application Support/VoiceFlow/`: `models/`, `settings.json`,
+`dictionary.json`. Logs go to the macOS unified log (subsystem `local.voiceflow.VoiceFlow`).
+
+## Development
+```sh
+scripts/fetch-deps.sh && scripts/fetch-models.sh whisper medium.en-q8_0 && scripts/fetch-models.sh whisper-coreml medium.en
 scripts/build-app.sh && open build/VoiceFlow.app
 scripts/test.sh
 ```
-Needs only the Command Line Tools. See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md), including how to run
-the accuracy benchmark on your own voice.
+See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md), including how to run the accuracy benchmark on your own voice.
 
 ## Documentation
 | Doc | Contents |

@@ -22,6 +22,7 @@ Local-only, accuracy-first macOS menu-bar dictation utility (Swift 6 + AppKit, S
 
 ## Commands
 - Build app: `scripts/build-app.sh` · Tests: `scripts/test.sh` (plain `swift test` fails with CLT only)
+- Install: `scripts/install.sh [--with-models]` · Uninstall: `scripts/uninstall.sh [--purge]` · Diagnostics: `VoiceFlow --diagnostics`
 - Runtimes: `scripts/fetch-deps.sh` · Models: `scripts/fetch-models.sh whisper medium.en-q8_0` (default STT)
 - STT benchmark: `scripts/bench/make-audio.sh && scripts/bench/stt.sh synthetic`;
   owner voice: `scripts/bench/record.sh <mic-label>` then `scripts/bench/stt.sh human`

@@ -18,8 +18,8 @@
 | 8 | Text modes | ✅ Complete (2026-09-17, owner approved) |
 | 9 | Developer intelligence | ✅ Complete (2026-09-17, owner tested) |
 | 10 | Application awareness | ✅ Complete (2026-09-17, owner approved) |
-| 11 | Final performance optimization | 🟡 Optimized + audited 2026-09-17; awaiting owner approval |
-| 12 | Packaging | ⬜ |
+| 11 | Final performance optimization | ✅ Complete (2026-09-17, owner approved) |
+| 12 | Packaging | 🟡 Implemented + tested 2026-09-17; awaiting owner install & approval |
 | 13 | Final audit | ⬜ |
 
 Legend: ✅ complete · 🟡 in progress / awaiting approval · ⏭️ next · ⬜ not started · ⚠️ blocked
@@ -280,7 +280,7 @@ per 30–60 s, GPU 0, footprint 13 MB.
 - Found for Phase 11: model modes take 3–4 s end to end (rewrite 1.9–2.6 s); rejected rewrites waste that time
 - Terminals default to Developer (spec allows Raw/Developer); Code available per terminal
 
-## Phase 11 — Final performance optimization 🟡 (awaiting owner approval)
+## Phase 11 — Final performance optimization ✅
 - [x] Model-mode latency analysis: ≈ 0.5 s + 0.026 s/output word; long dictations slowest and most rejected
 - [x] Measured and rejected: parallel sentence chunks (2.9 s vs 2.1 s whole); streaming early rejection (≤ 0.15 s saved, false rejections)
 - [x] Adopted: rewrite with the prewarmed session (−0.12 to −0.31 s); skip the model for ≤ 10-word dictations in Clean/Developer/Prompt
@@ -289,8 +289,19 @@ per 30–60 s, GPU 0, footprint 13 MB.
 - [x] Audit (PERFORMANCE §5.5): idle 0 CPU / 12–13 MB; launch 123 ms; recording start 66–87 ms; STT on owner set identical
       50/50, mean 0.598 s; helper 1.1–1.2 GB only while loaded; app 6.6 MB; models in use 1.39 GB
 - [x] 144 core tests + 3 app tests pass
-- [ ] **Owner:** real use check (long Smart dictation latency, short dictations, icon timing with AirPods); approve Phase 11
+- [x] Owner: working fine in use; approved (2026-09-17). Ollama gemma2:9b discussed and not pursued (memory/latency, localhost server)
 - Optional (owner's call): delete 5.0 GB of benchmark-only STT models
+
+## Phase 12 — Packaging 🟡 (awaiting owner approval)
+- [x] Bundle: version 1.0.0, build number from git, app icon (`scripts/assets/make-icon.swift`), category, microphone text covers
+      hands-free; `BuildInfo` reads the bundle
+- [x] `scripts/install.sh` (framework check, `--with-models`, build, tests, ~/Applications or `--applications`, launch) and
+      `scripts/uninstall.sh [--purge]`; both tested against a temporary folder (signature verified, installed copy runs)
+- [x] Menu: Open at Login (`SMAppService.mainApp`), Copy Diagnostics; `VoiceFlow --diagnostics`; Neural Engine encoder missing warning
+- [x] Crash handling verified: helper killed mid-transcription → error with Retry, app alive, next dictation recovers
+- [x] 146 core tests + 3 app tests pass
+- [ ] **Owner:** run `scripts/install.sh` (moves VoiceFlow to ~/Applications; macOS may ask for permissions again), try Open at
+      Login and Copy Diagnostics; approve Phase 12
 
 ## Phases 6–13
 Per SPEC.md. Notes so far:
@@ -331,6 +342,7 @@ Per SPEC.md. Notes so far:
 | 2026-09-17 | Developer corrections = context-gated rules (no global lexicon, no model); Code mode (rules); owner dictionary file | Spec §13 conservative; held-out check 0 over-corrections | ARCHITECTURE §3.5.2, ACCURACY §8 |
 | 2026-09-17 | Mode chosen per receiving app: owner rule → browser AI tab (window title via Accessibility) → built-in table → menu mode; terminals → Developer | Spec §Phase 10; no new permission; title never logged | ARCHITECTURE §3.5.3 |
 | 2026-09-17 | Rewrite in the prewarmed session; no model for ≤ 10-word Clean/Developer/Prompt dictations; red icon when audio flows | Measured −0.12…−0.31 s and ~0.65 s with ≤ 0.4 pt formatting cost; chunking/early abort rejected | PERFORMANCE §5.4–5.5 |
+| 2026-09-17 | Packaging: script install to ~/Applications, SMAppService login item, local diagnostics; no installer/daemon/notarization | Spec Phase 12 "no unnecessary installers or services"; personal build | ARCHITECTURE §3.7 |
 | 2026-09-16 | Carbon RegisterEventHotKey; Esc cancel registered only while recording | Press+release, no permission, zero idle cost | ARCHITECTURE §3.3 |
 | 2026-09-16 | Clipboard + ⌘V with full snapshot/restore; never lose speech | Works in Electron/terminals/browsers | ARCHITECTURE §3.4 |
 | 2026-09-16 | llama.cpp in-process (provisional); Ollama rejected | No daemon/IPC; MLX re-evaluated in Phase 7 | ARCHITECTURE §3.5 |
@@ -338,7 +350,7 @@ Per SPEC.md. Notes so far:
 ## Session handoff notes
 _Overwrite at the end of every session._
 
-- **Last session (2026-09-17):** Phases 0–10 complete (owner approved). Phase 11 optimized and audited; awaiting approval.
+- **Last session (2026-09-17):** Phases 0–10 complete (owner approved). Phases 0–11 complete. Phase 12 (packaging) implemented; awaiting owner install & approval.
 - **Models on this machine** (`~/Library/Application Support/VoiceFlow/models/`): **in use:** whisper medium.en-q8_0 +
   ggml-medium.en-encoder.mlmodelc. Benchmark-only (deletable on request): whisper tiny.en, base.en, small.en, large-v3-turbo,
   large-v3-turbo-q8_0 (STT alternate), distil-large-v3; parakeet tdt-0.6b-v3-q8_0.
@@ -346,4 +358,4 @@ _Overwrite at the end of every session._
   `benchmarks-output/results/human/`. Rerunning `scripts/bench/stt.sh human` re-scores instantly.
 - **Mode benchmark data:** `benchmarks-output/results/modes/` (prepared inputs, model JSONL per mode, `report.md` with every
   accepted/rejected rewrite). Re-score after guard changes with `vf-bench modes report … --results …` (no model rerun needed).
-- **Next action:** owner checks Phase 11 in real use and approves → Phase 12 (packaging).
+- **Next action:** owner installs with `scripts/install.sh` and approves Phase 12 → Phase 13 (final audit).

@@ -339,6 +339,25 @@ load latency vs resident memory.
 
 ---
 
+### 3.7 Packaging (Phase 12)
+- **Bundle:** `VoiceFlow.app` (6.9 MB): `MacOS/VoiceFlow` (menu-bar app, LSUIElement), `MacOS/voiceflow-stt` (speech helper),
+  `Frameworks/whisper.framework` (arm64 only), `Resources/` (AppIcon.icns, developer-vocabulary.txt, prompts/). Signed with the
+  local "VoiceFlow Dev" identity (stable permission grants); no hardened runtime or notarization (personal, not distributed).
+  Version 1.0.0; build number = git commit count.
+- **Data, separate from the app (spec §20):** `~/Library/Application Support/VoiceFlow/` → `models/` (never in the bundle,
+  installed only by `scripts/fetch-models.sh` / `install.sh --with-models`, SHA-256 verified), `settings.json`, `dictionary.json`.
+  Temporary audio stays in memory; logs in the unified log. Nothing else is written.
+- **Model discovery:** the menu shows "Speech model not installed / damaged — run …" and, when the Core ML encoder is absent,
+  "~25% slower without the Neural Engine encoder — run …". No runtime downloads.
+- **Install:** `scripts/install.sh` (Command Line Tools only): fetch framework if missing, optional models, build, tests, `ditto`
+  to `~/Applications` (or `/Applications`), launch. `scripts/uninstall.sh [--purge]`. No installer package, daemon or launch agent.
+- **Open at Login:** `SMAppService.mainApp` (system login items), menu toggle.
+- **Diagnostics:** menu → Copy Diagnostics / `--diagnostics`: versions, model/encoder/permission status, settings summary,
+  this launch's VoiceFlow log (`OSLogStore`, current process). Logs contain no transcript text by design.
+- **Failure handling verified:** speech helper killed mid-transcription → "The speech helper stopped unexpectedly" with Retry
+  (audio kept), app keeps running, next dictation starts a new helper (0.66 s) and works. Earlier phases: model missing,
+  microphone/accessibility/input monitoring denied, paste failure (text left on clipboard), rewrite failure (rule text used).
+
 ## 4. STT decision
 
 Data: ACCURACY.md §5 and PERFORMANCE.md §3. Measured 2026-09-16/17 on this machine.

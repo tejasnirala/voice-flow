@@ -24,6 +24,11 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Framewor
 cp "$BIN_DIR/VoiceFlow" "$APP/Contents/MacOS/VoiceFlow"
 cp "$BIN_DIR/voiceflow-stt" "$APP/Contents/MacOS/voiceflow-stt"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+# Build number = commit count (monotonic for this repo); "+dirty" builds are marked in the build string.
+BUILD_NUMBER="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
+git diff --quiet 2>/dev/null || BUILD_NUMBER="$BUILD_NUMBER.1"
+plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$APP/Contents/Info.plist"
+cp Resources/AppIcon.icns "$APP/Contents/Resources/"
 cp Resources/developer-vocabulary.txt "$APP/Contents/Resources/"
 cp -R prompts "$APP/Contents/Resources/prompts" 2>/dev/null || true
 

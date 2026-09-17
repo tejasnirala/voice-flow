@@ -117,7 +117,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private func rebuild(_ menu: NSMenu) {
         menu.removeAllItems()
 
-        menu.addItem(disabled("\(BuildInfo.name) \(BuildInfo.version)"))
+        menu.addItem(disabled("\(BuildInfo.name) \(BuildInfo.version) (\(BuildInfo.build))"))
         menu.addItem(disabled(statusText))
         if let triggerWarning {
             menu.addItem(disabled("⚠︎ \(triggerWarning)"))
@@ -127,6 +127,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
         if state == .idle, modelStatus != .installed {
             menu.addItem(disabled("⚠︎ Speech model \(modelStatusText) — run \(settings.sttModel.installCommand)"))
+        } else if state == .idle, settings.sttModel.coreMLEncoderInstallCommand != nil, !STTModelManager.hasCoreMLEncoder(for: settings.sttModel) {
+            menu.addItem(disabled("Speech runs ~25% slower without the Neural Engine encoder — run \(settings.sttModel.coreMLEncoderInstallCommand!)"))
         }
         if !PermissionManager.isAccessibilityTrusted, !(state.isErrorWithRecovery(.openAccessibilitySettings)) {
             menu.addItem(disabled("⚠︎ Accessibility not allowed — text is copied, not pasted"))
@@ -243,6 +245,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let dictionaryItem = NSMenuItem(title: "Open Dictionary File…", action: #selector(openDictionaryFile), keyEquivalent: "")
         dictionaryItem.target = self
         menu.addItem(dictionaryItem)
+        let login = NSMenuItem(title: "Open at Login", action: #selector(toggleOpenAtLogin), keyEquivalent: "")
+        login.target = self
+        login.state = LoginItem.isEnabled ? .on : .off
+        menu.addItem(login)
+        let diagnostics = NSMenuItem(title: "Copy Diagnostics", action: #selector(copyDiagnostics), keyEquivalent: "")
+        diagnostics.target = self
+        menu.addItem(diagnostics)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit \(BuildInfo.name)", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
     }
@@ -310,6 +319,24 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func toggleSmartRewrite() {
         settings.processingMode = settings.processingMode == .smart ? .fast : .smart
         persist()
+    }
+
+    @objc private func toggleOpenAtLogin() {
+        do {
+            try LoginItem.setEnabled(!LoginItem.isEnabled)
+        } catch {
+            Log.lifecycle.error("open at login change failed: \(error.localizedDescription, privacy: .public)")
+            let alert = NSAlert()
+            alert.messageText = "VoiceFlow couldn't change Open at Login"
+            alert.informativeText = "\(error.localizedDescription)\n\nYou can also add VoiceFlow in System Settings → General → Login Items."
+            alert.runModal()
+        }
+    }
+
+    @objc private func copyDiagnostics() {
+        let text = Diagnostics.report(settings: settings, modelStatus: modelStatusText, state: statusText)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 
     @objc private func openDictionaryFile() {

@@ -45,6 +45,13 @@ public struct STTModel: Equatable, Sendable {
     public var installCommand: String {
         "scripts/fetch-models.sh whisper \(id)"
     }
+
+    /// Command that installs the Core ML (Neural Engine) encoder for this model, if one exists.
+    public var coreMLEncoderInstallCommand: String? {
+        guard runtimeDirectory == "whisper", let base = coreMLEncoderDirectoryName.components(separatedBy: "-encoder").first,
+              base.hasPrefix("ggml-") else { return nil }
+        return "scripts/fetch-models.sh whisper-coreml \(base.dropFirst("ggml-".count))"
+    }
 }
 
 /// Validation state of a model file.
