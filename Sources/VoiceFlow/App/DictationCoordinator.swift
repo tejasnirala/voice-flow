@@ -53,6 +53,8 @@ final class DictationCoordinator {
 
     /// Called after every accepted transition, before its side effects run.
     var onStateChange: ((PipelineState) -> Void)?
+    /// Recording is live: real (non-zero) audio is arriving, so speech from now on is captured.
+    var onAudioFlowing: (() -> Void)?
     /// Called when a dictation ends: the pipeline returns to idle or error from an active state (measurement mode).
     var onDictationComplete: (() -> Void)?
 
@@ -75,6 +77,12 @@ final class DictationCoordinator {
             guard let self, self.machine.state == .recording else { return }
             Log.audio.notice("max recording duration reached (\(self.settings.maxRecordingSeconds, format: .fixed(precision: 0), privacy: .public) s)")
             self.finishRecording(event: .recordingLimitReached)
+        }
+        recorder.onAudioFlowing = { [weak self] in
+            guard let self, self.machine.state == .recording else { return }
+            let ms = Double(DispatchTime.now().uptimeNanoseconds - self.pressUptimeNs) / 1_000_000
+            Log.audio.notice("audio flowing \(ms, format: .fixed(precision: 0), privacy: .public) ms after press")
+            self.onAudioFlowing?()
         }
         recorder.onDeviceChanged = { [weak self] in
             guard let self, self.machine.state == .recording else { return }
@@ -538,7 +546,8 @@ final class DictationCoordinator {
                 lastTranscript = prepared
                 onSpeechInfoChange?(modelStatus, lastTranscript)
                 rewriteMode = mode
-                let rewrite = mode.usesModel(processing: settings.processingMode) && rewritePrompt(for: mode) != nil
+                let wordCount = prepared.split(whereSeparator: \.isWhitespace).count
+                let rewrite = mode.usesModel(processing: settings.processingMode, wordCount: wordCount) && rewritePrompt(for: mode) != nil
                     && OnDeviceRewriter.unavailableReason == nil
                 send(.transcriptionSucceeded(needsProcessing: rewrite))
             }

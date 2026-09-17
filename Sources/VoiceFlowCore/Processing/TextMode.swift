@@ -26,6 +26,16 @@ public enum TextMode: String, Codable, Sendable, CaseIterable {
         }
     }
 
+    /// Dictations this short skip the model in Clean, Developer and Prompt: measured gain ≤ 0.4 points of formatting
+    /// error (Prompt got worse) for ~0.65 s (docs/PERFORMANCE.md §5.4). Writing keeps it: polishing is its purpose.
+    public static let shortDictationWords = 10
+
+    /// Whether this dictation should be rewritten by the model.
+    public func usesModel(processing: Settings.ProcessingMode, wordCount: Int) -> Bool {
+        guard usesModel(processing: processing) else { return false }
+        return self == .writing || wordCount > Self.shortDictationWords
+    }
+
     /// The bundled prompt file (prompts/<name>.json). Developer reuses Clean: its formatting is deterministic.
     public var promptName: String? {
         switch self {

@@ -27,6 +27,15 @@ import Testing
         #expect(TextMode.writing.usesModel(processing: .fast))
     }
 
+    @Test func shortDictationsSkipTheModelExceptInWriting() {
+        #expect(!TextMode.clean.usesModel(processing: .smart, wordCount: 10))
+        #expect(TextMode.clean.usesModel(processing: .smart, wordCount: 11))
+        #expect(!TextMode.prompt.usesModel(processing: .fast, wordCount: 6))
+        #expect(TextMode.writing.usesModel(processing: .fast, wordCount: 3))
+        #expect(!TextMode.clean.usesModel(processing: .fast, wordCount: 40))
+        #expect(!TextMode.code.usesModel(processing: .smart, wordCount: 40))
+    }
+
     @Test func developerRewriteIsReformattedAfterTheGuard() {
         let prepared = "Rename it to user_id in package.json."
         let (text, verdict) = TextProcessingPlan.finalText(prepared: prepared, rewrite: "Rename it to user_id in package.json.",

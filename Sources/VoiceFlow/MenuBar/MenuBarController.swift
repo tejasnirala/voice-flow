@@ -45,6 +45,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     /// Reflects the pipeline state in the icon immediately; the menu text is refreshed when opened.
     func update(state: PipelineState) {
+        if state != self.state || state != .recording { audioFlowing = false }
         self.state = state
         guard let button = statusItem.button else { return }
         let symbol: String
@@ -56,8 +57,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         case .error: symbol = "exclamationmark.triangle"
         }
         var image = NSImage(systemSymbolName: symbol, accessibilityDescription: "\(BuildInfo.name): \(statusText)")
-        if state == .recording {
-            // Red while recording so it's obvious the microphone is live. The menu bar ignores
+        if state == .recording, audioFlowing {
+            // Red once audio is actually arriving (not at the key press), so red means "speak now". The menu bar ignores
             // `contentTintColor` for status items here, so bake the color into a non-template symbol.
             image = image?.withSymbolConfiguration(.init(paletteColors: [.systemRed]))
             image?.isTemplate = false
@@ -69,9 +70,19 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         if let menu = statusItem.menu, menu.numberOfItems > 0 { rebuild(menu) }
     }
 
+    /// Whether the current recording has real audio yet (the icon turns red then).
+    private var audioFlowing = false
+
+    func markAudioFlowing() {
+        guard state == .recording, !audioFlowing else { return }
+        audioFlowing = true
+        update(state: .recording)
+    }
+
     private var statusText: String {
         switch state {
         case .idle: "Ready — \(triggerInstructions)"
+        case .recording where !audioFlowing: "🎙 Starting microphone…"
         case .recording: handsFree ? "🎙 Hands-free — press ⌥ to finish, Esc to cancel" : "🎙 Recording… (Esc to cancel)"
         case .transcribing: "Transcribing on this Mac…"
         case .processing: "Smart rewrite on this Mac…"

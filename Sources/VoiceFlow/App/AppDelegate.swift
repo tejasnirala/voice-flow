@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menuBar = MenuBarController(settingsStore: store, settings: settings)
         let coordinator = DictationCoordinator(settings: settings)
         coordinator.onStateChange = { [weak menuBar] state in menuBar?.update(state: state) }
+        coordinator.onAudioFlowing = { [weak menuBar] in menuBar?.markAudioFlowing() }
         menuBar.onDismissError = { [weak coordinator] in coordinator?.dismissError() }
         menuBar.onSettingsChanged = { [weak coordinator] settings in coordinator?.updateSettings(settings) }
         menuBar.onRetryTranscription = { [weak coordinator] in coordinator?.retryTranscription() }

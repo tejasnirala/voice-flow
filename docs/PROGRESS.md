@@ -18,7 +18,7 @@
 | 8 | Text modes | ✅ Complete (2026-09-17, owner approved) |
 | 9 | Developer intelligence | ✅ Complete (2026-09-17, owner tested) |
 | 10 | Application awareness | ✅ Complete (2026-09-17, owner approved) |
-| 11 | Final performance optimization | ⬜ |
+| 11 | Final performance optimization | 🟡 Optimized + audited 2026-09-17; awaiting owner approval |
 | 12 | Packaging | ⬜ |
 | 13 | Final audit | ⬜ |
 
@@ -280,6 +280,18 @@ per 30–60 s, GPU 0, footprint 13 MB.
 - Found for Phase 11: model modes take 3–4 s end to end (rewrite 1.9–2.6 s); rejected rewrites waste that time
 - Terminals default to Developer (spec allows Raw/Developer); Code available per terminal
 
+## Phase 11 — Final performance optimization 🟡 (awaiting owner approval)
+- [x] Model-mode latency analysis: ≈ 0.5 s + 0.026 s/output word; long dictations slowest and most rejected
+- [x] Measured and rejected: parallel sentence chunks (2.9 s vs 2.1 s whole); streaming early rejection (≤ 0.15 s saved, false rejections)
+- [x] Adopted: rewrite with the prewarmed session (−0.12 to −0.31 s); skip the model for ≤ 10-word dictations in Clean/Developer/Prompt
+      (~0.65 s saved; gain ≤ 0.4 points, Prompt was worse); Writing unchanged
+- [x] Recording indicator turns red when real audio flows (first-word clipping mitigation; AirPods ~0.5 s)
+- [x] Audit (PERFORMANCE §5.5): idle 0 CPU / 12–13 MB; launch 123 ms; recording start 66–87 ms; STT on owner set identical
+      50/50, mean 0.598 s; helper 1.1–1.2 GB only while loaded; app 6.6 MB; models in use 1.39 GB
+- [x] 144 core tests + 3 app tests pass
+- [ ] **Owner:** real use check (long Smart dictation latency, short dictations, icon timing with AirPods); approve Phase 11
+- Optional (owner's call): delete 5.0 GB of benchmark-only STT models
+
 ## Phases 6–13
 Per SPEC.md. Notes so far:
 - **5:** clipboard algorithm in ARCHITECTURE.md §3.4. Never lose speech on paste failure.
@@ -318,6 +330,7 @@ Per SPEC.md. Notes so far:
 | 2026-09-17 | Spoken enumerations become lists (Clean + Smart Rewrite, Prompt, Writing); guard accepts removing only counting words in front of 2+ items | Owner request after live test | ACCURACY §7.3 |
 | 2026-09-17 | Developer corrections = context-gated rules (no global lexicon, no model); Code mode (rules); owner dictionary file | Spec §13 conservative; held-out check 0 over-corrections | ARCHITECTURE §3.5.2, ACCURACY §8 |
 | 2026-09-17 | Mode chosen per receiving app: owner rule → browser AI tab (window title via Accessibility) → built-in table → menu mode; terminals → Developer | Spec §Phase 10; no new permission; title never logged | ARCHITECTURE §3.5.3 |
+| 2026-09-17 | Rewrite in the prewarmed session; no model for ≤ 10-word Clean/Developer/Prompt dictations; red icon when audio flows | Measured −0.12…−0.31 s and ~0.65 s with ≤ 0.4 pt formatting cost; chunking/early abort rejected | PERFORMANCE §5.4–5.5 |
 | 2026-09-16 | Carbon RegisterEventHotKey; Esc cancel registered only while recording | Press+release, no permission, zero idle cost | ARCHITECTURE §3.3 |
 | 2026-09-16 | Clipboard + ⌘V with full snapshot/restore; never lose speech | Works in Electron/terminals/browsers | ARCHITECTURE §3.4 |
 | 2026-09-16 | llama.cpp in-process (provisional); Ollama rejected | No daemon/IPC; MLX re-evaluated in Phase 7 | ARCHITECTURE §3.5 |
@@ -325,7 +338,7 @@ Per SPEC.md. Notes so far:
 ## Session handoff notes
 _Overwrite at the end of every session._
 
-- **Last session (2026-09-17):** Phases 0–10 complete (owner approved). Next: Phase 11.
+- **Last session (2026-09-17):** Phases 0–10 complete (owner approved). Phase 11 optimized and audited; awaiting approval.
 - **Models on this machine** (`~/Library/Application Support/VoiceFlow/models/`): **in use:** whisper medium.en-q8_0 +
   ggml-medium.en-encoder.mlmodelc. Benchmark-only (deletable on request): whisper tiny.en, base.en, small.en, large-v3-turbo,
   large-v3-turbo-q8_0 (STT alternate), distil-large-v3; parakeet tdt-0.6b-v3-q8_0.
@@ -333,4 +346,4 @@ _Overwrite at the end of every session._
   `benchmarks-output/results/human/`. Rerunning `scripts/bench/stt.sh human` re-scores instantly.
 - **Mode benchmark data:** `benchmarks-output/results/modes/` (prepared inputs, model JSONL per mode, `report.md` with every
   accepted/rejected rewrite). Re-score after guard changes with `vf-bench modes report … --results …` (no model rerun needed).
-- **Next action:** Phase 11 (final performance optimization), starting with model-mode latency (rewrite 1.9–2.6 s; rejected rewrites waste it).
+- **Next action:** owner checks Phase 11 in real use and approves → Phase 12 (packaging).

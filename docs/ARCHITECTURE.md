@@ -275,6 +275,13 @@ the prompt and the guard policy. `processingMode: smart` is now the **Smart Rewr
 | On-device model correction | Broad | Phase 7/8: models invent and change meaning; guard would reject corrections (word changes) | Rejected |
 | Larger Whisper prompt | Helps recognition | Prompt window limited; changes accuracy, needs re-gating | Owner terms only, capped |
 
+### 3.5.2.1 Model call (Phase 11)
+- The session prewarmed at recording start (for the mode of the app in front) is the one used for the rewrite, if the final
+  mode's instructions match; otherwise a new session. One session per dictation, never reused (`OnDeviceRewriter.warmSession`).
+- `TextMode.usesModel(processing:wordCount:)`: Clean, Developer and Prompt skip the model for dictations of ≤ 10 words;
+  Writing always rewrites. Measurements: PERFORMANCE §5.4.
+- Rejected after measurement: parallel sentence chunks (slower), streaming early rejection (false rejections).
+
 ### 3.5.3 Application awareness (Phase 10)
 
 - **Which app:** the app that receives the paste. With `pasteInto: currentApp` (default) that's the app in front when the

@@ -37,6 +37,9 @@ final class AudioRecorder {
     var onLimitReached: (() -> Void)?
     /// Called if the input device changes while recording (e.g. AirPods connect). Audio captured so far is kept.
     var onDeviceChanged: (() -> Void)?
+    /// Called once per recording on the main thread when the first non-silent audio arrives (devices can deliver
+    /// digital zeros first, e.g. ~340 ms for AirPods). Speech before this moment isn't captured.
+    var onAudioFlowing: (() -> Void)?
 
     private var engine: AVAudioEngine?
     private var sink: CaptureSink?
@@ -59,9 +62,11 @@ final class AudioRecorder {
         converter.downmix = true
 
         let sink = CaptureSink(converter: converter, target: target, inputSampleRate: format.sampleRate,
-                               maxSamples: Int(maxSeconds * Self.sampleRate)) { [weak self] in
+                               maxSamples: Int(maxSeconds * Self.sampleRate), onLimitReached: { [weak self] in
             DispatchQueue.main.async { self?.onLimitReached?() }
-        }
+        }, onAudioFlowing: { [weak self] in
+            DispatchQueue.main.async { self?.onAudioFlowing?() }
+        })
 
         do {
             if #available(macOS 27.0, *) {
@@ -143,6 +148,8 @@ private final class CaptureSink: @unchecked Sendable {
     private let ratio: Double
     private let maxSamples: Int
     private let onLimitReached: @Sendable () -> Void
+    private let onAudioFlowing: @Sendable () -> Void
+    private var audioFlowing = false
     private let lock = OSAllocatedUnfairLock()
     private var samples: [Float] = []
     private var limitSignalled = false
@@ -151,12 +158,13 @@ private final class CaptureSink: @unchecked Sendable {
     var firstBufferUptimeNs: UInt64? { lock.withLockUnchecked { firstBufferNs } }
 
     init(converter: AVAudioConverter, target: AVAudioFormat, inputSampleRate: Double, maxSamples: Int,
-         onLimitReached: @escaping @Sendable () -> Void) {
+         onLimitReached: @escaping @Sendable () -> Void, onAudioFlowing: @escaping @Sendable () -> Void) {
         self.converter = converter
         self.target = target
         ratio = target.sampleRate / inputSampleRate
         self.maxSamples = maxSamples
         self.onLimitReached = onLimitReached
+        self.onAudioFlowing = onAudioFlowing
         samples.reserveCapacity(min(maxSamples, Int(target.sampleRate * 30)))
     }
 
@@ -176,6 +184,12 @@ private final class CaptureSink: @unchecked Sendable {
         let chunk = UnsafeBufferPointer(start: channel, count: Int(output.frameLength))
 
         // The closure runs synchronously under the lock, so capturing the non-Sendable buffer pointer is safe.
+        let firstSound = lock.withLockUnchecked { () -> Bool in
+            guard !audioFlowing, chunk.contains(where: { $0 != 0 }) else { return false }
+            audioFlowing = true
+            return true
+        }
+        if firstSound { onAudioFlowing() }
         let reachedLimit = lock.withLockUnchecked { () -> Bool in
             let room = maxSamples - samples.count
             guard room > 0 else { return false }

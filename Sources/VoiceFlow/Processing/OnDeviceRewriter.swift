@@ -1,4 +1,5 @@
 import Foundation
+import os
 import VoiceFlowCore
 #if canImport(FoundationModels)
 import FoundationModels
@@ -24,14 +25,34 @@ enum OnDeviceRewriter {
         return "requires macOS 26 or later"
     }
 
-    /// Loads the model ahead of use (called when recording starts in Smart Mode).
+    /// A session prewarmed at recording start, used by the next rewrite with the same instructions. Using the prewarmed
+    /// session itself (not a new one) saves 0.12–0.31 s per rewrite (docs/PERFORMANCE.md §5.4). Still one session per
+    /// dictation: it is taken once and never reused, so nothing carries over between dictations.
+    private static let warmSession = OSAllocatedUnfairLock<(instructions: String, session: AnyObject)?>(uncheckedState: nil)
+
+    /// Loads the model and prepares a session for `prompt` (called when recording starts).
     static func prewarm(prompt: RewritePrompt) {
         #if canImport(FoundationModels)
         if #available(macOS 26.0, *), unavailableReason == nil {
-            LanguageModelSession(instructions: prompt.instructions).prewarm()
+            let instructions = prompt.instructions
+            let session = LanguageModelSession(instructions: instructions)
+            session.prewarm()
+            warmSession.withLockUnchecked { $0 = (instructions, session) }
         }
         #endif
     }
+
+    #if canImport(FoundationModels)
+    @available(macOS 26.0, *)
+    private static func takeSession(instructions: String) -> LanguageModelSession {
+        let warm = warmSession.withLockUnchecked { state -> LanguageModelSession? in
+            defer { state = nil }
+            guard let state, state.instructions == instructions else { return nil }
+            return state.session as? LanguageModelSession
+        }
+        return warm ?? LanguageModelSession(instructions: instructions)
+    }
+    #endif
 
     enum RewriteError: LocalizedError {
         case unavailable(String)
@@ -52,7 +73,7 @@ enum OnDeviceRewriter {
             let maxTokens = text.split(whereSeparator: \.isWhitespace).count * 3 + 32
             return try await withThrowingTaskGroup(of: String.self) { group in
                 group.addTask {
-                    let session = LanguageModelSession(instructions: prompt.instructions)
+                    let session = takeSession(instructions: prompt.instructions)
                     let response = try await session.respond(
                         to: text, options: GenerationOptions(samplingMode: .greedy, maximumResponseTokens: maxTokens))
                     return response.content

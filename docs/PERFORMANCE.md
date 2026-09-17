@@ -443,12 +443,48 @@ guard (time spent for nothing). The model step dominates latency in model modes 
 llama.cpp `llama-bench`, Qwen2.5-1.5B Q4_K_M: Metal pp256 1,033 tok/s, tg64 85 tok/s; CPU 290 / 67 tok/s. A zero-shot
 prompt produced a TypeScript code block for a dictated sentence (the first sign of the contract problem in §5.1).
 
+## 5.4 Phase 11: model-mode latency experiments, 2026-09-17
+
+Rewrite latency on the benchmark outputs ≈ **0.5 s fixed + 0.026 s per output word**; dictations over 25 words are both the
+slowest (≈ 1.3–3.7 s) and most often rejected (Clean: 7 of 13).
+
+| Experiment | Method | Result | Decision |
+|---|---|---|---|
+| Sentence chunks, rewritten in parallel | 79-word transcript, 3 chunks ≥ 20 words, 3 rounds | whole 2.12–2.15 s; chunks serial 3.16–3.25 s; chunks **parallel 2.84–2.95 s** (the on-device model serializes requests; per-request overhead adds up) | **Rejected** |
+| Streaming early rejection (`StreamingGuard`) | Replayed all 354 saved rewrites word by word | would save 0.07–0.15 s per dictation on average; **falsely rejected 1–11 accepted rewrites per mode** (lists, "four oh four" → 404 look like drops mid-stream) | **Rejected** (quality loss), code removed |
+| Use the prewarmed session itself | New session vs session created + `prewarm()` 1.5 s earlier (recording) vs `prewarm(promptPrefix:)`; 3 lengths × 4 alternating rounds | 10 words 0.77 → **0.60 s**; 55 words 1.58 → **1.46 s**; 79 words 2.23 → **1.92 s**; prefix-only prewarm ≈ no gain | **Adopted** (still one session per dictation) |
+| Skip the model for short dictations | Formatting error before → after the model, by length (94 entries) | ≤ 10 words: Clean 8.7 → 8.4%, Developer 6.8 → 6.4%, **Prompt 8.7 → 10.0% (worse)**, Writing 8.7 → 8.1%, for ~0.65 s. 11–25 words: Clean 18.3 → 10.0% | **Adopted** for Clean/Developer/Prompt ≤ 10 words; Writing keeps the model |
+
+## 5.5 Phase 11 audit, 2026-09-17 (release build, MacBook Air M4, on AC)
+
+| Area | Measured | Earlier baseline |
+|---|---|---|
+| Launch (kernel start → didFinishLaunching) | 841 ms first launch after a build; **123 ms** after | 85–114 ms (Phase 1/6) |
+| Idle CPU / wakeups / GPU | 0.00–0.01 s over 60 s; 1–5 wakeups per 30–60 s; 0 GPU | same |
+| Idle footprint / RSS | **12–13 MB** / 42–48 MB | 13 MB |
+| Quit | 221–236 ms | 222–240 ms |
+| Recording start (warm engine) | `start()` 58–73 ms; press → running 66–87 ms; press → first buffer 172–187 ms (cold process 206–268 ms) | 68–79 / 173–184 ms (Phase 3) |
+| **Press → audio flowing (new)** | 172–187 ms warm, 268 ms cold (built-in mic, no leading zeros) | — |
+| Speech helper ready, fresh process | model load 0.34 s in the benchmark run; 0.57 s once in-app; 1.15 s + 3.1 s first transcription right after a rebuild (one-time Neural Engine compile) | 0.33–0.38 s |
+| STT, owner's 50 recordings | **mean 0.598 s, p95 1.016 s, max 1.661 s; transcripts identical 50/50** (WER 1.1%, terms 97.4%) | 0.635 / 1.108 / 1.781 s |
+| Helper memory | 1,095 MB after load, 1,210 MB peak; process exits 60 s after last use | same |
+| App memory while dictating | 14.7 → 19.8 MB | 13–27 MB |
+| End-to-end, owner use (Phase 10 logs) | short, no model: 0.6–0.9 s; 22–47 s dictations with a model rewrite: 3.1–4.1 s (rewrite 1.9–2.6 s) | — |
+| Disk | app 6.6 MB; models in use 1.39 GB (medium.en q8_0 785 MB + Core ML encoder 602 MB); benchmark-only models 5.0 GB (deletable on request) | — |
+
+**Recording indicator:** the menu-bar icon now turns red when the first non-silent audio arrives, not at the key press
+("🎙 Starting microphone…" until then). Built-in mic: no visible change (~0.18 s). AirPods: red ~0.5 s after the press, so the
+icon shows when speech is captured. This addresses first-word clipping without always-on capture.
+
+**Remaining cost:** in model modes the rewrite (0.6–2.6 s) dominates end-to-end time; the measured options above were the ones
+that don't trade away accuracy. A rejected rewrite still costs its generation time.
+
 ## 6. Open measurements (scheduled)
 
 | Measurement | Phase |
 |---|---|
 | Hotkey detection latency | 2 |
-| First-word clipping (built-in ~0.2 s, AirPods ~0.5 s): measure and mitigate | 6 |
+| First-word clipping (built-in ~0.2 s, AirPods ~0.5 s): mitigated by the audio-flowing indicator (§5.5); AirPods timing to confirm in owner use | 11 |
 | Cold (unloaded) vs warm strategy; residual ~170 MB after unload (helper process?) | 6 |
 | End-to-end release→text latency | 5, 6 |
-| Full audit | 11 |
+| Full audit | 11 ✅ (§5.5) |
