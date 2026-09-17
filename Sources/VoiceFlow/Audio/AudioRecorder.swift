@@ -40,6 +40,9 @@ final class AudioRecorder {
     /// Called once per recording on the main thread when the first non-silent audio arrives (devices can deliver
     /// digital zeros first, e.g. ~340 ms for AirPods). Speech before this moment isn't captured.
     var onAudioFlowing: (() -> Void)?
+    /// Input level 0…1 (RMS mapped from −50…0 dBFS), on the main thread about 20 times a second while recording.
+    /// Only set when something displays it (the floating pill).
+    var onLevel: ((Double) -> Void)?
 
     private var engine: AVAudioEngine?
     private var sink: CaptureSink?
@@ -61,12 +64,18 @@ final class AudioRecorder {
               let converter = AVAudioConverter(from: format, to: target) else { throw .unsupportedFormat }
         converter.downmix = true
 
+        var levelHandler: (@Sendable (Double) -> Void)?
+        if onLevel != nil {
+            levelHandler = { [weak self] level in
+                DispatchQueue.main.async { self?.onLevel?(level) }
+            }
+        }
         let sink = CaptureSink(converter: converter, target: target, inputSampleRate: format.sampleRate,
                                maxSamples: Int(maxSeconds * Self.sampleRate), onLimitReached: { [weak self] in
             DispatchQueue.main.async { self?.onLimitReached?() }
         }, onAudioFlowing: { [weak self] in
             DispatchQueue.main.async { self?.onAudioFlowing?() }
-        })
+        }, onLevel: levelHandler)
 
         do {
             if #available(macOS 27.0, *) {
@@ -149,6 +158,8 @@ private final class CaptureSink: @unchecked Sendable {
     private let maxSamples: Int
     private let onLimitReached: @Sendable () -> Void
     private let onAudioFlowing: @Sendable () -> Void
+    private let onLevel: (@Sendable (Double) -> Void)?
+    private var lastLevelNs: UInt64 = 0
     private var audioFlowing = false
     private let lock = OSAllocatedUnfairLock()
     private var samples: [Float] = []
@@ -158,7 +169,9 @@ private final class CaptureSink: @unchecked Sendable {
     var firstBufferUptimeNs: UInt64? { lock.withLockUnchecked { firstBufferNs } }
 
     init(converter: AVAudioConverter, target: AVAudioFormat, inputSampleRate: Double, maxSamples: Int,
-         onLimitReached: @escaping @Sendable () -> Void, onAudioFlowing: @escaping @Sendable () -> Void) {
+         onLimitReached: @escaping @Sendable () -> Void, onAudioFlowing: @escaping @Sendable () -> Void,
+         onLevel: (@Sendable (Double) -> Void)?) {
+        self.onLevel = onLevel
         self.converter = converter
         self.target = target
         ratio = target.sampleRate / inputSampleRate
@@ -190,6 +203,14 @@ private final class CaptureSink: @unchecked Sendable {
             return true
         }
         if firstSound { onAudioFlowing() }
+        if let onLevel, arrival - lastLevelNs >= 50_000_000 {
+            lastLevelNs = arrival
+            var sum: Float = 0
+            for sample in chunk { sum += sample * sample }
+            let rms = (sum / Float(max(chunk.count, 1))).squareRoot()
+            let db = 20 * log10(Double(max(rms, 1e-7)))
+            onLevel(min(1, max(0, (db + 50) / 50)))
+        }
         let reachedLimit = lock.withLockUnchecked { () -> Bool in
             let room = maxSamples - samples.count
             guard room > 0 else { return false }

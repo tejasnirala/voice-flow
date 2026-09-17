@@ -211,6 +211,25 @@ final class DictationCoordinator {
         if triggerChanged || (settings.dictationTrigger == .option && activeTrigger != .option) { activateTrigger() }
     }
 
+    /// Pill ✕: discard the current recording.
+    func cancelDictation() {
+        guard machine.state == .recording else { return }
+        Log.pipeline.notice("recording cancelled from the indicator")
+        send(.cancelRequested)
+    }
+
+    /// Pill ■: finish the current recording (hands-free or held).
+    func finishDictation() {
+        guard machine.state == .recording else { return }
+        finishRecording(event: .hotkeyReleased)
+    }
+
+    /// Input level for the floating pill; nil turns metering off.
+    var onLevel: ((Double) -> Void)? {
+        get { recorder.onLevel }
+        set { recorder.onLevel = newValue }
+    }
+
     func dismissError() {
         send(.errorDismissed)
     }

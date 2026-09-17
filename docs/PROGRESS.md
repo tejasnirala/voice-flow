@@ -300,8 +300,13 @@ per 30–60 s, GPU 0, footprint 13 MB.
 - [x] Menu: Open at Login (`SMAppService.mainApp`), Copy Diagnostics; `VoiceFlow --diagnostics`; Neural Engine encoder missing warning
 - [x] Crash handling verified: helper killed mid-transcription → error with Retry, app alive, next dictation recovers
 - [x] 146 core tests + 3 app tests pass
-- [ ] **Owner:** run `scripts/install.sh` (moves VoiceFlow to ~/Applications; macOS may ask for permissions again), try Open at
-      Login and Copy Diagnostics; approve Phase 12
+- [x] Owner request: full app UI + Wispr Flow–style pill (beyond spec §17, owner decision):
+      window (Home/Modes/Apps/Dictionary/Settings/About, Dock icon only while open, shown on first launch, ⌘O, reopen) and
+      draggable non-activating pill (level bars, finish/cancel, Transcribing/Rewriting/Pasted/errors) with saved position
+- [x] Verified: screenshots of all window sections and the pill while recording/after; idle unchanged (13 MB, 0 CPU); window
+      open 0.23 % CPU / 31 MB; 147 core + 5 app tests pass (incl. saved-position fallback)
+- [ ] **Owner:** try the window and the pill (drag it, dictate again: it should reappear there), then `scripts/install.sh`
+      (moves VoiceFlow to ~/Applications; macOS may ask for permissions again); approve Phase 12
 
 ## Phases 6–13
 Per SPEC.md. Notes so far:
@@ -343,6 +348,7 @@ Per SPEC.md. Notes so far:
 | 2026-09-17 | Mode chosen per receiving app: owner rule → browser AI tab (window title via Accessibility) → built-in table → menu mode; terminals → Developer | Spec §Phase 10; no new permission; title never logged | ARCHITECTURE §3.5.3 |
 | 2026-09-17 | Rewrite in the prewarmed session; no model for ≤ 10-word Clean/Developer/Prompt dictations; red icon when audio flows | Measured −0.12…−0.31 s and ~0.65 s with ≤ 0.4 pt formatting cost; chunking/early abort rejected | PERFORMANCE §5.4–5.5 |
 | 2026-09-17 | Packaging: script install to ~/Applications, SMAppService login item, local diagnostics; no installer/daemon/notarization | Spec Phase 12 "no unnecessary installers or services"; personal build | ARCHITECTURE §3.7 |
+| 2026-09-17 | Full app window + draggable floating pill with saved position (owner request; spec §17 said minimal menu-bar UI) | Owner decision; built to cost nothing when closed/idle | ARCHITECTURE §3.8, PERFORMANCE §5.6 |
 | 2026-09-16 | Carbon RegisterEventHotKey; Esc cancel registered only while recording | Press+release, no permission, zero idle cost | ARCHITECTURE §3.3 |
 | 2026-09-16 | Clipboard + ⌘V with full snapshot/restore; never lose speech | Works in Electron/terminals/browsers | ARCHITECTURE §3.4 |
 | 2026-09-16 | llama.cpp in-process (provisional); Ollama rejected | No daemon/IPC; MLX re-evaluated in Phase 7 | ARCHITECTURE §3.5 |
@@ -358,4 +364,4 @@ _Overwrite at the end of every session._
   `benchmarks-output/results/human/`. Rerunning `scripts/bench/stt.sh human` re-scores instantly.
 - **Mode benchmark data:** `benchmarks-output/results/modes/` (prepared inputs, model JSONL per mode, `report.md` with every
   accepted/rejected rewrite). Re-score after guard changes with `vf-bench modes report … --results …` (no model rerun needed).
-- **Next action:** owner installs with `scripts/install.sh` and approves Phase 12 → Phase 13 (final audit).
+- **Next action:** owner tries the window and pill, installs with `scripts/install.sh`, approves Phase 12 → Phase 13 (final audit).

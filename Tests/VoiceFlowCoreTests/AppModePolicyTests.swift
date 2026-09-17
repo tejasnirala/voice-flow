@@ -49,4 +49,15 @@ import Testing
         let roundTrip = try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s))
         #expect(roundTrip == s)
     }
+
+    @Test func indicatorSettingsDecodeTolerantly() throws {
+        #expect(Settings.default.showIndicator)
+        #expect(Settings.default.indicatorPosition == nil)
+        let s = try JSONDecoder().decode(Settings.self, from: Data(#"{"showIndicator": false, "indicatorPosition": {"x": 120.5, "y": 44}}"#.utf8))
+        #expect(!s.showIndicator)
+        #expect(s.indicatorPosition == .init(x: 120.5, y: 44))
+        let bad = try JSONDecoder().decode(Settings.self, from: Data(#"{"indicatorPosition": "left"}"#.utf8))
+        #expect(bad.indicatorPosition == nil)
+        #expect(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s)) == s)
+    }
 }

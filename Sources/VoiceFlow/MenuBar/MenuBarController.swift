@@ -15,6 +15,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     var onSettingsChanged: ((Settings) -> Void)?
     var onRetryTranscription: (() -> Void)?
     var onOpenInputMonitoringSettings: (() -> Void)?
+    var onOpenWindow: (() -> Void)?
+
+    /// Settings changed in the window (already saved).
+    func apply(_ settings: Settings) {
+        self.settings = settings
+    }
     /// Supplied by the coordinator: instructions for the active trigger, a fallback warning, hands-free state.
     var triggerInstructions = "hold ⌥ to dictate"
     var triggerWarning: String?
@@ -119,6 +125,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         menu.addItem(disabled("\(BuildInfo.name) \(BuildInfo.version) (\(BuildInfo.build))"))
         menu.addItem(disabled(statusText))
+        let openWindow = NSMenuItem(title: "Open VoiceFlow…", action: #selector(openWindow), keyEquivalent: "o")
+        openWindow.target = self
+        menu.addItem(openWindow)
         if let triggerWarning {
             menu.addItem(disabled("⚠︎ \(triggerWarning)"))
             let open = NSMenuItem(title: "Open Input Monitoring Settings…", action: #selector(openInputMonitoringSettings), keyEquivalent: "")
@@ -319,6 +328,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func toggleSmartRewrite() {
         settings.processingMode = settings.processingMode == .smart ? .fast : .smart
         persist()
+    }
+
+    @objc private func openWindow() {
+        onOpenWindow?()
     }
 
     @objc private func toggleOpenAtLogin() {

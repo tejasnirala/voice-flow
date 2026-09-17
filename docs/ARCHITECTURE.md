@@ -358,6 +358,30 @@ load latency vs resident memory.
   (audio kept), app keeps running, next dictation starts a new helper (0.66 s) and works. Earlier phases: model missing,
   microphone/accessibility/input monitoring denied, paste failure (text left on clipboard), rewrite failure (rule text used).
 
+### 3.8 App window and floating pill (Phase 12, owner request)
+Owner asked for a full app UI and a Wispr Flow–style pill. This goes beyond spec §17 ("minimal menu-bar utility, no large
+settings-heavy UI"); accepted as the owner's decision, built so it costs nothing while unused.
+
+- **Window** (`UI/MainWindowController.swift`, SwiftUI in an `NSWindow`): Home (status, last dictation in memory, setup
+  checklist: microphone, Input Monitoring, Accessibility, speech model, Neural Engine encoder, on-device model), Modes, Apps
+  (owner per-app rules with app icons, built-in defaults for installed apps), Dictionary (edits dictionary.json), Settings
+  (trigger, paste target, longest dictation, pill on/off + reset position, model unload delay, vocabulary, Open at Login),
+  About (privacy, Copy Diagnostics, data folder). Created on open and released on close; VoiceFlow joins the Dock only while
+  it's open. Shown on first launch (no settings file), from the menu ("Open VoiceFlow…", ⌘O) and when the app is opened again
+  from Finder/Spotlight. Launches at login stay menu-bar only.
+- **Pill** (`UI/IndicatorController.swift`): borderless non-activating `NSPanel` at status-bar level on all Spaces, so it never
+  takes focus from the app receiving the text. States: Starting… (until audio flows), recording with live level bars (RMS
+  from the capture tap, ~20 Hz, computed only while the pill is enabled), ■ finish (hands-free or hover), ✕ cancel,
+  Transcribing / Rewriting spinner, "Pasted" (0.8 s), errors (3 s). Drag anywhere; the origin is saved to settings.json
+  (`indicatorPosition`) on drag end and reused; a position that's no longer on any screen falls back to bottom center of the
+  screen with the pointer. Ordered out when idle.
+- **State sharing:** `AppState` (`@Observable`) mirrors pipeline state, trigger info, model status and settings for the window
+  and pill; the menu keeps its own copy. Both write through `SettingsStore`; AppDelegate propagates changes to the coordinator,
+  menu, pill and level metering.
+- **Toolchain constraint:** with Command Line Tools only, SwiftUI's `@State`/`@Entry` macros are unavailable (their plugin ships
+  with Xcode). View-local state lives in small `@Observable` classes (`WindowModel`, `PillInteraction`); `@Observable` and
+  `@Bindable` work.
+
 ## 4. STT decision
 
 Data: ACCURACY.md §5 and PERFORMANCE.md §3. Measured 2026-09-16/17 on this machine.

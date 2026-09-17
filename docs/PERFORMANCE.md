@@ -479,6 +479,14 @@ icon shows when speech is captured. This addresses first-word clipping without a
 **Remaining cost:** in model modes the rewrite (0.6–2.6 s) dominates end-to-end time; the measured options above were the ones
 that don't trade away accuracy. A rejected rewrite still costs its generation time.
 
+## 5.6 App window and pill (Phase 12), 2026-09-17
+| Measurement | Result |
+|---|---|
+| Idle, window never opened (`measure-idle.sh 30`) | CPU 0.00 s, 1 wakeup, **13 MB** (unchanged) |
+| Window open on Home (1 s permission refresh, redraw only on change) | 0.07 s CPU per 30 s (0.23 %), 31 MB footprint (first version without the change-check: 1 %, 36–38 MB) |
+| Pill while recording | level meter ~20 Hz; panel created on first dictation, ordered out when idle |
+| App size | 7.6 MB (app binary 2.2 MB with SwiftUI views) |
+
 ## 6. Open measurements (scheduled)
 
 | Measurement | Phase |

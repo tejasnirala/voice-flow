@@ -127,6 +127,8 @@ Phase status, leftovers and handoff notes: `docs/PROGRESS.md`. After each phase:
 benchmark → verify → review `git diff` → update docs + PROGRESS → commit → **stop for approval**.
 
 ## Debugging
+- UI: `open build/VoiceFlow.app --args --open-window <home|modes|apps|dictionary|settings|about>` opens the window on a
+  section (screenshots). SwiftUI `@State` isn't available without Xcode (macro plugin); use `@Observable` models.
 - Diagnostics: menu → Copy Diagnostics, or `VoiceFlow.app/Contents/MacOS/VoiceFlow --diagnostics` in Terminal (version, model,
   encoder, permissions, settings, this launch's log lines; never transcripts).
 - Logs: `/usr/bin/log stream --predicate 'subsystem == "local.voiceflow.VoiceFlow"'`

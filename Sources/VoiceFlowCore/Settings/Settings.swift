@@ -70,6 +70,16 @@ public struct Settings: Codable, Equatable, Sendable {
     public var modeByApp: Bool
     /// The owner's per-app modes by bundle ID; they override the built-in defaults.
     public var appModes: [String: TextMode]
+    /// Show the floating pill while dictating.
+    public var showIndicator: Bool
+    /// Where the owner dragged the pill (window origin in screen coordinates); nil = bottom center of the main screen.
+    public var indicatorPosition: IndicatorPosition?
+
+    public struct IndicatorPosition: Codable, Equatable, Sendable {
+        public var x: Double
+        public var y: Double
+        public init(x: Double, y: Double) { self.x = x; self.y = y }
+    }
 
     public static let `default` = Settings(processingMode: .fast, hotkey: .optionSpace, maxRecordingSeconds: 120)
 
@@ -77,7 +87,10 @@ public struct Settings: Codable, Equatable, Sendable {
                 saveRecordingsForDebugging: Bool = false, sttModelID: String = STTModel.mediumEnQ8.id,
                 useVocabularyPrompt: Bool = true, sttUnloadAfterSeconds: Double = 60,
                 pasteInto: InsertionPolicy.PasteTarget = .currentApp, dictationTrigger: DictationTrigger = .option,
-                textMode: TextMode = .clean, modeByApp: Bool = true, appModes: [String: TextMode] = [:]) {
+                textMode: TextMode = .clean, modeByApp: Bool = true, appModes: [String: TextMode] = [:],
+                showIndicator: Bool = true, indicatorPosition: IndicatorPosition? = nil) {
+        self.showIndicator = showIndicator
+        self.indicatorPosition = indicatorPosition
         self.pasteInto = pasteInto
         self.textMode = textMode
         self.modeByApp = modeByApp
@@ -119,5 +132,7 @@ public struct Settings: Codable, Equatable, Sendable {
         // Entries with an unknown mode are dropped individually, not the whole table.
         let rawAppModes = (try? c.decodeIfPresent([String: String].self, forKey: .appModes)) ?? [:]
         appModes = rawAppModes.compactMapValues(TextMode.init(rawValue:))
+        showIndicator = (try? c.decodeIfPresent(Bool.self, forKey: .showIndicator)) ?? d.showIndicator
+        indicatorPosition = (try? c.decodeIfPresent(IndicatorPosition.self, forKey: .indicatorPosition)) ?? nil
     }
 }

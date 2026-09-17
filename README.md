@@ -36,6 +36,13 @@ guard, and a rejected rewrite falls back to the rule-based text.
   Prompt and Writing use a content-preserving guard: sentences may be restructured, but no content word may be added,
   dropped or replaced.
 
+## App
+- **Menu bar:** status, mode, last dictation, Open VoiceFlow…
+- **Window** (first launch, ⌘O from the menu, or open VoiceFlow again): Home with setup checklist, Modes, Apps (mode per app),
+  Dictionary, Settings, About. Closes back to a menu-bar-only app.
+- **Floating pill while dictating:** live microphone level, finish ■ and cancel ✕, then Transcribing / Rewriting / Pasted.
+  Drag it anywhere; it reappears where you left it (Settings → Reset Position).
+
 ## Install (this Mac)
 ```sh
 scripts/install.sh --with-models   # first time: whisper.cpp framework, speech model (1.4 GB, verified), build, tests, ~/Applications
