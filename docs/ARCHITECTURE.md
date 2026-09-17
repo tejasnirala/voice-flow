@@ -68,7 +68,8 @@ ANY ──failure──▶ ERROR (message shown; transcript kept on clipboard if
 
 ```
 Sources/VoiceFlowCore/          (no AppKit/AVFoundation; unit-tested)
-  State/        PipelineState, transitions
+  State/        PipelineStateMachine, PipelineFailure (with recovery hints)
+  Audio/        RecordingGate (level analysis, keep/tooShort/silent)
   Settings/     Settings model + persistence (Codable JSON)
   Speech/       TranscriptionResult, ModelManifest/ModelStatus, Accuracy/ (corpus, normalizer, scorer)
   Processing/   TextProcessor, DeveloperVocabulary, prompt templates, LLM output guard
@@ -77,11 +78,11 @@ Sources/VoiceFlow/              (app; OS & native runtime boundaries)
   App/          main, AppDelegate, coordinator
   MenuBar/      MenuBarController (status item; menu built on demand)
   Hotkey/       GlobalHotkeyManager (Carbon)
-  Audio/        AudioRecorder (AVAudioEngine)
+  Audio/        AudioRecorder (AVAudioEngine), DebugRecordingWriter (opt-in WAV)
   Speech/       WhisperEngine, ParakeetEngine, STTModelManager
   Processing/   LocalLLMEngine (llama.cpp)
   Insertion/    ClipboardManager, TextInserter
-  Permissions/  PermissionManager
+  Permissions/  PermissionManager (microphone; Accessibility in Phase 5)
   Diagnostics/  Log (os.Logger categories), process start time
 Sources/vf-bench/               Benchmark scoring CLI
 ```
@@ -111,6 +112,15 @@ is replaceable (rule 15): the app depends only on the `SpeechEngine` protocol.
 | Core Audio AUHAL | Lowest latency and overhead | Much more code (device selection, format negotiation, render callbacks) | Best | Same | High | Fallback |
 | AVAudioRecorder | Simplest | Writes files; spec prefers memory buffers | — | Disk I/O | Lowest | Rejected |
 | AVCaptureSession | Device selection | Built for A/V capture pipelines, heavier | — | — | Medium | Rejected |
+
+**Implemented (Phase 3):** `Sources/VoiceFlow/Audio/AudioRecorder.swift`. The macOS 27 tap API
+(`installAudioTap`, with `installTap` below 27), a 1024-frame tap, one `AVAudioConverter` (downmix) → 16 kHz mono
+Float32 appended under an unfair lock, a hard sample cap = `maxRecordingSeconds` (limit → treated as a release,
+audio kept). The stopped engine is reused (~10 ms faster, no idle difference); it's rebuilt after an input-device
+change, and a change mid-recording stops with the audio captured so far. `engine.stop()` after every recording
+releases the microphone. The silence/too-short gate (`VoiceFlowCore/Audio/RecordingGate.swift`) uses thresholds
+calibrated on the owner's recordings (≥ 0.3 s; ≥ 0.15 s of 20 ms frames above −45 dBFS). Measured start latency
+and cost: PERFORMANCE.md §4.
 
 **Sample format:** whisper.cpp and Parakeet both take 16 kHz mono Float32. Microphones deliver 48 kHz
 (24 kHz on AirPods), so exactly **one** resampling step is unavoidable. It happens in the tap callback,
@@ -258,7 +268,7 @@ runs add per-microphone results. In-app cold vs warm and end-to-end latency foll
 | Microphone | Active only between hotkey press and release (macOS orange indicator confirms). No continuous listening |
 | Accessibility | Needed only to post ⌘V. The app explains why and links to System Settings. Without it, text is left on the clipboard with a notice |
 | Input Monitoring | Not needed (Carbon hotkeys) |
-| Audio | In memory only; released after transcription. No temp files. Benchmark clips are a separate, explicit developer workflow, gitignored |
+| Audio | In memory only; released after transcription. No temp files. Exception, off by default: `saveRecordingsForDebugging` in settings.json writes WAVs to `…/VoiceFlow/debug-recordings/` for quality checks and benchmarks (logged when used). Benchmark clips are a separate, explicit developer workflow, gitignored |
 | Transcripts | Never persisted or logged. Logs record timings, sizes and states only |
 | Clipboard | Snapshot kept in memory for well under a second; restored unless the user copied something meanwhile. Transient/concealed markers |
 | Network | **None at runtime.** No telemetry, analytics, crash upload or update checks. Only the explicit setup scripts download (HTTPS, SHA-256 verified). Verified with networking disabled in Phase 13 |

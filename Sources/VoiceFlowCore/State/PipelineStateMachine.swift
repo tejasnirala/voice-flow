@@ -1,12 +1,17 @@
 /// A failure shown to the user. `message` must never contain transcript text.
 public struct PipelineFailure: Equatable, Sendable {
     public enum Stage: String, Sendable { case hotkey, recording, transcription, processing, insertion }
+    /// Something the UI can offer so the user can fix the problem.
+    public enum Recovery: Equatable, Sendable { case openMicrophoneSettings }
+
     public var stage: Stage
     public var message: String
+    public var recovery: Recovery?
 
-    public init(stage: Stage, message: String) {
+    public init(stage: Stage, message: String, recovery: Recovery? = nil) {
         self.stage = stage
         self.message = message
+        self.recovery = recovery
     }
 }
 

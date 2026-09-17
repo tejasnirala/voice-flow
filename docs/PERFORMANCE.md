@@ -164,7 +164,66 @@ Notes:
 
 ---
 
-## 4. LLM (Smart Mode), preliminary
+## 4. Audio recording (Phase 3)
+
+### 4.1 Start latency and cost, 2026-09-17
+Release build, MacBook Air Microphone (48 kHz, 1 ch) → AVAudioEngine tap (1024 frames) → AVAudioConverter →
+16 kHz mono Float32 in memory. `scripts/measure-recording.sh <seconds> <runs> [--fresh-engine]`: all runs in one
+process; "press" = the moment recording was requested (for real hotkey presses: the event timestamp).
+
+| Variant | Run | engine `start()` | Press → engine running | Press → first audio buffer | CPU per 2 s recording |
+|---|---|---|---|---|---|
+| Reuse engine (chosen) | 1 (cold process) | 128.6 ms | 145.4 ms | 246.0 ms | 40 ms |
+| Reuse engine | 2–5 | 66.9–77.3 ms | **68.2–79.2 ms** | **173.0–184.1 ms** | 25–29 ms |
+| Fresh engine per recording | 1 (cold process) | 129.1 ms | 146.1 ms | 246.1 ms | 41 ms |
+| Fresh engine per recording | 2–5 | 77.5–83.4 ms | 78.3–85.1 ms | 183.3–191.2 ms | 22–28 ms |
+
+Owner hotkey recordings (same session): press → running 96.0 ms, press → first buffer 201.9 ms,
+**130 ms of leading digital silence** (the device delivered zeros before real audio), 10.3 s recording
+using 69 ms CPU (~0.7 % of one core). The benchmark recordings (`record.sh`, fresh engine per clip) also
+start with ~200 ms of zeros; measurement-mode runs above showed 0 ms.
+
+**Owner device test, 2026-09-17 (hotkey, speech):**
+
+| Input device | Press → engine running | Press → first buffer | Leading digital silence | ≈ Real audio starts after press | Recording |
+|---|---|---|---|---|---|
+| MacBook Air Microphone | 75.5 ms | 179.8 ms | 0 ms | ~0.18 s | 6.1 s, peak −30.6 dBFS, kept |
+| AirPods Pro 3 (Bluetooth) | 86.7 ms | 189.4 ms | **342 ms** | **~0.53 s** | 15.0 s, peak −16.4 dBFS, 9.2 s speech, kept; CPU 90 ms; footprint 20.6 → 21.1 MB |
+
+AirPods need a Bluetooth profile switch before the microphone delivers audio, so their first ~0.5 s after the
+press is lost. The owner didn't notice a slower start, but words spoken immediately would be clipped.
+
+**What it means:** real audio starts roughly **0.17–0.33 s after the press** (first buffer plus any leading
+zeros). Speech that starts at the exact instant of the press can lose its first ~0.2 s. Always-on capture
+(pre-roll) would fix that but is ruled out (no continuous microphone). Phase 6 options: show "recording"
+only once audio flows, try smaller tap buffers or AUHAL, and measure first-word clipping directly.
+
+**Engine reuse decision:** keeping the stopped AVAudioEngine saves ~10 ms per start. Idle after recording is
+the same either way (below), so reuse is on.
+
+### 4.2 Memory and idle after recording, 2026-09-17
+| Condition | Footprint | Idle CPU (2 × 30 s windows) | Idle wakeups / 30 s |
+|---|---|---|---|
+| Never recorded (baseline) | 13 MB | 0.00 s, 0.00 s | 1, 1 |
+| After 2 recordings, fresh engine | 14 MB | 0.00 s, 0.01 s | 8, 8 |
+| After 2 recordings, engine reused | 14 MB | 0.00 s, 0.01 s | 5, 6 |
+| After 5 recordings, engine reused | 14 MB | 0.00 s | 16 (one window) |
+
+During a recording, footprint rises ~2–3 MB (engine + buffers; 16 kHz Float32 = 3.84 MB per minute of audio),
+then drops back. After the microphone has been used once, macOS audio services add a few idle wakeups per
+30 s (independent of engine reuse), with ~0.01 s CPU per 30 s.
+
+### 4.3 Correctness checks, 2026-09-17
+- **End-to-end format:** a sentence played through the MacBook speakers (`say`, Samantha) was recorded
+  in-app (debug saving on) as 16 kHz mono and transcribed by whisper large-v3-turbo q8_0 + vocab:
+  "The request goes through the reverse proxy before reaching the Express API and redistores the temporary
+  session data." One acoustic merge ("Redis stores" → "redistores") over a speaker-to-mic path; the capture
+  format and conversion are correct.
+- **Max duration:** limit set to 3 s, recording requested for 6 s → stopped at 3.00 s, audio kept.
+- **Silence gate:** 12 silent 2 s recordings (room noise, peaks −41…−65 dBFS) → all `silent`; owner tap
+  (0.17 s) → `tooShort`; owner speech (10.3 s) → `keep`.
+
+## 5. LLM (Smart Mode), preliminary
 
 **2026-09-16**, llama.cpp b11005 official macOS arm64 binaries, Qwen2.5-1.5B-Instruct Q4_K_M (1.04 GiB).
 
@@ -189,12 +248,12 @@ prompt-eval time. ~1.26 GB while loaded, so load lazily and unload when idle. ML
 
 ---
 
-## 5. Open measurements (scheduled)
+## 6. Open measurements (scheduled)
 
 | Measurement | Phase |
 |---|---|
 | Hotkey detection latency | 2 |
-| Recording start latency per input device; recording CPU/memory | 3 |
+| First-word clipping (built-in ~0.2 s, AirPods ~0.5 s): measure and mitigate | 6 |
 | In-app STT latency, cold vs warm, human-voice set | 4, 6 |
 | End-to-end release→text latency | 5, 6 |
 | LLM runtime comparison (llama.cpp vs MLX vs Apple Foundation Models) | 7 |

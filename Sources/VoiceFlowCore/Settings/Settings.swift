@@ -39,13 +39,20 @@ public struct Settings: Codable, Equatable, Sendable {
     public var hotkey: Hotkey
     /// Recording stops automatically after this many seconds.
     public var maxRecordingSeconds: Double
+    /// Developer option, off by default: keep each recording as a WAV in
+    /// `~/Library/Application Support/VoiceFlow/debug-recordings/` for audio-quality checks and benchmarks.
+    /// Not exposed in the menu; set in settings.json.
+    public var saveRecordingsForDebugging: Bool
 
-    public static let `default` = Settings(processingMode: .fast, hotkey: .optionSpace, maxRecordingSeconds: 120)
+    public static let `default` = Settings(processingMode: .fast, hotkey: .optionSpace, maxRecordingSeconds: 120,
+                                           saveRecordingsForDebugging: false)
 
-    public init(processingMode: ProcessingMode, hotkey: Hotkey, maxRecordingSeconds: Double) {
+    public init(processingMode: ProcessingMode, hotkey: Hotkey, maxRecordingSeconds: Double,
+                saveRecordingsForDebugging: Bool = false) {
         self.processingMode = processingMode
         self.hotkey = hotkey
         self.maxRecordingSeconds = maxRecordingSeconds
+        self.saveRecordingsForDebugging = saveRecordingsForDebugging
     }
 
     public init(from decoder: Decoder) throws {
@@ -55,5 +62,6 @@ public struct Settings: Codable, Equatable, Sendable {
         hotkey = (try? c.decodeIfPresent(Hotkey.self, forKey: .hotkey)) ?? d.hotkey
         let seconds = (try? c.decodeIfPresent(Double.self, forKey: .maxRecordingSeconds)) ?? d.maxRecordingSeconds
         maxRecordingSeconds = (1...600).contains(seconds) ? seconds : d.maxRecordingSeconds
+        saveRecordingsForDebugging = (try? c.decodeIfPresent(Bool.self, forKey: .saveRecordingsForDebugging)) ?? d.saveRecordingsForDebugging
     }
 }

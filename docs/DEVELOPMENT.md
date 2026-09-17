@@ -96,6 +96,12 @@ benchmark → verify → review `git diff` → update docs + PROGRESS → commit
   (or `log show --last 10m --style compact --predicate …`). **Use the full path in zsh:** zsh's built-in `log`
   command shadows `/usr/bin/log` and fails silently or with "too many arguments".
 - Startup & idle measurement: `scripts/build-app.sh && scripts/measure-idle.sh 60`
+- Recording measurement (no hotkey needed): `scripts/measure-recording.sh <seconds> <runs> [--fresh-engine] [--stay]`.
+  Logs press → engine running / first buffer, leading silence, levels, gate verdict, CPU and footprint.
+  Both measurement scripts quit the app; relaunch with `open build/VoiceFlow.app`.
+- Save recordings for inspection: add `"saveRecordingsForDebugging": true` to settings.json. WAVs (16 kHz mono)
+  go to `~/Library/Application Support/VoiceFlow/debug-recordings/`. Turn it off and delete the folder afterwards.
+- Microphone permission: `tccutil reset Microphone local.voiceflow.VoiceFlow` to test the first-run prompt again.
 - Settings file: `~/Library/Application Support/VoiceFlow/settings.json` (menu → Open Settings File…). It's
   created only when first changed/opened. An invalid file is moved to `settings.invalid.json` and defaults
   are used (logged as an error).

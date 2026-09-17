@@ -10,6 +10,7 @@ import Testing
         #expect(Settings.default.processingMode == .fast)
         #expect(Settings.default.hotkey == Settings.Hotkey(keyCode: 49, carbonModifiers: 0x0800))
         #expect(Settings.default.maxRecordingSeconds == 120)
+        #expect(Settings.default.saveRecordingsForDebugging == false)
     }
 
     @Test func hotkeyDisplayNames() {

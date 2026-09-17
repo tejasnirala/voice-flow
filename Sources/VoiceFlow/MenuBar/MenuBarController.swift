@@ -11,6 +11,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private var state: PipelineState = .idle
     /// Called when the user dismisses an error from the menu.
     var onDismissError: (() -> Void)?
+    /// Called when settings are reloaded or changed from the menu.
+    var onSettingsChanged: ((Settings) -> Void)?
 
     init(settingsStore: SettingsStore, settings: Settings) {
         self.settingsStore = settingsStore
@@ -68,6 +70,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         // Pick up edits made in the settings file since the menu was last opened.
         let (loaded, outcome) = settingsStore.load()
+        if loaded != settings { onSettingsChanged?(loaded) }
         settings = loaded
         if case .invalidUsedDefaults(let path) = outcome {
             Log.settings.error("settings file was invalid; preserved at \(path, privacy: .public), using defaults")
@@ -80,7 +83,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         menu.addItem(disabled("\(BuildInfo.name) \(BuildInfo.version)"))
         menu.addItem(disabled(statusText))
-        if case .error = state {
+        if case .error(let failure) = state {
+            if failure.recovery == .openMicrophoneSettings {
+                let open = NSMenuItem(title: "Open Microphone Settings…", action: #selector(openMicrophoneSettings), keyEquivalent: "")
+                open.target = self
+                menu.addItem(open)
+            }
             let dismiss = NSMenuItem(title: "Dismiss", action: #selector(dismissError), keyEquivalent: "")
             dismiss.target = self
             menu.addItem(dismiss)
@@ -116,6 +124,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     // MARK: Actions
 
+    @objc private func openMicrophoneSettings() {
+        PermissionManager.openMicrophoneSettings()
+    }
+
     @objc private func dismissError() {
         onDismissError?()
     }
@@ -135,6 +147,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private func persist() {
         do {
             try settingsStore.save(settings)
+            onSettingsChanged?(settings)
             Log.settings.notice("settings saved")
         } catch {
             Log.settings.error("failed to save settings: \(error.localizedDescription, privacy: .public)")

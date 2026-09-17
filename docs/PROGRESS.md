@@ -10,8 +10,8 @@
 | 0 | Machine & architecture discovery | ✅ Complete (2026-09-17; STT model final at Phase 4 gate) |
 | 1 | Native macOS shell | ✅ Complete (2026-09-17, owner verified menu) |
 | 2 | Global hotkey | ✅ Complete (2026-09-17, owner tested) |
-| 3 | Audio recording | ⏭️ Next (after approval) |
-| 4 | STT integration (+ accuracy gate) | ⬜ |
+| 3 | Audio recording | ✅ Complete (2026-09-17, owner tested incl. AirPods) |
+| 4 | STT integration (+ accuracy gate) | ⏭️ Next |
 | 5 | Text insertion (first usable product) | ⬜ |
 | 6 | Fast path optimization | ⬜ |
 | 7 | Local LLM (Smart Mode) | ⬜ |
@@ -119,10 +119,25 @@ per 30–60 s, GPU 0, footprint 13 MB.
 - [x] Measured: dispatch latency median 0.13 ms, p95 0.31 ms, max 0.69 ms (n=26 presses); idle unchanged
       (0.00 s CPU, 1 wakeup / 30 s, GPU 0, 13 MB) → PERFORMANCE.md §2.2–2.3
 
-## Phase 3 — Audio recording
-AVAudioEngine tap → one resample to 16 kHz mono Float32 in memory; max duration; cancellation; silence
-and too-short detection; permission errors. Measure start latency per input device (built-in, AirPods,
-iPhone), memory, CPU.
+## Phase 3 — Audio recording ✅
+- [x] `AudioRecorder`: AVAudioEngine tap (macOS 27 `installAudioTap`, `installTap` fallback) → AVAudioConverter →
+      16 kHz mono Float32 in memory; lock-protected sink; sample cap = `maxRecordingSeconds` (limit → keep audio);
+      input-device change mid-recording → stop with the audio so far and rebuild the engine; engine reused (measured)
+- [x] `RecordingGate` (Core, 6 tests): tooShort < 0.3 s; silent < 0.15 s above −45 dBFS. Thresholds calibrated on owner clips
+- [x] Microphone permission: first-use prompt → error "allow, then try again"; denied → error with "Open Microphone
+      Settings…" (`PipelineFailure.recovery`)
+- [x] Coordinator: begin/finish/cancel recording, per-recording metrics log (press → running, first buffer, leading
+      silence, peak, speech, verdict, CPU, footprint); Phase 3 stub still ends at transcribing → idle
+- [x] Opt-in `saveRecordingsForDebugging` (off by default) + measurement mode (`--measure-recording`, `scripts/measure-recording.sh`)
+- [x] Verified: owner granted mic permission and recorded speech (kept) and a tap (tooShort); 12 silent runs → silent;
+      max duration 3 s → stopped at 3.00 s; speaker playback → in-app WAV → Whisper transcript correct; owner settings
+      backed up/restored around tests; 36 tests pass; no build warnings
+- [x] Measured → PERFORMANCE.md §4: press → first audio 173–184 ms warm (246 ms cold); ~0.7 % CPU while recording;
+      +2–3 MB during recording; idle after mic use 5–8 wakeups/30 s, ~0.01 s CPU/30 s
+- [x] Owner checks (2026-09-17): Esc during recording → discarded, orange mic indicator off immediately; indicator only
+      while holding; AirPods recording worked (15 s, kept)
+- Known limitation → Phase 6: speech right after the press can be clipped. Built-in mic ~0.18 s; **AirPods ~0.53 s**
+  (342 ms of leading silence during the Bluetooth profile switch). No pre-roll by design
 
 ## Phase 4 — STT integration (accuracy gate)
 `SpeechEngine` protocol → whisper.cpp engine (and Parakeet if still a finalist); STTModelManager
@@ -157,10 +172,10 @@ Per SPEC.md. Notes so far:
 ## Session handoff notes
 _Overwrite at the end of every session._
 
-- **Last session (2026-09-17):** Phases 0–2 complete; awaiting owner approval for Phase 3 (audio recording).
+- **Last session (2026-09-17):** Phases 0–3 complete. Next: Phase 4 (STT integration + accuracy gate).
 - **Models on this machine** (`~/Library/Application Support/VoiceFlow/models/`): whisper tiny.en, base.en,
   small.en, medium.en-q8_0, large-v3-turbo, large-v3-turbo-q8_0, distil-large-v3; parakeet tdt-0.6b-v3-q8_0;
   llm qwen2.5-1.5b-instruct-q4_k_m.
 - **Owner recordings:** `benchmarks-output/audio/human/macbook-mic/` (50 clips, gitignored). Results cached in
   `benchmarks-output/results/human/`. Rerunning `scripts/bench/stt.sh human` re-scores instantly.
-- **Next action:** owner approval → Phase 3. Before Phase 3: create the "VoiceFlow Dev" signing identity (microphone permission). Phase 4 gate items D1, D3, D4 are waiting on the owner.
+- **Next action:** Phase 4. Its gate needs owner items D1 (review 6 clips), D3 (threshold approval), D4 (more recordings).
