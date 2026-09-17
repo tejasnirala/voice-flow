@@ -13,6 +13,16 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     var onDismissError: (() -> Void)?
     /// Called when settings are reloaded or changed from the menu.
     var onSettingsChanged: ((Settings) -> Void)?
+    var onRetryTranscription: (() -> Void)?
+    private var modelStatus: STTModelStatus = .installed
+    /// Held only in memory for display and copying.
+    private var lastTranscript: String?
+
+    func update(modelStatus: STTModelStatus, lastTranscript: String?) {
+        self.modelStatus = modelStatus
+        self.lastTranscript = lastTranscript
+        if let menu = statusItem.menu, menu.numberOfItems > 0 { rebuild(menu) }
+    }
 
     init(settingsStore: SettingsStore, settings: Settings) {
         self.settingsStore = settingsStore
@@ -58,7 +68,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         switch state {
         case .idle: "Ready — hold \(settings.hotkey.displayName) to dictate"
         case .recording: "🎙 Recording… (Esc to cancel)"
-        case .transcribing: "Transcribing…"
+        case .transcribing: "Transcribing on this Mac…"
         case .processing: "Processing…"
         case .inserting: "Inserting…"
         case .error(let failure): "⚠︎ \(failure.message)"
@@ -83,7 +93,15 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         menu.addItem(disabled("\(BuildInfo.name) \(BuildInfo.version)"))
         menu.addItem(disabled(statusText))
+        if state == .idle, modelStatus != .installed {
+            menu.addItem(disabled("⚠︎ Speech model \(modelStatusText) — run \(settings.sttModel.installCommand)"))
+        }
         if case .error(let failure) = state {
+            if failure.recovery == .retryTranscription {
+                let retry = NSMenuItem(title: "Retry Transcription", action: #selector(retryTranscription), keyEquivalent: "")
+                retry.target = self
+                menu.addItem(retry)
+            }
             if failure.recovery == .openMicrophoneSettings {
                 let open = NSMenuItem(title: "Open Microphone Settings…", action: #selector(openMicrophoneSettings), keyEquivalent: "")
                 open.target = self
@@ -94,6 +112,15 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             menu.addItem(dismiss)
         }
         menu.addItem(.separator())
+
+        if let transcript = lastTranscript {
+            let preview = transcript.count > 60 ? transcript.prefix(60) + "…" : Substring(transcript)
+            menu.addItem(disabled("Last: \(preview)"))
+            let copy = NSMenuItem(title: "Copy Last Transcript", action: #selector(copyLastTranscript), keyEquivalent: "c")
+            copy.target = self
+            menu.addItem(copy)
+            menu.addItem(.separator())
+        }
 
         let modeItem = NSMenuItem(title: "Mode", action: nil, keyEquivalent: "")
         let modes = NSMenu()
@@ -123,6 +150,25 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     // MARK: Actions
+
+    private var modelStatusText: String {
+        switch modelStatus {
+        case .installed: "installed"
+        case .missing: "not installed"
+        case .corrupted: "damaged"
+        case .incompatible: "incompatible"
+        }
+    }
+
+    @objc private func retryTranscription() {
+        onRetryTranscription?()
+    }
+
+    @objc private func copyLastTranscript() {
+        guard let lastTranscript else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(lastTranscript, forType: .string)
+    }
 
     @objc private func openMicrophoneSettings() {
         PermissionManager.openMicrophoneSettings()

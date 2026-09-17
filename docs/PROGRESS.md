@@ -11,7 +11,7 @@
 | 1 | Native macOS shell | ✅ Complete (2026-09-17, owner verified menu) |
 | 2 | Global hotkey | ✅ Complete (2026-09-17, owner tested) |
 | 3 | Audio recording | ✅ Complete (2026-09-17, owner tested incl. AirPods) |
-| 4 | STT integration (+ accuracy gate) | ⏭️ Next |
+| 4 | STT integration (+ accuracy gate) | 🟡 Implemented & verified; **accuracy gate awaiting owner** |
 | 5 | Text insertion (first usable product) | ⬜ |
 | 6 | Fast path optimization | ⬜ |
 | 7 | Local LLM (Smart Mode) | ⬜ |
@@ -139,10 +139,27 @@ per 30–60 s, GPU 0, footprint 13 MB.
 - Known limitation → Phase 6: speech right after the press can be clipped. Built-in mic ~0.18 s; **AirPods ~0.53 s**
   (342 ms of leading silence during the Bluetooth profile switch). No pre-roll by design
 
-## Phase 4 — STT integration (accuracy gate)
-`SpeechEngine` protocol → whisper.cpp engine (and Parakeet if still a finalist); STTModelManager
-(installed/missing/corrupted/incompatible); in-app instrumentation. Run the human corpus benchmark.
-**Don't pass this phase until the chosen model meets the approved threshold.**
+## Phase 4 — STT integration (accuracy gate) 🟡
+- [x] Core: `SpeechEngine` protocol, `TranscriptionResult`, `STTModel` catalog (large-v3-turbo q8_0 default, medium.en q8_0
+      alternate; size + SHA-256), `STTModelStatus`, `ModelVerificationRecord`, `TranscriptGuard` (removes non-speech tags,
+      collapses decoder loops, drops stock silence phrases; never adds/replaces words), retry-transcription transition,
+      STT settings (`sttModelID`, `useVocabularyPrompt`, `sttUnloadAfterSeconds`). 48 tests
+- [x] App: `whisper.xcframework` binary target (bundle thinned to arm64: app 4.8 MB), `WhisperEngine` (lock-serialized context,
+      same inference params as the benchmark), `STTModelManager` (quick size check at launch, SHA-256 once per file state,
+      bundled vocabulary prompt), coordinator (load starts at recording start, transcribe on release, guard, retry on failure
+      with audio kept, one-shot idle unload, free on quit), menu (model status + install command, Last transcript,
+      Copy Last Transcript, Retry Transcription), `--transcribe-benchmark` mode
+- [x] Verified: in-app STT == benchmark on owner's 50 clips (50/50 identical; WER 1.8%, terms 98.7%); live pipeline with
+      speaker playback (3 dictations, release → text 1114–1146 ms); idle unload; missing model → clear error + retry, no crash
+- [x] Bugs found and fixed: SHA-256 autorelease buildup (+850 MB); stale failed-preparation reuse; measurement-mode
+      double completion from nested transitions; **ggml Metal residency polling thread (~100 wakeups/s forever) → disabled**
+      (A/B: no latency cost)
+- [x] Measured → PERFORMANCE.md §3.4
+- [ ] **Owner live test:** dictate a few developer sentences; open the menu → Last transcript / Copy Last Transcript; judge accuracy
+- [ ] **Accuracy gate (ACCURACY.md §5.6):** D1 review 6 clips · D3 approve threshold (+ inserted-phrase criterion) ·
+      D4 more recordings (second take and/or in-app dictations with `saveRecordingsForDebugging`)
+- Known → Phase 6: release → text ~1.1 s (fixed 30 s encoder window); ~170 MB remains allocated in whisper.cpp after
+  unload (baseline 14 MB) → evaluate a helper process or upstream fix; cold vs warm unload timing
 
 ## Phases 5–13
 Per SPEC.md. Notes so far:
@@ -165,6 +182,8 @@ Per SPEC.md. Notes so far:
 | 2026-09-17 | Provisional STT: medium.en q8_0 + vocab, superseded the same day ↓ | Tied at 97.4% before owner scoring decisions | — |
 | 2026-09-17 | Owner: "cube control" = kubectl pronunciation; "Helm" and "git" were said | Listening review | ACCURACY §5.5 |
 | 2026-09-17 | **Provisional STT: large-v3-turbo q8_0 + developer vocabulary prompt**; medium.en q8_0 + prompt alternate | Only config meeting every proposed criterion (98.7% terms); insertion risk tracked (D3/D4) | ARCHITECTURE §4.3, ACCURACY §5.6 |
+| 2026-09-17 | Disable ggml Metal residency sets (`GGML_METAL_NO_RESIDENCY`) | Otherwise a 5 ms polling thread runs for the process lifetime; A/B shows no latency cost | PERFORMANCE §3.4 |
+| 2026-09-17 | Load STT model at recording start; idle unload via one-shot timer (300 s provisional) | Model ready at release; memory returned when idle (except ~170 MB whisper.cpp residue) | ARCHITECTURE §3.6 |
 | 2026-09-16 | Carbon RegisterEventHotKey; Esc cancel registered only while recording | Press+release, no permission, zero idle cost | ARCHITECTURE §3.3 |
 | 2026-09-16 | Clipboard + ⌘V with full snapshot/restore; never lose speech | Works in Electron/terminals/browsers | ARCHITECTURE §3.4 |
 | 2026-09-16 | llama.cpp in-process (provisional); Ollama rejected | No daemon/IPC; MLX re-evaluated in Phase 7 | ARCHITECTURE §3.5 |
@@ -172,10 +191,10 @@ Per SPEC.md. Notes so far:
 ## Session handoff notes
 _Overwrite at the end of every session._
 
-- **Last session (2026-09-17):** Phases 0–3 complete. Next: Phase 4 (STT integration + accuracy gate).
+- **Last session (2026-09-17):** Phases 0–3 complete; Phase 4 implemented, verified and committed; accuracy gate + owner live test pending.
 - **Models on this machine** (`~/Library/Application Support/VoiceFlow/models/`): whisper tiny.en, base.en,
   small.en, medium.en-q8_0, large-v3-turbo, large-v3-turbo-q8_0, distil-large-v3; parakeet tdt-0.6b-v3-q8_0;
   llm qwen2.5-1.5b-instruct-q4_k_m.
 - **Owner recordings:** `benchmarks-output/audio/human/macbook-mic/` (50 clips, gitignored). Results cached in
   `benchmarks-output/results/human/`. Rerunning `scripts/bench/stt.sh human` re-scores instantly.
-- **Next action:** Phase 4. Its gate needs owner items D1 (review 6 clips), D3 (threshold approval), D4 (more recordings).
+- **Next action:** owner live-tests dictation (transcript in menu) and resolves D1/D3/D4 → close Phase 4 gate → Phase 5 (text insertion).

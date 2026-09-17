@@ -22,7 +22,7 @@ M="$HOME/Library/Application Support/VoiceFlow/models"
 FW="$(pwd)/Vendor/whisper.xcframework/macos-arm64_x86_64"
 BIN=benchmarks-output/bin/stt_engines
 CORPUS=benchmarks/corpus/developer-speech.json
-VOCAB=benchmarks/vocabulary.txt
+VOCAB=Resources/developer-vocabulary.txt
 OUT="benchmarks-output/results/$SET"
 mkdir -p "$(dirname "$BIN")" "$OUT"
 

@@ -5,20 +5,25 @@ import PackageDescription
 // Command Line Tools. `scripts/build-app.sh` wraps the executable in a .app bundle.
 //
 // Targets:
-//   VoiceFlowCore — platform-independent logic (state machine, settings, text
-//                   processing, accuracy scoring). No AppKit/AVFoundation; unit-tested.
-//   VoiceFlow     — the menu-bar app: OS/hardware boundaries (hotkey, audio,
-//                   permissions, insertion, UI) and native inference runtimes.
+//   VoiceFlowCore — platform-independent logic (state machine, settings, audio gate, STT model
+//                   catalog, transcript guard, accuracy scoring). No AppKit/AVFoundation; unit-tested.
+//   VoiceFlow     — the menu-bar app: OS/hardware boundaries (hotkey, audio, permissions,
+//                   insertion, UI) and the whisper.cpp runtime.
 //   vf-bench      — developer tool: scores STT benchmark results against the corpus.
-//
-// Native STT benchmark engines live in scripts/bench/ (compiled with swiftc against
-// Vendor/whisper.xcframework) so a plain `swift build` never requires Vendor/.
+//   whisper       — prebuilt whisper.cpp framework. Run `scripts/fetch-deps.sh` first; the
+//                   package doesn't resolve without Vendor/whisper.xcframework.
 let package = Package(
     name: "VoiceFlow",
     platforms: [.macOS(.v14)],
     targets: [
+        .binaryTarget(name: "whisper", path: "Vendor/whisper.xcframework"),
         .target(name: "VoiceFlowCore"),
-        .executableTarget(name: "VoiceFlow", dependencies: ["VoiceFlowCore"]),
+        .executableTarget(
+            name: "VoiceFlow",
+            dependencies: ["VoiceFlowCore", "whisper"],
+            // The app bundle embeds whisper.framework in Contents/Frameworks.
+            linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]
+        ),
         .executableTarget(name: "vf-bench", dependencies: ["VoiceFlowCore"]),
         .testTarget(name: "VoiceFlowCoreTests", dependencies: ["VoiceFlowCore"]),
     ]

@@ -29,3 +29,7 @@ Local-only, accuracy-first macOS menu-bar dictation utility (Swift 6 + AppKit, S
 - No Xcode (Command Line Tools only): no `xcodebuild`, no offline `metal` compiler.
 - whisper.cpp Metal shaders compile at runtime (~15 s the first time for a new binary, then cached).
 - Always `whisper_free`/`parakeet_free` before process exit, or ggml's Metal teardown asserts.
+- `swift build` requires `Vendor/whisper.xcframework` (run `scripts/fetch-deps.sh`).
+- The app sets `GGML_METAL_NO_RESIDENCY=1` at launch (ggml's residency thread polls every 5 ms). Don't remove it without re-measuring idle wakeups.
+- Performance comparisons on this fanless MacBook Air must alternate variants with cool-downs (thermal throttling).
+- In zsh use `/usr/bin/log`, not `log` (a zsh builtin).

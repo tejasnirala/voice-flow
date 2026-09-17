@@ -43,17 +43,29 @@ public struct Settings: Codable, Equatable, Sendable {
     /// `~/Library/Application Support/VoiceFlow/debug-recordings/` for audio-quality checks and benchmarks.
     /// Not exposed in the menu; set in settings.json.
     public var saveRecordingsForDebugging: Bool
+    /// `STTModel.id` from the catalog.
+    public var sttModelID: String
+    /// Bias Whisper toward developer vocabulary via its initial prompt (decisive on real speech, ACCURACY.md §5.5).
+    public var useVocabularyPrompt: Bool
+    /// Unload the STT model after this many idle seconds (0 = unload right after each dictation).
+    public var sttUnloadAfterSeconds: Double
 
-    public static let `default` = Settings(processingMode: .fast, hotkey: .optionSpace, maxRecordingSeconds: 120,
-                                           saveRecordingsForDebugging: false)
+    public static let `default` = Settings(processingMode: .fast, hotkey: .optionSpace, maxRecordingSeconds: 120)
 
     public init(processingMode: ProcessingMode, hotkey: Hotkey, maxRecordingSeconds: Double,
-                saveRecordingsForDebugging: Bool = false) {
+                saveRecordingsForDebugging: Bool = false, sttModelID: String = STTModel.largeV3TurboQ8.id,
+                useVocabularyPrompt: Bool = true, sttUnloadAfterSeconds: Double = 300) {
         self.processingMode = processingMode
         self.hotkey = hotkey
         self.maxRecordingSeconds = maxRecordingSeconds
         self.saveRecordingsForDebugging = saveRecordingsForDebugging
+        self.sttModelID = sttModelID
+        self.useVocabularyPrompt = useVocabularyPrompt
+        self.sttUnloadAfterSeconds = sttUnloadAfterSeconds
     }
+
+    /// The configured model, or the default if the configured id isn't in the catalog.
+    public var sttModel: STTModel { STTModel.model(id: sttModelID) ?? .largeV3TurboQ8 }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -63,5 +75,10 @@ public struct Settings: Codable, Equatable, Sendable {
         let seconds = (try? c.decodeIfPresent(Double.self, forKey: .maxRecordingSeconds)) ?? d.maxRecordingSeconds
         maxRecordingSeconds = (1...600).contains(seconds) ? seconds : d.maxRecordingSeconds
         saveRecordingsForDebugging = (try? c.decodeIfPresent(Bool.self, forKey: .saveRecordingsForDebugging)) ?? d.saveRecordingsForDebugging
+        let modelID = (try? c.decodeIfPresent(String.self, forKey: .sttModelID)) ?? d.sttModelID
+        sttModelID = STTModel.model(id: modelID) != nil ? modelID : d.sttModelID
+        useVocabularyPrompt = (try? c.decodeIfPresent(Bool.self, forKey: .useVocabularyPrompt)) ?? d.useVocabularyPrompt
+        let unload = (try? c.decodeIfPresent(Double.self, forKey: .sttUnloadAfterSeconds)) ?? d.sttUnloadAfterSeconds
+        sttUnloadAfterSeconds = (0...86_400).contains(unload) ? unload : d.sttUnloadAfterSeconds
     }
 }

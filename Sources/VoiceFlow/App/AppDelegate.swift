@@ -21,6 +21,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator.onStateChange = { [weak menuBar] state in menuBar?.update(state: state) }
         menuBar.onDismissError = { [weak coordinator] in coordinator?.dismissError() }
         menuBar.onSettingsChanged = { [weak coordinator] settings in coordinator?.updateSettings(settings) }
+        menuBar.onRetryTranscription = { [weak coordinator] in coordinator?.retryTranscription() }
+        coordinator.onSpeechInfoChange = { [weak menuBar] status, transcript in
+            menuBar?.update(modelStatus: status, lastTranscript: transcript)
+        }
         coordinator.start()
         self.menuBar = menuBar
         self.coordinator = coordinator
@@ -34,7 +38,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Measurement mode, used by scripts/measure-recording.sh:
     /// `open VoiceFlow.app --args --measure-recording <seconds> [--runs N] [--fresh-engine] [--stay]`
-    /// Records N times (1 s apart) without the hotkey, logging each recording's metrics, then quits
+    /// Runs N dictations (each starts 1 s after the previous one completes) without the hotkey, logging recording and
+    /// transcription metrics, then quits
     /// (or stays running with `--stay` so idle cost after recording can be sampled).
     private func runMeasurementModeIfRequested(_ coordinator: DictationCoordinator) {
         let args = ProcessInfo.processInfo.arguments
@@ -61,13 +66,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { coordinator.stopRecordingProgrammatically() }
         }
-        coordinator.onRecordingFinished = {
+        coordinator.onDictationComplete = {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { next() }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { next() }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        coordinator?.shutdown()
         Log.lifecycle.notice("terminating")
     }
 }

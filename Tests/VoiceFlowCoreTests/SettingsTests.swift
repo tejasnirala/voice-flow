@@ -11,6 +11,16 @@ import Testing
         #expect(Settings.default.hotkey == Settings.Hotkey(keyCode: 49, carbonModifiers: 0x0800))
         #expect(Settings.default.maxRecordingSeconds == 120)
         #expect(Settings.default.saveRecordingsForDebugging == false)
+        #expect(Settings.default.sttModel == .largeV3TurboQ8)
+        #expect(Settings.default.useVocabularyPrompt)
+        #expect(Settings.default.sttUnloadAfterSeconds == 300)
+    }
+
+    @Test func unknownModelIDFallsBackToDefault() throws {
+        let settings = try JSONDecoder().decode(Settings.self, from: Data(#"{"sttModelID":"tiny"}"#.utf8))
+        #expect(settings.sttModelID == STTModel.largeV3TurboQ8.id)
+        let medium = try JSONDecoder().decode(Settings.self, from: Data(#"{"sttModelID":"medium.en-q8_0"}"#.utf8))
+        #expect(medium.sttModel == .mediumEnQ8)
     }
 
     @Test func hotkeyDisplayNames() {

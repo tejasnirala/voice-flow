@@ -2,7 +2,7 @@ import Foundation
 import VoiceFlowCore
 
 /// Connects hardware/OS events to the `PipelineStateMachine` and performs the side effects of each
-/// accepted transition. Phase 3: hotkey + audio recording. STT and insertion are attached in later phases.
+/// accepted transition. Phase 4: hotkey → recording → local STT. Insertion is attached in Phase 5.
 @MainActor
 final class DictationCoordinator {
     private(set) var machine = PipelineStateMachine()
@@ -15,13 +15,28 @@ final class DictationCoordinator {
     private var cpuAtStart = 0.0
     private var footprintAtStartMB = 0.0
 
-    /// Audio waiting for transcription (Phase 4). Released as soon as it's no longer needed.
+    /// Audio waiting for transcription. Kept after a transcription failure so it can be retried; otherwise
+    /// released as soon as the dictation ends. Memory only.
     private var pendingAudio: [Float]?
+    private var pendingSpeechSeconds = 0.0
+
+    // MARK: Speech-to-text state
+    private var speechEngine: WhisperEngine?
+    private var speechEngineKey: String?
+    /// Model load started when recording begins, so the model is ready (or nearly) at release.
+    private var prepareTask: Task<Void, Error>?
+    private var unloadWork: DispatchWorkItem?
+
+    /// Most recent transcript, kept in memory only (shown in the menu, cleared on quit).
+    private(set) var lastTranscript: String?
+    /// Called when the STT model status or the last transcript changes.
+    var onSpeechInfoChange: ((STTModelStatus, String?) -> Void)?
+    private(set) var modelStatus: STTModelStatus = .missing
 
     /// Called after every accepted transition, before its side effects run.
     var onStateChange: ((PipelineState) -> Void)?
-    /// Called when a recording ends (for measurement mode).
-    var onRecordingFinished: (() -> Void)?
+    /// Called when a dictation ends: the pipeline returns to idle or error from an active state (measurement mode).
+    var onDictationComplete: (() -> Void)?
 
     init(settings: Settings) {
         self.settings = settings
@@ -34,6 +49,7 @@ final class DictationCoordinator {
     }
 
     func start() {
+        refreshModelStatus()
         hotkeys.onHotkey = { [weak self] action, phase, latencyMs in
             self?.handleHotkey(action, phase, latencyMs: latencyMs)
         }
@@ -64,10 +80,29 @@ final class DictationCoordinator {
 
     func updateSettings(_ settings: Settings) {
         self.settings = settings
+        refreshModelStatus()
     }
 
     func dismissError() {
         send(.errorDismissed)
+    }
+
+    func retryTranscription() {
+        send(.retryTranscriptionRequested)
+    }
+
+    /// Frees the model synchronously. Called on quit (ggml's Metal backend asserts if a context outlives exit).
+    func shutdown() {
+        unloadWork?.cancel()
+        speechEngine?.unload()
+    }
+
+    private func refreshModelStatus() {
+        modelStatus = STTModelManager.quickStatus(for: settings.sttModel)
+        if modelStatus != .installed {
+            Log.speech.error("model \(self.settings.sttModel.id, privacy: .public) status: \(String(describing: self.modelStatus), privacy: .public)")
+        }
+        onSpeechInfoChange?(modelStatus, lastTranscript)
     }
 
     /// Starts a recording without the hotkey (measurement mode). Returns false if it couldn't start.
@@ -122,6 +157,9 @@ final class DictationCoordinator {
         Log.pipeline.notice("\(Self.name(previous), privacy: .public) → \(Self.name(next), privacy: .public)")
         onStateChange?(next)
         runEffects(from: previous, to: next, event: event)
+        // Use this transition's own result: effects may already have sent nested events (e.g. inserting → idle),
+        // and those report their own completion.
+        if previous.isActive, !next.isActive { onDictationComplete?() }
     }
 
     private func runEffects(from previous: PipelineState, to next: PipelineState, event: PipelineEvent) {
@@ -135,16 +173,19 @@ final class DictationCoordinator {
             if recorder.isRecording { // cancel or failure: the audio isn't kept
                 recorder.cancel()
                 Log.audio.notice("recording discarded (\(String(describing: event), privacy: .public))")
-                onRecordingFinished?()
             }
         }
 
         switch next {
         case .transcribing:
-            // Phase 3 stub: no STT yet. The audio would be transcribed here (Phase 4).
+            transcribePendingAudio()
+        case .inserting:
+            // Phase 4 stub: text insertion arrives in Phase 5. The transcript is available in the menu.
+            Log.pipeline.notice("insertion not implemented yet (Phase 5); transcript kept in menu")
+            send(.insertionFinished)
+        case .idle:
             pendingAudio = nil
-            send(.transcriptionEmpty)
-        case .idle, .error:
+        case .error(let failure) where failure.recovery != .retryTranscription:
             pendingAudio = nil
         default:
             break
@@ -171,6 +212,8 @@ final class DictationCoordinator {
             return
         }
 
+        unloadWork?.cancel()
+        prepareSpeechEngine()
         cpuAtStart = ResourceUsage.cpuSeconds
         footprintAtStartMB = ResourceUsage.footprintMB
         do {
@@ -218,13 +261,149 @@ final class DictationCoordinator {
             }
         }
 
-        onRecordingFinished?()
         if verdict == .keep {
             pendingAudio = samples
+            pendingSpeechSeconds = analysis.speechSeconds
             send(event)
         } else {
             send(.recordingDiscarded)
+            scheduleUnload()
         }
+    }
+
+    // MARK: - Speech-to-text
+
+    /// Returns the engine for the current settings, creating it if the model or prompt setting changed.
+    private func currentSpeechEngine() -> WhisperEngine {
+        let model = settings.sttModel
+        let key = "\(model.id)|\(settings.useVocabularyPrompt)"
+        if let engine = speechEngine, speechEngineKey == key { return engine }
+        speechEngine?.unload()
+        let engine = WhisperEngine(model: model, modelURL: STTModelManager.url(for: model),
+                                   prompt: settings.useVocabularyPrompt ? STTModelManager.vocabularyPrompt() : nil)
+        speechEngine = engine
+        speechEngineKey = key
+        return engine
+    }
+
+    /// Verifies and loads the model in the background while the user is still speaking.
+    private func prepareSpeechEngine() {
+        let engine = currentSpeechEngine()
+        // Restart whenever the model isn't loaded, so an earlier failure (e.g. model missing, since installed)
+        // isn't reused. Concurrent loads are safe: the engine serializes them and loads at most once.
+        guard !engine.isLoaded else { return }
+        let model = engine.model
+        prepareTask = Task.detached(priority: .userInitiated) {
+            let (status, hashed) = STTModelManager.verify(model)
+            if hashed > 0 {
+                Log.speech.notice("model verified (SHA-256) in \(hashed, format: .fixed(precision: 2), privacy: .public) s: \(String(describing: status), privacy: .public)")
+            }
+            guard status == .installed else { throw ModelUnavailable(status: status, model: model) }
+            let start = DispatchTime.now().uptimeNanoseconds
+            try engine.prepare()
+            Log.speech.notice("model loaded in \(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9, format: .fixed(precision: 2), privacy: .public) s (started at recording start)")
+        }
+    }
+
+    struct ModelUnavailable: LocalizedError {
+        let status: STTModelStatus
+        let model: STTModel
+        var errorDescription: String? {
+            switch status {
+            case .missing: "Speech model not installed. Run: \(model.installCommand)"
+            case .corrupted(let reason): "Speech model file is damaged (\(reason)). Reinstall: \(model.installCommand)"
+            case .incompatible(let reason): "Speech model can't be used (\(reason))"
+            case .installed: "Speech model unavailable"
+            }
+        }
+    }
+
+    private func transcribePendingAudio() {
+        guard let audio = pendingAudio else {
+            send(.transcriptionEmpty)
+            return
+        }
+        let engine = currentSpeechEngine()
+        if !engine.isLoaded { prepareSpeechEngine() }
+        let preparation = prepareTask
+        let speechSeconds = pendingSpeechSeconds
+        let releasedAt = DispatchTime.now().uptimeNanoseconds
+        let cpuBefore = ResourceUsage.cpuSeconds
+
+        Task { [weak self] in
+            let outcome: Result<TranscriptionResult, Error> = await Task.detached(priority: .userInitiated) {
+                do {
+                    try await preparation?.value
+                    return .success(try engine.transcribe(audio))
+                } catch {
+                    return .failure(error)
+                }
+            }.value
+            self?.finishTranscription(outcome, speechSeconds: speechSeconds, releasedAt: releasedAt, cpuBefore: cpuBefore)
+        }
+    }
+
+    private func finishTranscription(_ outcome: Result<TranscriptionResult, Error>, speechSeconds: Double,
+                                     releasedAt: UInt64, cpuBefore: Double) {
+        prepareTask = nil
+        refreshModelStatus()
+        guard machine.state == .transcribing else {
+            Log.speech.notice("transcription result discarded (state changed)")
+            return
+        }
+        switch outcome {
+        case .failure(let error):
+            Log.speech.error("transcription failed: \(error.localizedDescription, privacy: .public)")
+            send(.failed(PipelineFailure(stage: .transcription, message: error.localizedDescription, recovery: .retryTranscription)))
+        case .success(var result):
+            let cleaned = TranscriptGuard.clean(result.text, speechSeconds: speechSeconds)
+            result.guardFlags = cleaned.flags
+            result.text = cleaned.text
+            let totalMs = Double(DispatchTime.now().uptimeNanoseconds - releasedAt) / 1_000_000
+            let words = result.text.split(whereSeparator: \.isWhitespace).count
+            Log.speech.notice("""
+                stt: audio \(result.audioSeconds, format: .fixed(precision: 2), privacy: .public) s, \
+                transcribe \(result.transcribeSeconds, format: .fixed(precision: 3), privacy: .public) s \
+                (RTF \(result.transcribeSeconds / max(result.audioSeconds, 0.001), format: .fixed(precision: 3), privacy: .public)), \
+                \(result.coldStart ? "cold" : "warm", privacy: .public), load in call \(result.loadSeconds, format: .fixed(precision: 2), privacy: .public) s, \
+                waited for model \(result.waitedForModelSeconds, format: .fixed(precision: 2), privacy: .public) s, \
+                release → text \(totalMs, format: .fixed(precision: 0), privacy: .public) ms, \
+                \(words, privacy: .public) words, guard \(result.guardFlags.map(\.rawValue).sorted().joined(separator: ","), privacy: .public), \
+                CPU \((ResourceUsage.cpuSeconds - cpuBefore) * 1000, format: .fixed(precision: 0), privacy: .public) ms, \
+                footprint \(ResourceUsage.footprintMB, format: .fixed(precision: 0), privacy: .public) MB
+                """)
+            pendingAudio = nil
+            scheduleUnload()
+            if result.text.isEmpty {
+                send(.transcriptionEmpty)
+            } else {
+                lastTranscript = result.text
+                onSpeechInfoChange?(modelStatus, lastTranscript)
+                send(.transcriptionSucceeded(needsProcessing: false))
+            }
+        }
+    }
+
+    /// One-shot timer (not polling): frees ~1 GB of model memory after the configured idle time.
+    private func scheduleUnload() {
+        unloadWork?.cancel()
+        guard let engine = speechEngine else { return }
+        let delay = settings.sttUnloadAfterSeconds
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, !self.machine.state.isActive, engine.isLoaded else { return }
+            DispatchQueue.global(qos: .utility).async {
+                let before = ResourceUsage.footprintMB
+                engine.unload()
+                // ~170 MB stays allocated inside whisper.cpp/ggml after whisper_free (not allocator caching:
+                // malloc_zone_pressure_relief frees 0 MB). See PERFORMANCE.md §3.4.
+                Log.speech.notice("""
+                    model unloaded after \(delay, format: .fixed(precision: 0), privacy: .public) s idle: footprint \
+                    \(before, format: .fixed(precision: 0), privacy: .public) → \(ResourceUsage.footprintMB, format: .fixed(precision: 0), privacy: .public) MB
+                    """)
+            }
+        }
+        unloadWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
     private func registerCancelKeys() {

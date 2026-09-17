@@ -4,13 +4,14 @@ import Testing
 @Suite struct PipelineStateMachineTests {
     static let failure = PipelineFailure(stage: .transcription, message: "model missing")
     static let hotkeyFailure = PipelineFailure(stage: .hotkey, message: "⌥Space is in use")
+    static let retryableFailure = PipelineFailure(stage: .transcription, message: "model missing", recovery: .retryTranscription)
 
-    static let allStates: [PipelineState] = [.idle, .recording, .transcribing, .processing, .inserting, .error(failure)]
+    static let allStates: [PipelineState] = [.idle, .recording, .transcribing, .processing, .inserting, .error(failure), .error(retryableFailure)]
     static let allEvents: [PipelineEvent] = [
         .hotkeyPressed, .hotkeyReleased, .cancelRequested, .recordingLimitReached, .recordingDiscarded,
         .transcriptionSucceeded(needsProcessing: true), .transcriptionSucceeded(needsProcessing: false),
         .transcriptionEmpty, .processingSucceeded, .processingFellBackToTranscript, .insertionFinished,
-        .failed(failure), .failed(hotkeyFailure), .errorDismissed,
+        .failed(failure), .failed(hotkeyFailure), .errorDismissed, .retryTranscriptionRequested,
     ]
 
     /// The complete transition table. Any (state, event) pair not listed must be rejected.
@@ -39,6 +40,9 @@ import Testing
         (.inserting, .failed(hotkeyFailure), .error(hotkeyFailure)),
         (.error(failure), .hotkeyPressed, .recording),
         (.error(failure), .errorDismissed, .idle),
+        (.error(retryableFailure), .hotkeyPressed, .recording),
+        (.error(retryableFailure), .errorDismissed, .idle),
+        (.error(retryableFailure), .retryTranscriptionRequested, .transcribing),
     ]
 
     @Test func transitionTableIsExhaustive() {

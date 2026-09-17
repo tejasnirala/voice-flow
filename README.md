@@ -6,7 +6,7 @@ A local-only macOS menu-bar dictation utility built for software development.
 Speech recognition and optional cleanup run entirely on your Mac. No cloud, no telemetry, no stored audio
 or transcripts.
 
-> **Status:** Phase 3 (menu-bar shell, global hotkey, audio recording). No transcription yet.
+> **Status:** Phase 4: hold ⌥Space → speak → release → local transcription (shown in the menu). Text insertion arrives in Phase 5.
 > See [`docs/PROGRESS.md`](docs/PROGRESS.md).
 
 ## Priorities
@@ -21,6 +21,7 @@ or transcripts.
 ## Quick start (development)
 ```sh
 scripts/fetch-deps.sh
+scripts/fetch-models.sh whisper large-v3-turbo-q8_0
 scripts/build-app.sh && open build/VoiceFlow.app
 scripts/test.sh
 ```

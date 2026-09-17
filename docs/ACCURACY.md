@@ -224,6 +224,12 @@ lowest category 93.3%, 0 hallucinated terms in normal clips). **Provisional defa
 medium.en q8_0 + vocab misses the per-category criterion by one term (files 8/9) and is the **alternate**:
 ~41% faster (0.84 s vs 1.42 s mean), English-only. large-v3-turbo is multilingual, so Hinglish stays possible.
 
+**In-app verification (Phase 4, 2026-09-17):** the app's own STT path (`VoiceFlow --transcribe-benchmark`: same
+`WhisperEngine`, model, vocabulary prompt and `TranscriptGuard` as live dictation) over the owner's 50 clips produced
+**identical transcripts to the benchmark harness on 50/50 clips**: WER 1.8%, terms 98.7% (77/78). Repeated across
+6 further in-app runs (residency on/off, 10- and 50-clip sets): transcripts identical every time. TranscriptGuard flags:
+none triggered on the owner's clips.
+
 Open items before Phase 4 passes:
 
 | # | Item | Status |

@@ -162,6 +162,50 @@ Notes:
   runs were single passes; run-to-run variance hasn't been measured yet (Phase 6).
 - Both finalists are within the latency sanity bound (p95 ≤ 2 s) and use ~1.1–1.2 GB while loaded.
 
+### 3.4 In-app STT (Phase 4), 2026-09-17
+Release app, whisper large-v3-turbo q8_0 + developer vocabulary prompt, Metal, residency sets off (below).
+
+**Live dictation path** (`scripts/measure-recording.sh 5 3` with speech played through the speakers; the model starts
+loading when recording starts):
+
+| Dictation | Model at release | Press → first audio | Transcribe (5.2 s audio) | **Release → text** | Footprint |
+|---|---|---|---|---|---|
+| 1 (fresh launch; load 0.35 s during recording) | loaded | 237 ms | 1.106 s | **1119 ms** | 13 → 1110 MB |
+| 2 | warm | 169 ms | 1.133 s | **1146 ms** | 1110 MB |
+| 3 | warm | 164 ms | 1.105 s | **1114 ms** | 1110 MB |
+
+An earlier identical run showed the first audio buffer delivered 1976 ms after the press while the model loaded in
+parallel, with no audio lost (recording length = press → release). It didn't reproduce in the next run. Watch in Phase 6.
+
+**Release → text is ~1.1 s and dominated by Whisper's fixed 30 s encoder window** (same as §3.1): the main Phase 6 target.
+
+**Model loading and memory:**
+
+| Measurement | Value |
+|---|---|
+| Model load (shaders cached) | 0.30–0.54 s |
+| First model load in a newly built app bundle | 15.5 s (runtime Metal shader compilation, once) |
+| SHA-256 verification of the model | Once per file state (record in `models/verified.json`); runs during the first recording |
+| Footprint with model loaded | ~1,010–1,110 MB (peak ~1,130 MB) |
+| Footprint after unload (`sttUnloadAfterSeconds`) | **141–184 MB**: ~170 MB stays allocated inside whisper.cpp/ggml after `whisper_free` (Malloc Large 133 MB + Small 40 MB; GPU memory < 1 MB). `malloc_zone_pressure_relief` frees 0 MB, so it's live allocations, not caching |
+| Bug fixed during measurement | SHA-256 hashing without an autorelease pool kept ~850 MB resident (footprint after load 1,900 MB → 1,057 MB after fix) |
+
+**Metal residency sets (decision: off).** With residency sets on (ggml default), ggml starts a thread that wakes
+every 5 ms for the process lifetime: **~3,000 idle wakeups per 30 s** measured after unload, from
+`ggml_metal_rsets_init` (`ggml-metal-device.m:984–997`). `GGML_METAL_NO_RESIDENCY=1` (set in `main.swift`) prevents
+the thread from being created. Thermally controlled A/B (10 owner clips per run, cool-down between runs, alternating):
+
+| Residency sets | Mean latency | p95 | Footprint after load |
+|---|---|---|---|
+| Off, run 1 / 2 | 1.221 s / 1.180 s | 2.402 s / 2.340 s | 1,012 MB |
+| On, run 1 / 2 | 1.219 s / 1.173 s | 2.423 s / 2.305 s | 1,053 MB |
+
+No latency difference and identical transcripts, 41 MB less memory. After unload with residency off: **15–19 wakeups
+per 30 s, 0.00 s CPU over 60 s**.
+
+**Thermal caveat:** 50-clip back-to-back runs on this fanless MacBook Air slowed steadily (mean 1.14 → 1.44 → 1.69 →
+1.76 → 1.94 s over ~5 consecutive minutes). Benchmark comparisons must alternate variants with cool-downs.
+
 ---
 
 ## 4. Audio recording (Phase 3)
@@ -254,7 +298,7 @@ prompt-eval time. ~1.26 GB while loaded, so load lazily and unload when idle. ML
 |---|---|
 | Hotkey detection latency | 2 |
 | First-word clipping (built-in ~0.2 s, AirPods ~0.5 s): measure and mitigate | 6 |
-| In-app STT latency, cold vs warm, human-voice set | 4, 6 |
+| Cold (unloaded) vs warm strategy; residual ~170 MB after unload (helper process?) | 6 |
 | End-to-end release→text latency | 5, 6 |
 | LLM runtime comparison (llama.cpp vs MLX vs Apple Foundation Models) | 7 |
 | Full audit | 11 |

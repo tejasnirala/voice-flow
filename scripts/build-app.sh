@@ -22,6 +22,7 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp "$BIN_DIR/VoiceFlow" "$APP/Contents/MacOS/VoiceFlow"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+cp Resources/developer-vocabulary.txt "$APP/Contents/Resources/"
 cp -R prompts "$APP/Contents/Resources/prompts" 2>/dev/null || true
 
 # Embed only the Vendor/ frameworks the executable actually links.
@@ -31,6 +32,9 @@ for fw in Vendor/*.xcframework; do
   otool -L "$APP/Contents/MacOS/VoiceFlow" | grep -q "@rpath/$name.framework" || continue
   slice="$(find "$fw" -maxdepth 1 -type d -name 'macos-*' | head -1)"
   cp -R "$slice/$name.framework" "$APP/Contents/Frameworks/"
+  # Apple Silicon only: drop the x86_64 slice (roughly halves the framework).
+  bin="$APP/Contents/Frameworks/$name.framework/Versions/A/$name"
+  if lipo -archs "$bin" | grep -q x86_64; then lipo "$bin" -thin arm64 -output "$bin.arm64" && mv "$bin.arm64" "$bin"; fi
 done
 
 IDENTITY_HASH="$(security find-identity -p codesigning | awk -v name="\"$IDENTITY\"" 'index($0, name) {print $2; exit}')"

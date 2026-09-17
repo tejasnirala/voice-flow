@@ -8,7 +8,7 @@ import os
 /// (and its orange indicator) is only active while the hotkey is held.
 @MainActor
 final class AudioRecorder {
-    static let sampleRate = 16_000.0
+    nonisolated static let sampleRate = 16_000.0
 
     struct StartMetrics {
         let deviceName: String

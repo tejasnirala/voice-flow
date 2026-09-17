@@ -13,6 +13,9 @@ scripts/fetch-models.sh whisper large-v3-turbo-q8_0     # example; see ACCURACY.
 Models go to `~/Library/Application Support/VoiceFlow/models/{whisper,parakeet,llm}/`. Each file is
 verified against Hugging Face's SHA-256 before use. Setup is the only step that uses the network.
 
+`swift build` needs `Vendor/whisper.xcframework` (the package links it as a binary target), so run
+`scripts/fetch-deps.sh` once after cloning.
+
 ## Everyday commands
 ```sh
 swift build                    # debug build of all targets
@@ -33,7 +36,7 @@ Sources/vf-bench/             Benchmark scorer/report CLI
 Tests/VoiceFlowCoreTests/     Swift Testing tests
 Resources/Info.plist          App bundle metadata (LSUIElement, microphone usage string)
 benchmarks/corpus/            Developer-speech accuracy corpus (JSON)
-benchmarks/vocabulary.txt     Developer vocabulary used for prompt/contextual-string experiments
+Resources/developer-vocabulary.txt Developer vocabulary: Whisper initial prompt (bundled in the app) and benchmarks
 scripts/                      build, test, fetch, bench
 docs/                         SPEC, PROGRESS, ARCHITECTURE, ACCURACY, PERFORMANCE, DEVELOPMENT
 Vendor/                       (gitignored) fetched native frameworks
@@ -102,6 +105,12 @@ benchmark → verify → review `git diff` → update docs + PROGRESS → commit
 - Save recordings for inspection: add `"saveRecordingsForDebugging": true` to settings.json. WAVs (16 kHz mono)
   go to `~/Library/Application Support/VoiceFlow/debug-recordings/`. Turn it off and delete the folder afterwards.
 - Microphone permission: `tccutil reset Microphone local.voiceflow.VoiceFlow` to test the first-run prompt again.
+- In-app STT over benchmark clips (the same code path as dictation, writes vf-bench JSONL):
+  `build/VoiceFlow.app/Contents/MacOS/VoiceFlow --transcribe-benchmark <audio-dir> --corpus benchmarks/corpus/developer-speech.json --out <file.jsonl>`
+  then `swift run -c release vf-bench score benchmarks/corpus/developer-speech.json <file.jsonl>`.
+  Alternate variants and cool down between runs: back-to-back runs throttle on the MacBook Air.
+- STT settings (settings.json): `sttModelID` (`large-v3-turbo-q8_0` | `medium.en-q8_0`), `useVocabularyPrompt`,
+  `sttUnloadAfterSeconds`. `VOICEFLOW_METAL_RESIDENCY=1` re-enables ggml residency sets (A/B testing only).
 - Settings file: `~/Library/Application Support/VoiceFlow/settings.json` (menu → Open Settings File…). It's
   created only when first changed/opened. An invalid file is moved to `settings.invalid.json` and defaults
   are used (logged as an error).

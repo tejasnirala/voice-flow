@@ -22,12 +22,12 @@ start="$(date '+%Y-%m-%d %H:%M:%S')"
 echo "recording ${RUNS} × ${SECONDS_TO_RECORD}s ${EXTRA[*]:-}…"
 open "$APP" --args --measure-recording "$SECONDS_TO_RECORD" --runs "$RUNS" ${EXTRA[@]+"${EXTRA[@]}"}
 if [[ " ${EXTRA[*]:-} " == *" --stay "* ]]; then
-  sleep $(( RUNS * (${SECONDS_TO_RECORD%.*} + 2) + 3 ))
+  sleep $(( RUNS * (${SECONDS_TO_RECORD%.*} + 4) + 5 ))
 else
   sleep 1
   while pgrep -x VoiceFlow >/dev/null; do sleep 0.2; done
   sleep 1
 fi
 /usr/bin/log show --start "$start" --style compact \
-  --predicate 'subsystem == "local.voiceflow.VoiceFlow" AND category IN {"audio", "lifecycle"}' \
+  --predicate 'subsystem == "local.voiceflow.VoiceFlow" AND category IN {"audio", "lifecycle", "speech"}' \
   | grep -v '^Timestamp' | sed -E 's/^[0-9-]+ ([0-9:.]+) [^]]*\] /  \1 /'

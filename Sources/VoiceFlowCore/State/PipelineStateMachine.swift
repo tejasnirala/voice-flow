@@ -2,7 +2,11 @@
 public struct PipelineFailure: Equatable, Sendable {
     public enum Stage: String, Sendable { case hotkey, recording, transcription, processing, insertion }
     /// Something the UI can offer so the user can fix the problem.
-    public enum Recovery: Equatable, Sendable { case openMicrophoneSettings }
+    public enum Recovery: Equatable, Sendable {
+        case openMicrophoneSettings
+        /// The recording is still held in memory; transcription can be retried (e.g. after installing the model).
+        case retryTranscription
+    }
 
     public var stage: Stage
     public var message: String
@@ -50,6 +54,8 @@ public enum PipelineEvent: Equatable, Sendable {
     case insertionFinished
     case failed(PipelineFailure)
     case errorDismissed
+    /// Retry transcribing the recording kept after a transcription failure.
+    case retryTranscriptionRequested
 }
 
 /// The explicit, deterministic dictation state machine. Side effects (start the recorder, run STT, …) are
@@ -102,6 +108,8 @@ public struct PipelineStateMachine: Sendable {
 
         case (.error, .errorDismissed):
             return .idle
+        case (.error(let failure), .retryTranscriptionRequested) where failure.recovery == .retryTranscription:
+            return .transcribing
 
         default:
             return nil

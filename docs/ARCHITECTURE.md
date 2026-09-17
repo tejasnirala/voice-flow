@@ -71,7 +71,8 @@ Sources/VoiceFlowCore/          (no AppKit/AVFoundation; unit-tested)
   State/        PipelineStateMachine, PipelineFailure (with recovery hints)
   Audio/        RecordingGate (level analysis, keep/tooShort/silent)
   Settings/     Settings model + persistence (Codable JSON)
-  Speech/       TranscriptionResult, ModelManifest/ModelStatus, Accuracy/ (corpus, normalizer, scorer)
+  Speech/       SpeechEngine protocol, TranscriptionResult, STTModel catalog/status/verification record,
+                TranscriptGuard, Accuracy/ (corpus, normalizer, scorer)
   Processing/   TextProcessor, DeveloperVocabulary, prompt templates, LLM output guard
   Diagnostics/  PerformanceMonitor spans
 Sources/VoiceFlow/              (app; OS & native runtime boundaries)
@@ -79,7 +80,7 @@ Sources/VoiceFlow/              (app; OS & native runtime boundaries)
   MenuBar/      MenuBarController (status item; menu built on demand)
   Hotkey/       GlobalHotkeyManager (Carbon)
   Audio/        AudioRecorder (AVAudioEngine), DebugRecordingWriter (opt-in WAV)
-  Speech/       WhisperEngine, ParakeetEngine, STTModelManager
+  Speech/       WhisperEngine (whisper.cpp, Metal), STTModelManager (locate, SHA-256 verify, vocabulary prompt)
   Processing/   LocalLLMEngine (llama.cpp)
   Insertion/    ClipboardManager, TextInserter
   Permissions/  PermissionManager (microphone; Accessibility in Phase 5)
@@ -194,6 +195,15 @@ Model status detection (STTModelManager): **missing** (no file), **corrupted** (
 the recorded manifest), **incompatible** (runtime refuses to load it, or the header/ftype is unsupported),
 **installed**. The setup script already verifies SHA-256 against Hugging Face metadata. The app records
 the hash at install and re-verifies lazily, not on every launch (hashing 1.5 GB costs ~1 s).
+
+**Implemented (Phase 4):** the model catalog (`STTModel`: file, size, SHA-256) lives in Core. At launch only a size
+check runs (no hashing, no loading). The first time a file state is seen, SHA-256 is verified during the first
+recording and remembered (`models/verified.json`). Status is shown in the menu with the install command; nothing is
+downloaded at runtime. **Loading:** the model starts loading when recording starts (ready at release: 0.3–0.5 s
+load), and a one-shot timer unloads it after `sttUnloadAfterSeconds` idle (default 300 s, provisional). The app frees
+the model on quit. **Metal residency sets are disabled** (`GGML_METAL_NO_RESIDENCY`): with them, ggml runs a 5 ms
+polling thread for the process lifetime (PERFORMANCE.md §3.4). A transcription failure keeps the audio in memory
+and offers *Retry Transcription*; the last transcript is kept in memory only (menu: *Copy Last Transcript*).
 
 **Cold vs warm strategy:** decided in Phase 6 from measurements (spec §22). The Phase 0 harness already
 records load time, first-run time and footprint after load per model (PERFORMANCE.md). Current hypothesis:
