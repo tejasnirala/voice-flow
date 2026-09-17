@@ -325,7 +325,7 @@ Per SPEC.md. Notes so far:
 ## Session handoff notes
 _Overwrite at the end of every session._
 
-- **Last session (2026-09-17):** Phases 0–9 complete (owner approved). Phases 0–10 complete (owner approved). Next: Phase 11.
+- **Last session (2026-09-17):** Phases 0–10 complete (owner approved). Next: Phase 11.
 - **Models on this machine** (`~/Library/Application Support/VoiceFlow/models/`): **in use:** whisper medium.en-q8_0 +
   ggml-medium.en-encoder.mlmodelc. Benchmark-only (deletable on request): whisper tiny.en, base.en, small.en, large-v3-turbo,
   large-v3-turbo-q8_0 (STT alternate), distil-large-v3; parakeet tdt-0.6b-v3-q8_0.
