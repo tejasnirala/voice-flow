@@ -87,7 +87,9 @@ final class WhisperEngine: SpeechEngine, @unchecked Sendable {
         params.language = UnsafePointer(language)
         if let promptCString { params.initial_prompt = UnsafePointer(promptCString) }
 
-        // Long recordings: drop long pauses and transcribe ≤ 25 s chunks independently (SpeechSegmenter).
+        // Long recordings: drop long pauses and transcribe ≤ 29 s chunks independently (SpeechSegmenter).
+        // The encoder always uses Whisper's full 30 s window: fitting it to the audio (audio_ctx) was 2–3× faster but
+        // failed the accuracy gate, returning empty transcripts for some clips (PERFORMANCE.md §3.5).
         let chunks = SpeechSegmenter.chunks(for: samples, sampleRate: AudioRecorder.sampleRate)
         var texts: [String] = []
         var transcribedSamples = 0

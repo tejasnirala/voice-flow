@@ -221,6 +221,22 @@ per 30 s, 0.00 s CPU over 60 s**.
 **Thermal caveat:** 50-clip back-to-back runs on this fanless MacBook Air slowed steadily (mean 1.14 → 1.44 → 1.69 →
 1.76 → 1.94 s over ~5 consecutive minutes). Benchmark comparisons must alternate variants with cool-downs.
 
+### 3.5 Phase 6 experiment: fitted encoder window (`audio_ctx`), rejected, 2026-09-17
+Whisper always encodes a 30 s window, which is the fixed ~0.7 s cost of short dictations. `audio_ctx` shrinks the window
+to the audio length (50 frames/s + margin). In-app engine (medium.en q8_0 + vocab), both benchmark sets, variants run
+back to back with 45 s cool-downs.
+
+| Variant (margin:min frames) | 50 clips: WER / terms / invented | Long-form: WER / terms | Mean latency, clips ≤ 6 s | 6–12 s | Long-form |
+|---|---|---|---|---|---|
+| **full window (kept)** | **1.1% / 97.4% / 0** | **0.7% / 97.4%** | 0.725 s | 0.755 s | 2.549 s |
+| dynamic 64:500 | 10.2% / 87.2% / 0 | 6.6% / 94.9% | 0.304 s | 0.334 s | 1.999 s |
+| dynamic 64:0 | 11.1% / 84.6% / 0 | 6.6% / 94.9% | 0.254 s | 0.376 s | 2.000 s |
+| dynamic 128:0 | 25.9% / 65.4% / 0 | 1.8% / 94.9% | 0.276 s | 0.341 s | 2.113 s |
+
+2–3× faster, but every variant fails the approved gate (terms ≥ 95%). Failure mode: **whole transcripts replaced by
+"." or "--"** (technical-10, identifiers-04, identifiers-06, architecture-04) and **truncated endings** (natural-01 lost
+its last clause). Silently losing a dictation is unacceptable, so the switch was removed.
+
 ---
 
 ## 4. Audio recording (Phase 3)

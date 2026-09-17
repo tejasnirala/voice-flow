@@ -17,6 +17,7 @@ Local-only, accuracy-first macOS menu-bar dictation utility (Swift 6 + AppKit, S
 - Never pick an STT model because it's smaller or faster if it fails the accuracy threshold (ACCURACY.md).
 - The LLM must never hide or "fix" bad STT, or invent technical terms.
 - Never commit models, audio, `Vendor/`, `build/`, `.build/`, `benchmarks-output/`, or secrets.
+- Chain build → test → commit with `&&` (or `set -e`). Never let a commit run after a failed build or test.
 - New dependencies need a justification in ARCHITECTURE.md §6.
 
 ## Commands
