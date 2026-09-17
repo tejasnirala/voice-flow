@@ -8,6 +8,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private let statusItem: NSStatusItem
     private let settingsStore: SettingsStore
     private var settings: Settings
+    private var state: PipelineState = .idle
+    /// Called when the user dismisses an error from the menu.
+    var onDismissError: (() -> Void)?
 
     init(settingsStore: SettingsStore, settings: Settings) {
         self.settingsStore = settingsStore
@@ -15,15 +18,49 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         super.init()
 
-        let image = NSImage(systemSymbolName: "mic", accessibilityDescription: BuildInfo.name)
-        image?.isTemplate = true
-        statusItem.button?.image = image
-        statusItem.button?.toolTip = BuildInfo.name
+        update(state: .idle)
 
         let menu = NSMenu()
         menu.delegate = self
         menu.autoenablesItems = false
         statusItem.menu = menu
+    }
+
+    /// Reflects the pipeline state in the icon immediately; the menu text is refreshed when opened.
+    func update(state: PipelineState) {
+        self.state = state
+        guard let button = statusItem.button else { return }
+        let symbol: String
+        switch state {
+        case .idle: symbol = "mic"
+        case .recording: symbol = "mic.fill"
+        case .transcribing, .processing: symbol = "waveform"
+        case .inserting: symbol = "text.cursor"
+        case .error: symbol = "exclamationmark.triangle"
+        }
+        var image = NSImage(systemSymbolName: symbol, accessibilityDescription: "\(BuildInfo.name): \(statusText)")
+        if state == .recording {
+            // Red while recording so it's obvious the microphone is live. The menu bar ignores
+            // `contentTintColor` for status items here, so bake the color into a non-template symbol.
+            image = image?.withSymbolConfiguration(.init(paletteColors: [.systemRed]))
+            image?.isTemplate = false
+        } else {
+            image?.isTemplate = true
+        }
+        button.image = image
+        button.toolTip = "\(BuildInfo.name) — \(statusText)"
+        if let menu = statusItem.menu, menu.numberOfItems > 0 { rebuild(menu) }
+    }
+
+    private var statusText: String {
+        switch state {
+        case .idle: "Ready — hold \(settings.hotkey.displayName) to dictate"
+        case .recording: "🎙 Recording… (Esc to cancel)"
+        case .transcribing: "Transcribing…"
+        case .processing: "Processing…"
+        case .inserting: "Inserting…"
+        case .error(let failure): "⚠︎ \(failure.message)"
+        }
     }
 
     // MARK: NSMenuDelegate
@@ -42,7 +79,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.removeAllItems()
 
         menu.addItem(disabled("\(BuildInfo.name) \(BuildInfo.version)"))
-        menu.addItem(disabled("● Ready"))
+        menu.addItem(disabled(statusText))
+        if case .error = state {
+            let dismiss = NSMenuItem(title: "Dismiss", action: #selector(dismissError), keyEquivalent: "")
+            dismiss.target = self
+            menu.addItem(dismiss)
+        }
         menu.addItem(.separator())
 
         let modeItem = NSMenuItem(title: "Mode", action: nil, keyEquivalent: "")
@@ -73,6 +115,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     // MARK: Actions
+
+    @objc private func dismissError() {
+        onDismissError?()
+    }
 
     @objc private func selectFastMode() {
         guard settings.processingMode != .fast else { return }

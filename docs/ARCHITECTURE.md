@@ -124,8 +124,19 @@ straight into the final buffer. No intermediate files or formats.
 | CGEventTap | Can do modifier-only hotkeys (e.g. Fn) | Sees every keystroke system-wide | Small per-key cost | Input Monitoring or Accessibility | Fallback if a modifier-only hotkey is ever wanted |
 | `NSEvent.addGlobalMonitorForEvents` | Simple | Can't consume the key; every keystroke | Small per-key cost | Accessibility | Rejected |
 
-Cancellation: Esc is registered as a second Carbon hotkey **only while RECORDING**, then unregistered, so
-Esc works normally everywhere else. Duplicate or auto-repeat events are ignored unless IDLE (Phase 2 tests this).
+Cancellation: Esc and ⌥Esc are registered as Carbon hotkeys **only while RECORDING** (Carbon matches modifiers
+exactly, and ⌥ is usually still held), then unregistered, so Esc works normally everywhere else.
+
+Verified behavior (Phase 2, owner-tested 2026-09-17):
+- Press and release both arrive in ~0.13 ms (PERFORMANCE.md §2.2). No keystroke leaks into the focused app,
+  including during long holds.
+- **Releasing ⌥ before Space keeps recording until Space is released.** The hotkey ends on the key-up of the
+  hotkey's key. No characters leak meanwhile, so this is accepted (detecting modifier release would need a
+  global flags monitor and likely Input Monitoring permission).
+- Duplicate presses and stray releases are rejected by the state machine.
+- **While VoiceFlow's own menu is open**, macOS delivers hotkey events only after it closes. Presses more
+  than 500 ms late are ignored as stale rather than producing an empty recording.
+- Registration failure (combination taken by another app) → error state with a message in the menu.
 
 ### 3.4 Text insertion & clipboard
 

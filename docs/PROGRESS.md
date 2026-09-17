@@ -9,8 +9,8 @@
 |---|---|---|
 | 0 | Machine & architecture discovery | ✅ Complete (2026-09-17; STT model final at Phase 4 gate) |
 | 1 | Native macOS shell | ✅ Complete (2026-09-17, owner verified menu) |
-| 2 | Global hotkey | 🟡 In progress |
-| 3 | Audio recording | ⬜ |
+| 2 | Global hotkey | ✅ Complete (2026-09-17, owner tested) |
+| 3 | Audio recording | ⏭️ Next (after approval) |
 | 4 | STT integration (+ accuracy gate) | ⬜ |
 | 5 | Text insertion (first usable product) | ⬜ |
 | 6 | Fast path optimization | ⬜ |
@@ -100,10 +100,23 @@ benchmark → fix → review → CPU/RAM check → docs + this file → show cha
 Measured: launch 85–110 ms (653 ms on the first run of a new build), idle CPU 0.00 s over 60 s, 2–5 wakeups
 per 30–60 s, GPU 0, footprint 13 MB.
 
-## Phase 2 — Global hotkey
-`PipelineState` + explicit transition function (exhaustive tests); Carbon ⌥Space press/release from
-`Settings.hotkey`; Esc cancel registered only while recording; duplicate/auto-repeat handling; menu status
-line reflects state; registration-failure handling (hotkey taken by another app). Measure hotkey latency.
+## Phase 2 — Global hotkey ✅
+- [x] `PipelineStateMachine` (VoiceFlowCore/State): explicit transition table, cancel, duplicate/stray-event
+      rejection, Smart-Mode fallback to the transcript, error recovery; exhaustive state×event test (30 tests total)
+- [x] `GlobalHotkeyManager` (Carbon `RegisterEventHotKey`, press + release, dispatch-latency measurement)
+- [x] Esc and ⌥Esc cancel registered only while recording
+- [x] `DictationCoordinator`: hotkey → state machine → effects. Phase 2 stub: release → transcribing →
+      `transcriptionEmpty` → idle (no audio/STT yet)
+- [x] Menu bar: icon per state (red mic while recording), status text, Dismiss on error; registration
+      failure ("already used by another app") surfaces as an error state
+- [x] Build, tests, idle unchanged (0.00 s CPU / 30 s, GPU 0, 13 MB); ⌥Space registered OK
+- [x] Owner test (2026-09-17): hold/release, quick tap, Esc cancel, long holds (14 s), VS Code/browser/Notes focused,
+      no stray characters; release-⌥-first keeps recording until Space is up (accepted, no leak)
+- [x] Bug found and fixed: hotkey events are held by macOS while VoiceFlow's own menu is open, then replayed together
+      (a 1 ms "recording"). Presses > 500 ms late are now ignored as stale (owner verified)
+- [x] Bug found and fixed: `contentTintColor` is ignored for status items → red palette symbol while recording (owner verified)
+- [x] Measured: dispatch latency median 0.13 ms, p95 0.31 ms, max 0.69 ms (n=26 presses); idle unchanged
+      (0.00 s CPU, 1 wakeup / 30 s, GPU 0, 13 MB) → PERFORMANCE.md §2.2–2.3
 
 ## Phase 3 — Audio recording
 AVAudioEngine tap → one resample to 16 kHz mono Float32 in memory; max duration; cancellation; silence
@@ -143,10 +156,10 @@ Per SPEC.md. Notes so far:
 ## Session handoff notes
 _Overwrite at the end of every session._
 
-- **Last session (2026-09-17):** Phases 0–1 complete; Phase 2 (global hotkey + state machine) started.
+- **Last session (2026-09-17):** Phases 0–2 complete; awaiting owner approval for Phase 3 (audio recording).
 - **Models on this machine** (`~/Library/Application Support/VoiceFlow/models/`): whisper tiny.en, base.en,
   small.en, medium.en-q8_0, large-v3-turbo, large-v3-turbo-q8_0, distil-large-v3; parakeet tdt-0.6b-v3-q8_0;
   llm qwen2.5-1.5b-instruct-q4_k_m.
 - **Owner recordings:** `benchmarks-output/audio/human/macbook-mic/` (50 clips, gitignored). Results cached in
   `benchmarks-output/results/human/`. Rerunning `scripts/bench/stt.sh human` re-scores instantly.
-- **Next action:** finish Phase 2. Phase 4 gate items D1, D3, D4 are waiting on the owner.
+- **Next action:** owner approval → Phase 3. Before Phase 3: create the "VoiceFlow Dev" signing identity (microphone permission). Phase 4 gate items D1, D3, D4 are waiting on the owner.

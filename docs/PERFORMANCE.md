@@ -57,7 +57,28 @@ new signature on first run); after that ~85–110 ms. Idle cost is effectively z
 no GPU client, a handful of run-loop wakeups per minute (system/AppKit, no app timers). Settings are read
 only at launch and when the menu opens; nothing is written unless the user changes a setting.
 
-### 2.2 Phase 0 shell, 2026-09-16 (for reference)
+### 2.2 Global hotkey (Phase 2), 2026-09-17
+Owner test session: real presses of ⌥Space across Safari/Chrome search field, VS Code, Notes, Terminal.
+Dispatch latency = `GetCurrentEventTime() − GetEventTime(event)` in the Carbon handler, i.e. from the system's
+timestamp on the hotkey event to VoiceFlow's handler. It doesn't include hardware/HID → WindowServer time,
+which isn't observable from the app.
+
+| Event | n | min | median | p95 | max |
+|---|---|---|---|---|---|
+| Press | 26 | 0.09 ms | **0.13 ms** | 0.31 ms | 0.69 ms |
+| Release | 26 | 0.08 ms | **0.13 ms** | 0.14 ms | 0.19 ms |
+
+State change to `recording` was logged in the same millisecond as the press in every case.
+
+**Exception, by design:** while VoiceFlow's own status menu is open, macOS holds hotkey events until the menu
+closes (observed 2.6–12.6 s). Presses more than 500 ms late are ignored as stale (verified by the owner:
+pressing ⌥Space with the menu open does nothing). Idle cost after Phase 2: see §2.3.
+
+### 2.3 Idle after Phase 2, 2026-09-17
+`scripts/measure-idle.sh 30` with the hotkey registered: launch 88.9 ms, CPU 0.00 s (0.000 %), 1 idle wakeup
+in 30 s, GPU 0.000 ms, footprint 13 MB, quit 301 ms. The registered Carbon hotkey adds no measurable idle cost.
+
+### 2.4 Phase 0 shell, 2026-09-16 (for reference)
 Empty status item: 13–14 MB footprint, 0.0 % CPU (single `ps` sample), bundle 68 KB.
 
 ---

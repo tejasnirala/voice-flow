@@ -6,7 +6,7 @@ A local-only macOS menu-bar dictation utility built for software development.
 Speech recognition and optional cleanup run entirely on your Mac. No cloud, no telemetry, no stored audio
 or transcripts.
 
-> **Status:** Phase 1 (native menu-bar shell). Not usable for dictation yet.
+> **Status:** Phase 2 (menu-bar shell + global hotkey). Not usable for dictation yet.
 > See [`docs/PROGRESS.md`](docs/PROGRESS.md).
 
 ## Priorities

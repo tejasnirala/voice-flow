@@ -12,6 +12,12 @@ import Testing
         #expect(Settings.default.maxRecordingSeconds == 120)
     }
 
+    @Test func hotkeyDisplayNames() {
+        #expect(Settings.Hotkey.optionSpace.displayName == "⌥Space")
+        #expect(Settings.Hotkey(keyCode: 49, carbonModifiers: 0x0100 | 0x0200).displayName == "⇧⌘Space")
+        #expect(Settings.Hotkey(keyCode: 3, carbonModifiers: 0x1000).displayName == "⌃Key 3")
+    }
+
     @Test func missingFileYieldsDefaults() {
         let (settings, outcome) = SettingsStore(directory: directory).load()
         #expect(settings == .default)

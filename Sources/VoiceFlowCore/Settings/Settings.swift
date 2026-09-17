@@ -22,6 +22,17 @@ public struct Settings: Codable, Equatable, Sendable {
 
         /// ⌥ Space: kVK_Space (49) with optionKey (0x0800).
         public static let optionSpace = Hotkey(keyCode: 49, carbonModifiers: 0x0800)
+
+        /// Human-readable form, e.g. "⌥Space". Modifier order follows macOS convention (⌃⌥⇧⌘).
+        public var displayName: String {
+            var name = ""
+            if carbonModifiers & 0x1000 != 0 { name += "⌃" }
+            if carbonModifiers & 0x0800 != 0 { name += "⌥" }
+            if carbonModifiers & 0x0200 != 0 { name += "⇧" }
+            if carbonModifiers & 0x0100 != 0 { name += "⌘" }
+            let keys: [UInt32: String] = [49: "Space", 53: "Esc", 36: "Return", 48: "Tab"]
+            return name + (keys[keyCode] ?? "Key \(keyCode)")
+        }
     }
 
     public var processingMode: ProcessingMode
