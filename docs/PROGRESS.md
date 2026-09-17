@@ -13,8 +13,8 @@
 | 3 | Audio recording | ✅ Complete (2026-09-17, owner tested incl. AirPods) |
 | 4 | STT integration (+ accuracy gate) | ✅ Gate passed 2026-09-17 (medium.en q8_0 + vocab); owner live test pending |
 | 5 | Text insertion (first usable product) | ✅ Complete (2026-09-17, owner tested) |
-| 6 | Fast path optimization | 🟡 In progress |
-| 7 | Local LLM (Smart Mode) | ⬜ |
+| 6 | Fast path optimization | ✅ Complete (2026-09-17, owner verified in real use) |
+| 7 | Local LLM (Smart Mode) | 🟡 Started |
 | 8 | Text modes | ⬜ |
 | 9 | Developer intelligence | ⬜ |
 | 10 | Application awareness | ⬜ |
@@ -192,7 +192,7 @@ per 30–60 s, GPU 0, footprint 13 MB.
 - Phase 6 notes: footprint with model loaded grew 1,185 → ~1,500 MB during the owner session (investigate); restore delay
   250 ms unproblematic so far
 
-## Phase 6 — Fast path optimization 🟡
+## Phase 6 — Fast path optimization ✅
 - [x] Fitted encoder window (`audio_ctx`): 2–3× faster but failed the gate (empty/truncated transcripts) → rejected, switch removed
 - [x] **Core ML encoder on the Neural Engine: adopted.** Same accuracy (49/50 + 7/7 identical), −25% clip latency, live release → text
       544–700 ms (was 914–1,015). `fetch-models.sh whisper-coreml medium.en`; the load log names the encoder
@@ -201,8 +201,10 @@ per 30–60 s, GPU 0, footprint 13 MB.
 - [x] Cold vs warm: cold = warm latency (load 0.3 s runs during speech); load/unload cycles leak ~0.7 MB each → default unload 300 → 60 s
 - [x] Residual ~187 MB after unload → owner chose the helper process: `voiceflow-stt` owns whisper.cpp; app 13–18 MB always; helper
       ready in 0.33–0.38 s per fresh process; release → text 606–764 ms; no orphans on app kill; accuracy identical (50/50, 7/7)
-- [ ] Recording start latency (engine prepare) and ⌥ dispatch latency (from owner use)
-- [ ] Docs + commit + owner check
+- [x] Owner real use (2026-09-17): ⌥ dispatch 0.22–1.66 ms; press → first audio 185–241 ms; release → pasted 1.09 s (32 s hands-free) /
+      1.58 s (40 s hold); app 13–27 MB. Recording-start optimization not pursued (tens of ms) → PERFORMANCE.md §3.10
+- **Phase 6 outcome:** short dictation release → text ~0.95 s → ~0.6–0.75 s (Core ML encoder); app memory ~190 MB+ → 13–27 MB
+  (helper process); accuracy unchanged on both sets
 
 ## Phases 6–13
 Per SPEC.md. Notes so far:
@@ -243,10 +245,10 @@ Per SPEC.md. Notes so far:
 ## Session handoff notes
 _Overwrite at the end of every session._
 
-- **Last session (2026-09-17):** Phases 0–5 complete; VoiceFlow is usable end to end (⌥ trigger, local STT, paste). Phase 6 started.
+- **Last session (2026-09-17):** Phases 0–6 complete. Phase 7 (Smart Mode) started.
 - **Models on this machine** (`~/Library/Application Support/VoiceFlow/models/`): whisper tiny.en, base.en,
   small.en, medium.en-q8_0, large-v3-turbo, large-v3-turbo-q8_0, distil-large-v3; parakeet tdt-0.6b-v3-q8_0;
   llm qwen2.5-1.5b-instruct-q4_k_m.
 - **Owner recordings:** `benchmarks-output/audio/human/macbook-mic/` (50 clips + `spoken-overrides.json`, gitignored). Results cached in
   `benchmarks-output/results/human/`. Rerunning `scripts/bench/stt.sh human` re-scores instantly.
-- **Next action:** remaining Phase 6 items (recording start latency, ⌥ latency from owner use), then close Phase 6.
+- **Next action:** Phase 7 (local LLM, Smart Mode): discovery and benchmark first.

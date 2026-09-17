@@ -307,6 +307,22 @@ per load cycle, §3.8).
 The app binary no longer links whisper.cpp; only the helper does. Bundle 5.8 MB (app 1.0 MB, helper 0.7 MB, whisper
 framework).
 
+### 3.10 Owner real use after Phase 6, 2026-09-17
+Owner dictating paragraphs into VS Code (MacBook mic, helper process, Core ML encoder); transcripts judged accurate by the owner.
+
+| | Hold ⌥ | Hands-free (double-tap) |
+|---|---|---|
+| ⌥ dispatch latency (event timestamp → handler) | 1.66 ms | 0.22 ms |
+| Press → engine running / first audio buffer | 140.9 / 240.6 ms | 80.2 / 184.8 ms |
+| Speech helper ready (launched at press) | 0.52 s | already running |
+| Audio / speech / sent to model | 40.1 s / 18.3 s / 34.3 s (2 chunks) | 32.4 s / 16.0 s / 26.8 s (1 chunk) |
+| Transcribe | 1.553 s | 1.075 s |
+| **Release → pasted** | **1,579 ms** (47 words) | **1,087 ms** (54 words) |
+| App footprint | 13.0 → 24 MB | 24.5 → 27 MB |
+
+Recording start (≈ 60–140 ms to a running engine, 165–241 ms to the first buffer on the built-in mic) was left as is: the
+remaining engine-preparation idea would save only tens of milliseconds.
+
 ## 4. Audio recording (Phase 3)
 
 ### 4.1 Start latency and cost, 2026-09-17

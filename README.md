@@ -6,7 +6,7 @@ A local-only macOS menu-bar dictation utility built for software development.
 Speech recognition and optional cleanup run entirely on your Mac. No cloud, no telemetry, no stored audio
 or transcripts.
 
-> **Status:** Phase 5 complete: hold ⌥ (or double-tap for hands-free) → speak → the text is pasted into the focused app, clipboard preserved. Usable; optimization phases follow.
+> **Status:** Phase 6 complete: hold ⌥ (or double-tap for hands-free) → speak → text pasted in ~0.6–1.1 s, clipboard preserved. The app uses ~13–27 MB; speech recognition runs in an on-demand helper process. Next: optional local LLM cleanup (Phase 7).
 > See [`docs/PROGRESS.md`](docs/PROGRESS.md).
 
 ## Priorities
