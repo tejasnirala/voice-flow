@@ -222,6 +222,33 @@ rewrite (fresh session, greedy, bounded tokens, 5 s timeout, prewarmed at record
 rewrite and input (no added phrases, no dropped or replaced content words, developer terms kept, no expansion, no code) →
 accept, or use the cleaned transcript. Speech is never lost: errors, timeouts and unavailability all fall back.
 
+### 3.5.1 Text modes (Phase 8)
+
+`TextMode` (setting `textMode`; menu **Mode**) selects the deterministic preparation, whether the on-device model runs,
+the prompt and the guard policy. `processingMode: smart` is now the **Smart Rewrite** toggle for Clean and Developer.
+
+| Mode | Deterministic step (`TextProcessingPlan.prepare`) | Model | Prompt | Guard policy |
+|---|---|---|---|---|
+| Raw | none | never | — | — |
+| Clean (default) | `RuleBasedCleanup` | Smart Rewrite only | `clean.json` | strict |
+| Developer | `RuleBasedCleanup` → `DeveloperFormatter`; re-applied after an accepted rewrite | Smart Rewrite only | `clean.json` | strict |
+| Prompt | `RuleBasedCleanup` | always | `prompt.json` | content-preserving |
+| Writing | `RuleBasedCleanup` | always | `writing.json` | content-preserving |
+
+- **`DeveloperFormatter`** (rules, no model): joins spoken symbols only in unambiguous patterns ("<word> dot <known
+  extension>", leading "dot env" after grammar words and verbs, "dash dash <flag>", "dash <letter>", "<a> underscore <b>",
+  "<a> slash <b>"), known multi-word names (Next.js, Node.js, tsconfig.json, docker-compose.yml, PostgreSQL, GraphQL…) and
+  canonical casing of whole tokens that are unambiguous product names (Redis, MongoDB, JWT, API…). Words that are also
+  ordinary English or lowercase commands (express, react, docker, git, cd) are left alone. Word-level guesses (nginx.com →
+  nginx.conf, "kube control" → kubectl) belong to Phase 9.
+- **Guard policies** (`RewriteGuard.Policy`): *strict* = Phase 7 guard (only punctuation, case, fillers, stutters, articles
+  may change). *contentPreserving* = the set of content words (normalized words minus a fixed list of grammar words and
+  fillers; negations are content) must be identical in input and output, developer terms kept, no expansion, no code
+  fence. Restructuring and grammar words are allowed; synonyms, answers, additions and omissions are not.
+- The mode is captured when the transcript is ready, so a menu change during processing can't mix modes.
+- Prompt/Writing when the on-device model is unavailable: menu items disabled with the reason; if selected anyway (settings
+  file), the rule-cleaned text is pasted.
+
 ### 3.6 Model storage & loading
 
 | Option | Advantages | Disadvantages | Decision |

@@ -343,7 +343,9 @@ final class DictationCoordinator {
 
         unloadWork?.cancel()
         prepareSpeechEngine()
-        if settings.processingMode == .smart, let prompt = smartPrompt { OnDeviceRewriter.prewarm(prompt: prompt) }
+        if settings.textMode.usesModel(processing: settings.processingMode), let prompt = rewritePrompt(for: settings.textMode) {
+            OnDeviceRewriter.prewarm(prompt: prompt)
+        }
         cpuAtStart = ResourceUsage.cpuSeconds
         footprintAtStartMB = ResourceUsage.footprintMB
         do {
@@ -513,25 +515,39 @@ final class DictationCoordinator {
                 """)
             pendingAudio = nil
             scheduleUnload()
-            let prepared = TextProcessingPlan.prepare(result.text, cleanup: settings.cleanupTranscripts)
+            let mode = settings.textMode
+            let prepared = TextProcessingPlan.prepare(result.text, mode: mode)
             if prepared.isEmpty {
                 send(.transcriptionEmpty)
             } else {
                 lastTranscript = prepared
                 onSpeechInfoChange?(modelStatus, lastTranscript)
-                let smart = settings.processingMode == .smart && smartPrompt != nil && OnDeviceRewriter.unavailableReason == nil
-                send(.transcriptionSucceeded(needsProcessing: smart))
+                rewriteMode = mode
+                let rewrite = mode.usesModel(processing: settings.processingMode) && rewritePrompt(for: mode) != nil
+                    && OnDeviceRewriter.unavailableReason == nil
+                send(.transcriptionSucceeded(needsProcessing: rewrite))
             }
         }
     }
 
-    // MARK: - Smart Mode
+    // MARK: - Model rewrite (Smart Mode for Clean/Developer; always for Prompt/Writing)
 
-    private lazy var smartPrompt: RewritePrompt? = RewritePrompt.bundled("clean")
+    /// Text mode of the transcript being processed (fixed at transcription time, so a menu change can't mix modes).
+    private var rewriteMode: TextMode = .clean
+    private var rewritePrompts: [String: RewritePrompt] = [:]
+
+    private func rewritePrompt(for mode: TextMode) -> RewritePrompt? {
+        guard let name = mode.promptName else { return nil }
+        if let cached = rewritePrompts[name] { return cached }
+        let prompt = RewritePrompt.bundled(name)
+        rewritePrompts[name] = prompt
+        return prompt
+    }
     private lazy var vocabularyTerms: [String] = RewriteGuard.terms(fromVocabulary: DeveloperVocabulary.prompt())
 
     private func rewriteLastTranscript() {
-        guard let prepared = lastTranscript, let prompt = smartPrompt else {
+        let mode = rewriteMode
+        guard let prepared = lastTranscript, let prompt = rewritePrompt(for: mode) else {
             send(.processingFellBackToTranscript)
             return
         }
@@ -547,18 +563,18 @@ final class DictationCoordinator {
             }
             guard let self, self.machine.state == .processing else { return }
             let ms = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
-            let (text, verdict) = TextProcessingPlan.finalText(prepared: prepared, rewrite: rewrite, terms: terms)
+            let (text, verdict) = TextProcessingPlan.finalText(prepared: prepared, rewrite: rewrite, terms: terms, mode: mode)
             self.lastTranscript = text
             self.onSpeechInfoChange?(self.modelStatus, text)
             switch verdict {
             case .accept?:
-                Log.speech.notice("smart rewrite accepted in \(ms, format: .fixed(precision: 0), privacy: .public) ms")
+                Log.speech.notice("\(mode.rawValue, privacy: .public) rewrite accepted in \(ms, format: .fixed(precision: 0), privacy: .public) ms")
                 self.send(.processingSucceeded)
             case .reject(let reasons)?:
-                Log.speech.notice("smart rewrite rejected by guard (\(reasons.joined(separator: ", "), privacy: .public)) in \(ms, format: .fixed(precision: 0), privacy: .public) ms; using cleaned transcript")
+                Log.speech.notice("\(mode.rawValue, privacy: .public) rewrite rejected by guard (\(reasons.joined(separator: ", "), privacy: .public)) in \(ms, format: .fixed(precision: 0), privacy: .public) ms; using cleaned transcript")
                 self.send(.processingFellBackToTranscript)
             case nil:
-                Log.speech.error("smart rewrite failed (\(failure ?? "unknown", privacy: .public)) after \(ms, format: .fixed(precision: 0), privacy: .public) ms; using cleaned transcript")
+                Log.speech.error("\(mode.rawValue, privacy: .public) rewrite failed (\(failure ?? "unknown", privacy: .public)) after \(ms, format: .fixed(precision: 0), privacy: .public) ms; using cleaned transcript")
                 self.send(.processingFellBackToTranscript)
             }
         }

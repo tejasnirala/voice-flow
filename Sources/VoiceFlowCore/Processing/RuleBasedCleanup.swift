@@ -50,10 +50,18 @@ public enum RuleBasedCleanup {
             words[0] = initial.uppercased() + first.dropFirst()
         }
 
-        // 4. End punctuation for sentences of 3+ words that lack it.
+        // 4. The pronoun "I" ("i", "i'm", "i'll", …) is always capitalized.
+        for index in words.indices where words[index] == "i" || words[index].hasPrefix("i'") || words[index].hasPrefix("i’")
+            || (words[index].count == 2 && words[index].hasPrefix("i") && ",.?!".contains(words[index].last!)) {
+            words[index] = "I" + words[index].dropFirst()
+        }
+
+        // 5. End punctuation for sentences of 3+ words that lack it.
         var result = words.joined(separator: " ")
         if words.count >= 3, let last = result.last, last.isLetter || last.isNumber {
-            result += questionStarters.contains(bare(words[0])) ? "?" : "."
+            // "Do not deploy…" / "Don't…" is an instruction, not a question.
+            let negatedImperative = ["do", "does"].contains(bare(words[0])) && bare(words[1]) == "not"
+            result += questionStarters.contains(bare(words[0])) && !negatedImperative ? "?" : "."
         }
         return result
     }

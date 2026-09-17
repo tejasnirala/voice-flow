@@ -154,20 +154,36 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             menu.addItem(.separator())
         }
 
-        let modeItem = NSMenuItem(title: "Mode", action: nil, keyEquivalent: "")
+        let modelReason = OnDeviceRewriter.unavailableReason
+        let modeItem = NSMenuItem(title: "Mode: \(settings.textMode.displayName)", action: nil, keyEquivalent: "")
         let modes = NSMenu()
-        let fast = NSMenuItem(title: "Fast (rule-based cleanup, no LLM)", action: #selector(selectFastMode), keyEquivalent: "")
-        fast.target = self
-        fast.state = settings.processingMode == .fast ? .on : .off
-        modes.addItem(fast)
-        let smartReason = OnDeviceRewriter.unavailableReason
-        let smart = NSMenuItem(title: smartReason == nil ? "Smart (on-device Apple model, +~0.8 s)" : "Smart — \(smartReason!)",
-                               action: #selector(selectSmartMode), keyEquivalent: "")
+        modes.autoenablesItems = false
+        let descriptions: [TextMode: String] = [
+            .raw: "Raw — exactly as recognized",
+            .clean: "Clean — punctuation, no fillers or stutters",
+            .developer: "Developer — Clean + package.json, --flags, user_id",
+            .prompt: "Prompt — clear prompt for an AI (on-device model)",
+            .writing: "Writing — polished prose (on-device model)",
+        ]
+        for mode in TextMode.allCases {
+            let item = NSMenuItem(title: descriptions[mode] ?? mode.displayName, action: #selector(selectTextMode(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = mode.rawValue
+            item.state = settings.textMode == mode ? .on : .off
+            if mode.requiresModel, let modelReason {
+                item.title += " — \(modelReason)"
+                item.isEnabled = false
+            }
+            modes.addItem(item)
+        }
+        modes.addItem(.separator())
+        let smart = NSMenuItem(title: modelReason == nil ? "Smart Rewrite for Clean & Developer (on-device model, +~0.8 s)"
+                                                         : "Smart Rewrite — \(modelReason!)",
+                               action: #selector(toggleSmartRewrite), keyEquivalent: "")
         smart.target = self
-        smart.isEnabled = smartReason == nil
+        smart.isEnabled = modelReason == nil
         smart.state = settings.processingMode == .smart ? .on : .off
         modes.addItem(smart)
-        modes.autoenablesItems = false
         modeItem.submenu = modes
         menu.addItem(modeItem)
 
@@ -222,15 +238,14 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         onDismissError?()
     }
 
-    @objc private func selectSmartMode() {
-        guard settings.processingMode != .smart else { return }
-        settings.processingMode = .smart
+    @objc private func selectTextMode(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let mode = TextMode(rawValue: raw), settings.textMode != mode else { return }
+        settings.textMode = mode
         persist()
     }
 
-    @objc private func selectFastMode() {
-        guard settings.processingMode != .fast else { return }
-        settings.processingMode = .fast
+    @objc private func toggleSmartRewrite() {
+        settings.processingMode = settings.processingMode == .smart ? .fast : .smart
         persist()
     }
 

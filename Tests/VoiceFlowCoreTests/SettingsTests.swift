@@ -16,7 +16,7 @@ import Testing
         #expect(Settings.default.sttUnloadAfterSeconds == 60)
         #expect(Settings.default.pasteInto == .currentApp)
         #expect(Settings.default.dictationTrigger == .option)
-        #expect(Settings.default.cleanupTranscripts)
+        #expect(Settings.default.textMode == .clean)
     }
 
     @Test func pasteTargetDecodes() throws {
@@ -83,5 +83,16 @@ import Testing
         #expect(outcome == .invalidUsedDefaults(preservedAt: preserved.path))
         #expect(try String(contentsOf: preserved, encoding: .utf8) == "{ not json")
         #expect(!FileManager.default.fileExists(atPath: store.fileURL.path))
+    }
+
+    @Test func legacyCleanupSettingMapsToTextMode() throws {
+        let off = try JSONDecoder().decode(Settings.self, from: Data(#"{"cleanupTranscripts":false}"#.utf8))
+        #expect(off.textMode == .raw)
+        let on = try JSONDecoder().decode(Settings.self, from: Data(#"{"cleanupTranscripts":true}"#.utf8))
+        #expect(on.textMode == .clean)
+        let explicit = try JSONDecoder().decode(Settings.self, from: Data(#"{"cleanupTranscripts":false,"textMode":"developer"}"#.utf8))
+        #expect(explicit.textMode == .developer)
+        let unknown = try JSONDecoder().decode(Settings.self, from: Data(#"{"textMode":"poetry"}"#.utf8))
+        #expect(unknown.textMode == .clean)
     }
 }

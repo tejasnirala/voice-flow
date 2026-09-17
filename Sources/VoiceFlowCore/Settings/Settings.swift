@@ -6,7 +6,8 @@ public struct Settings: Codable, Equatable, Sendable {
     public enum ProcessingMode: String, Codable, Sendable, CaseIterable {
         /// Audio → STT → paste. No LLM.
         case fast
-        /// Audio → STT → rule-based cleanup → on-device Apple model rewrite checked by `RewriteGuard` → paste.
+        /// Clean and Developer modes also get an on-device Apple model rewrite checked by `RewriteGuard`.
+        /// (Prompt and Writing always use the model.)
         case smart
     }
 
@@ -62,8 +63,8 @@ public struct Settings: Codable, Equatable, Sendable {
     public var sttUnloadAfterSeconds: Double
     /// Paste into the app focused when the transcript is ready (default) or only into the app focused at key press.
     public var pasteInto: InsertionPolicy.PasteTarget
-    /// Rule-based cleanup of every transcript (hesitations, stutters, capitalization, end punctuation). No LLM, instant.
-    public var cleanupTranscripts: Bool
+    /// How transcripts are turned into pasted text (Raw, Clean, Developer, Prompt, Writing).
+    public var textMode: TextMode
 
     public static let `default` = Settings(processingMode: .fast, hotkey: .optionSpace, maxRecordingSeconds: 120)
 
@@ -71,9 +72,9 @@ public struct Settings: Codable, Equatable, Sendable {
                 saveRecordingsForDebugging: Bool = false, sttModelID: String = STTModel.mediumEnQ8.id,
                 useVocabularyPrompt: Bool = true, sttUnloadAfterSeconds: Double = 60,
                 pasteInto: InsertionPolicy.PasteTarget = .currentApp, dictationTrigger: DictationTrigger = .option,
-                cleanupTranscripts: Bool = true) {
+                textMode: TextMode = .clean) {
         self.pasteInto = pasteInto
-        self.cleanupTranscripts = cleanupTranscripts
+        self.textMode = textMode
         self.dictationTrigger = dictationTrigger
         self.processingMode = processingMode
         self.hotkey = hotkey
@@ -86,6 +87,8 @@ public struct Settings: Codable, Equatable, Sendable {
 
     /// The configured model, or the default if the configured id isn't in the catalog.
     public var sttModel: STTModel { STTModel.model(id: sttModelID) ?? .mediumEnQ8 }
+
+    private enum LegacyKeys: String, CodingKey { case cleanupTranscripts }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -102,6 +105,8 @@ public struct Settings: Codable, Equatable, Sendable {
         let unload = (try? c.decodeIfPresent(Double.self, forKey: .sttUnloadAfterSeconds)) ?? d.sttUnloadAfterSeconds
         sttUnloadAfterSeconds = (0...86_400).contains(unload) ? unload : d.sttUnloadAfterSeconds
         pasteInto = (try? c.decodeIfPresent(InsertionPolicy.PasteTarget.self, forKey: .pasteInto)) ?? d.pasteInto
-        cleanupTranscripts = (try? c.decodeIfPresent(Bool.self, forKey: .cleanupTranscripts)) ?? d.cleanupTranscripts
+        // Before Phase 8, `cleanupTranscripts: false` meant no cleanup: that's Raw mode now.
+        let legacyCleanup = try? decoder.container(keyedBy: LegacyKeys.self).decodeIfPresent(Bool.self, forKey: .cleanupTranscripts)
+        textMode = (try? c.decodeIfPresent(TextMode.self, forKey: .textMode)) ?? (legacyCleanup == false ? .raw : d.textMode)
     }
 }

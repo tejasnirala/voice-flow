@@ -75,6 +75,13 @@ python3 scripts/bench/llm_llama.py benchmarks-output/tools/llama-b11005/llama-se
   benchmarks-output/cleanup-corpus.json prompts/clean.json benchmarks-output/results/cleanup/qwen05.jsonl qwen05
 swift run -c release vf-bench cleanup benchmarks-output/cleanup-corpus.json benchmarks-output/results/cleanup/*.jsonl --rule-based --guarded --errors
 
+# Text modes benchmark (Phase 8): deterministic modes computed in vf-bench; model runs on per-mode prepared input
+B=".build/release/vf-bench"; O=benchmarks-output/results/modes; mkdir -p $O; swift build -c release --product vf-bench
+$B modes report benchmarks-output/cleanup-corpus-spoken.json --show          # Developer rules on spoken forms
+$B modes prepare benchmarks-output/cleanup-corpus.json benchmarks/corpus/mode-traps.json --mode prompt --out $O/prepared-prompt.json
+benchmarks-output/bin/llm_apple $O/prepared-prompt.json prompts/prompt.json $O/prompt-apple.jsonl prompt/apple   # run name = <mode>/<label>
+$B modes report benchmarks-output/cleanup-corpus.json benchmarks/corpus/mode-traps.json --results $O/prompt-apple.jsonl --show
+
 # Subset of runs: regex filter on run names
 scripts/bench/stt.sh human 'large-v3-turbo|parakeet'
 ```

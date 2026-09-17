@@ -40,6 +40,9 @@ func percentile(_ xs: [Double], _ p: Double) -> Double? {
 }
 
 let args = Array(CommandLine.arguments.dropFirst())
+if args.first == "modes" {
+    exit(try runModes(Array(args.dropFirst())))
+}
 if args.first == "cleanup" {
     exit(try runCleanupReport(Array(args.dropFirst())))
 }
@@ -247,5 +250,116 @@ func runCleanupReport(_ args: [String]) throws -> Int32 {
               + catCols.joined(separator: " | ") + String(format: " | %.3f | %.3f |", mean, p95))
     }
     if showErrors { print("\n## Unsafe outputs\n"); print(errors.joined(separator: "\n")) }
+    return 0
+}
+
+// MARK: - Text modes (Phase 8)
+
+/// `vf-bench modes prepare <corpus.json>... --mode <mode> --out <file.json>`
+///   Writes the corpus with each input replaced by `TextProcessingPlan.prepare(input, mode:)`, for scripts/bench/llm_apple.
+/// `vf-bench modes report <corpus.json>... [--results <run.jsonl>]... [--show]`
+///   Deterministic modes (raw, clean, developer) are computed here. Model runs come from JSONL whose run name starts
+///   with the mode ("prompt/apple", "developer/apple"); each output goes through the mode's guard as in the app.
+func runModes(_ args: [String]) throws -> Int32 {
+    struct Entry: Codable { let id, category, input, reference: String; let terms: [String] }
+    struct Corpus: Codable { var version = 1; var entries: [Entry] }
+    struct Result: Decodable { let type: String; let run: String; let id: String?; let output: String?; let latency_s: Double? }
+    func values(_ flag: String) -> [String] { args.indices.filter { args[$0] == flag && $0 + 1 < args.count }.map { args[$0 + 1] } }
+    let flagged = Set(args.indices.filter { args[$0].hasPrefix("--") && args[$0] != "--show" }.map { $0 + 1 })
+    let corpusFiles = args.dropFirst().indices.filter { !args[$0].hasPrefix("--") && !flagged.contains($0) }.map { args[$0] }
+    var entries: [Entry] = []
+    for file in corpusFiles { entries += try JSONDecoder().decode(Corpus.self, from: Data(contentsOf: URL(fileURLWithPath: file))).entries }
+    let terms = RewriteGuard.terms(fromVocabulary: DeveloperVocabulary.prompt())
+
+    switch args.first {
+    case "prepare":
+        guard let raw = values("--mode").first, let mode = TextMode(rawValue: raw), let out = values("--out").first else { return 2 }
+        let prepared = entries.map { Entry(id: $0.id, category: $0.category, input: TextProcessingPlan.prepare($0.input, mode: mode),
+                                           reference: $0.reference, terms: $0.terms) }
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(Corpus(entries: prepared)).write(to: URL(fileURLWithPath: out))
+        print("wrote \(prepared.count) entries (\(raw)) to \(out)")
+        return 0
+    case "report":
+        break
+    default:
+        FileHandle.standardError.write(Data("usage: vf-bench modes prepare|report <corpus.json>... (see source)\n".utf8)); return 2
+    }
+    let show = args.contains("--show")
+    let byID = Dictionary(uniqueKeysWithValues: entries.map { ($0.id, $0) })
+    // Spoken separators are removed before safety scoring so "package dot json" → "package.json" counts as no change.
+    func unspoken(_ text: String) -> String {
+        text.split(whereSeparator: \.isWhitespace).filter { !["dot", "dash", "hyphen", "underscore", "slash"].contains($0.lowercased()) }
+            .joined(separator: " ")
+    }
+    var details: [String] = []
+
+    print("## Deterministic modes (\(entries.count) entries)\n")
+    print("Unsafe = invented phrase, dropped term or content word, replaced word, expansion or code fence vs the raw transcript (spoken separators ignored). Fmt WER = case/punctuation-sensitive error vs the ideal written text.\n")
+    print("| Mode | Changed | **Unsafe** | Fmt WER | Mean latency ms | Max ms |")
+    print("|---|---|---|---|---|---|")
+    for mode in [TextMode.raw, .clean, .developer] {
+        var changed = 0, unsafe = 0, after = EditCounts(), times: [Double] = []
+        for e in entries {
+            let t = DispatchTime.now().uptimeNanoseconds
+            let out = TextProcessingPlan.prepare(e.input, mode: mode)
+            times.append(Double(DispatchTime.now().uptimeNanoseconds - t) / 1e6)
+            let s = CleanupScorer.score(input: unspoken(e.input), output: unspoken(out), reference: e.reference, terms: e.terms)
+            after = after + s.formattingAfter
+            if out != e.input { changed += 1 }
+            if s.isUnsafe { unsafe += 1 }
+            if show, mode == .developer, out != TextProcessingPlan.prepare(e.input, mode: .clean) {
+                details.append("- developer `\(e.id)`\(s.isUnsafe ? " **UNSAFE**" : "")\n  - clean:     \(TextProcessingPlan.prepare(e.input, mode: .clean))\n  - developer: \(out)")
+            }
+        }
+        print("| \(mode.displayName) | \(changed) | **\(unsafe)** | \(pct(after.rate)) | \(String(format: "%.3f", times.reduce(0, +) / Double(max(times.count, 1)))) | \(String(format: "%.3f", times.max() ?? 0)) |")
+    }
+
+    var runs: [String] = [], results: [String: [Result]] = [:]
+    for file in values("--results") {
+        for raw in try String(contentsOfFile: file, encoding: .utf8).split(separator: "\n") where !raw.isEmpty {
+            let r = try JSONDecoder().decode(Result.self, from: Data(raw.utf8))
+            guard r.type == "clip" else { continue }
+            if !runs.contains(r.run) { runs.append(r.run) }
+            results[r.run, default: []].append(r)
+        }
+    }
+    if !runs.isEmpty {
+        print("\n## Model rewrite modes (on-device model + mode guard)\n")
+        print("Accepted = the model output passed the mode's guard and is pasted; otherwise the prepared text is pasted. Shipped unsafe = unsafe vs the raw transcript after the guard (strict scoring; restructuring in Prompt/Writing shows here as a content-order change, reviewed by hand below).\n")
+        print("| Run | Guard | Entries | Accepted | Fallback | Rejections by reason | Fmt WER prepared → shipped | Mean latency s | p95 s |")
+        print("|---|---|---|---|---|---|---|---|---|")
+    }
+    for run in runs {
+        guard let mode = TextMode(rawValue: String(run.prefix { $0 != "/" })) else { continue }
+        let rs = (results[run] ?? []).filter { byID[$0.id ?? ""] != nil }
+        var accepted = 0, reasons: [String: Int] = [:], before = EditCounts(), after = EditCounts()
+        for r in rs {
+            let e = byID[r.id!]!
+            let prepared = TextProcessingPlan.prepare(e.input, mode: mode)
+            let rewrite = (r.output ?? "").isEmpty ? nil : r.output
+            let (text, verdict) = TextProcessingPlan.finalText(prepared: prepared, rewrite: rewrite, terms: terms + e.terms.map { String($0.prefix { $0 != "|" }) }, mode: mode)
+            before = before + AccuracyScorer.editCounts(reference: AccuracyScorer.formattedTokens(e.reference), hypothesis: AccuracyScorer.formattedTokens(prepared))
+            after = after + AccuracyScorer.editCounts(reference: AccuracyScorer.formattedTokens(e.reference), hypothesis: AccuracyScorer.formattedTokens(text))
+            switch verdict {
+            case .accept?:
+                accepted += 1
+                if show, text != prepared {
+                    details.append("- \(run) `\(e.id)` accepted\n  - prepared: \(prepared)\n  - shipped:  \(text.replacingOccurrences(of: "\n", with: " ⏎ "))")
+                }
+            case .reject(let why)?:
+                why.forEach { reasons[$0, default: 0] += 1 }
+                if show {
+                    details.append("- \(run) `\(e.id)` rejected (\(why.joined(separator: ", ")))\n  - prepared: \(prepared)\n  - model:    \((r.output ?? "").replacingOccurrences(of: "\n", with: " ⏎ "))")
+                }
+            case nil:
+                reasons["no output", default: 0] += 1
+            }
+        }
+        let lat = rs.compactMap(\.latency_s)
+        let why = reasons.sorted { $0.value > $1.value }.map { "\($0.key) \($0.value)" }.joined(separator: ", ")
+        print("| \(run) | \(mode.guardPolicy) | \(rs.count) | \(accepted) | \(pct(Double(rs.count - accepted) / Double(max(rs.count, 1)))) | \(why.isEmpty ? "—" : why) | \(pct(before.rate)) → \(pct(after.rate)) | \(fmt(lat.isEmpty ? nil : lat.reduce(0, +) / Double(lat.count), 3)) | \(fmt(percentile(lat, 0.95), 3)) |")
+    }
+    if show, !details.isEmpty { print("\n## Details\n"); print(details.joined(separator: "\n")) }
     return 0
 }

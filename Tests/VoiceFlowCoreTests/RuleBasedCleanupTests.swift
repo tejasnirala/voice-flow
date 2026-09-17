@@ -4,6 +4,9 @@ import Testing
 @Suite struct RuleBasedCleanupTests {
     @Test(arguments: [
         ("um so we need to uh run npm install", "So we need to run npm install."),
+        ("do not deploy on Friday", "Do not deploy on Friday."),
+        ("do we deploy on Friday", "Do we deploy on Friday?"),
+        ("okay so i looked into it and i'm not sure i, for one, agree", "Okay so I looked into it and I'm not sure I, for one, agree."),
         ("the the API returns 404 when the token is is expired", "The API returns 404 when the token is expired."),
         ("we should we should add a middleware", "We should add a middleware."),
         ("the function returns null when the when the user exists", "The function returns null when the user exists."),

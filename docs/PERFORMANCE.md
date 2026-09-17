@@ -414,7 +414,14 @@ Full results: ACCURACY.md §6. Latency per rewrite (72 entries, warm):
 Rule-based cleanup: effectively 0 ms. Live Smart Mode in the app: rewrite 775–1,181 ms after transcription (model
 prewarmed at recording start).
 
-### 5.2 Phase 0 exploration, 2026-09-16 (for reference)
+### 5.2 Text modes (Phase 8), 2026-09-17
+Rules, per transcript (72 + 15 + 54 entries, release build): Clean 0.02–0.05 ms mean (max 0.4 ms), Developer 0.2–0.4 ms mean
+(max 2.9 ms on a 7-dictation long-form transcript). On-device model per rewrite (warm): Developer + Smart Rewrite 0.80 s mean /
+2.12 s p95; Prompt 0.91 / 2.46 s; Writing 0.87 / 2.35 s; model warm-up 0.4–1.4 s on first use (prewarmed at recording start
+in the app). No new timers, threads or idle work; the prompt files are loaded once on first use (a few KB). App size 6.1 MB.
+Full results: ACCURACY.md §7.
+
+### 5.3 Phase 0 exploration, 2026-09-16 (for reference)
 llama.cpp `llama-bench`, Qwen2.5-1.5B Q4_K_M: Metal pp256 1,033 tok/s, tg64 85 tok/s; CPU 290 / 67 tok/s. A zero-shot
 prompt produced a TypeScript code block for a dictated sentence (the first sign of the contract problem in §5.1).
 
