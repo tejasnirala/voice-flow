@@ -245,6 +245,13 @@ the prompt and the guard policy. `processingMode: smart` is now the **Smart Rewr
   may change). *contentPreserving* = the set of content words (normalized words minus a fixed list of grammar words and
   fillers; negations are content) must be identical in input and output, developer terms kept, no expansion, no code
   fence. Restructuring and grammar words are allowed; synonyms, answers, additions and omissions are not.
+- **Lists** (after owner test): Clean, Prompt and Writing prompts make a list when the speaker explicitly enumerates.
+  `ListScaffold` lets both policies accept removal of the counting words directly in front of each item (2+ items), nothing
+  else. Clean/Developer keep line breaks only around list items; Developer formatting runs per line.
+- Strict policy details: fillers, stutters, articles and optional "that" may be deleted; an article may become another
+  article; a single added word must be a grammar word ("never", "not" are rejected).
+- Content-preserving details: pronouns you/me/us/they/them are content; "so" is droppable only as a lead-in; "you know" only as
+  a pair.
 - The mode is captured when the transcript is ready, so a menu change during processing can't mix modes.
 - Prompt/Writing when the on-device model is unavailable: menu items disabled with the reason; if selected anyway (settings
   file), the rule-cleaned text is pasted.

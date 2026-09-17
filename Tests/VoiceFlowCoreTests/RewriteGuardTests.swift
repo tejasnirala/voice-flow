@@ -32,4 +32,12 @@ import Testing
         #expect(terms.count == 6)
         #expect(terms.first == "Next.js")
     }
+
+    @Test func singleAddedMeaningWordIsRejected() {
+        #expect(RewriteGuard.evaluate(input: "deploy now", output: "Never deploy now.", terms: terms) != .accept)
+        #expect(RewriteGuard.evaluate(input: "we should merge it", output: "We should not merge it.", terms: terms) != .accept)
+        #expect(RewriteGuard.evaluate(input: "the build is green", output: "The build is not green.", terms: terms) != .accept)
+        // Grammar words may still be added.
+        #expect(RewriteGuard.evaluate(input: "build green so deploy", output: "The build is green, so deploy.", terms: terms) == .accept)
+    }
 }

@@ -54,6 +54,7 @@ import Testing
         ("thanks for the update I will review it tomorrow", "Thanks for the update. I will review it tomorrow."),
         ("we deploy to AWS but the analytics team uses Azure and GCP",
          "We deploy to AWS, but the analytics team uses Azure.\nThe analytics team uses GCP."),
+        ("okay so I looked at the PR and it looks good", "Okay, I looked at the PR. It looks good."),
         ("so we move the token validation into a service and then we add an index",
          "Move the token validation into a service.\n- Then add an index."),
     ])
@@ -83,6 +84,9 @@ import Testing
         ("check all the pods", "Check some pods."),
         ("I will review the design doc", "We will review the design doc."),
         ("we deploy to AWS but the analytics team uses Azure", "We deploy to AWS. The analytics team uses Azure."),
+        ("I want you to write a function", "I want to write a function."),
+        ("can you send me the document", "Can you send the document?"),
+        ("the first release failed so we shipped a second one", "The first release failed. We shipped a second one."),
     ])
     func rejectsContentChanges(input: String, output: String) {
         #expect(RewriteGuard.evaluate(input: input, output: output, terms: terms, policy: .contentPreserving) != .accept)
@@ -102,5 +106,15 @@ import Testing
                                                 rewrite: "Refactor it.   \n\n\n- Keep the errors.\n- Add tests.", terms: [], mode: .prompt)
         #expect(list.verdict == .accept)
         #expect(list.text == "Refactor it.\n\n- Keep the errors.\n- Add tests.")
+    }
+
+    @Test func cleanKeepsLineBreaksOnlyAroundLists() {
+        let prepared = "Hey, quick update. The review went well. We need two things first tests and second docs. Thanks."
+        let rewrite = "Hey, quick update.\nThe review went well.\n\nWe need two things:\n- Tests.\n- Docs.\nThanks."
+        let clean = TextProcessingPlan.finalText(prepared: prepared, rewrite: rewrite, terms: [], mode: .clean)
+        #expect(clean.verdict == .accept)
+        #expect(clean.text == "Hey, quick update. The review went well. We need two things:\n- Tests.\n- Docs.\nThanks.")
+        let writing = TextProcessingPlan.finalText(prepared: prepared, rewrite: rewrite, terms: [], mode: .writing)
+        #expect(writing.text == "Hey, quick update.\nThe review went well.\n\nWe need two things:\n- Tests.\n- Docs.\nThanks.")
     }
 }

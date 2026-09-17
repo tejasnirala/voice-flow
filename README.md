@@ -21,7 +21,8 @@ guard, and a rejected rewrite falls back to the rule-based text.
 - **Clean (default):** rules remove hesitations and stutters and fix capitalization and end punctuation. Instant.
 - **Developer:** Clean + spoken symbols and developer casing by rule ("package dot json" → `package.json`,
   "dash dash save" → `--save`, "user underscore id" → `user_id`, "postgres q l" → PostgreSQL). Instant.
-- **Prompt:** Apple's on-device model turns spoken thoughts into a clear prompt for an AI assistant (+~1 s).
+- **Prompt:** Apple's on-device model turns spoken thoughts into a clear prompt for an AI assistant (+~1 s). Spoken
+  enumerations ("two things: one is …, the second is …") become bullet lists here, in Writing, and in Clean with Smart Rewrite.
 - **Writing:** Apple's on-device model turns speech into polished prose (+~1 s).
 - **Smart Rewrite** (toggle): also runs the on-device model for Clean and Developer, with a word-for-word guard (+~0.8 s).
   Prompt and Writing use a content-preserving guard: sentences may be restructured, but no content word may be added,

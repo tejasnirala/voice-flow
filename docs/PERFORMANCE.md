@@ -415,11 +415,15 @@ Rule-based cleanup: effectively 0 ms. Live Smart Mode in the app: rewrite 775–
 prewarmed at recording start).
 
 ### 5.2 Text modes (Phase 8), 2026-09-17
-Rules, per transcript (72 + 15 + 54 entries, release build): Clean 0.02–0.05 ms mean (max 0.4 ms), Developer 0.2–0.4 ms mean
-(max 2.9 ms on a 7-dictation long-form transcript). On-device model per rewrite (warm): Developer + Smart Rewrite 0.80 s mean /
-2.12 s p95; Prompt 0.91 / 2.46 s; Writing 0.87 / 2.35 s; model warm-up 0.4–1.4 s on first use (prewarmed at recording start
-in the app). No new timers, threads or idle work; the prompt files are loaded once on first use (a few KB). App size 6.1 MB.
-Full results: ACCURACY.md §7.
+Rules, per transcript (72 + 22 + 54 entries, release build): Clean 0.02–0.05 ms mean (max 0.4 ms), Developer 0.2–0.4 ms mean
+(max 3.1 ms on a 7-dictation long-form transcript). On-device model per rewrite (warm, final prompts): Clean + Smart Rewrite
+0.81 s mean / 2.13 s p95; Developer + Smart Rewrite 0.84 / 2.17 s; Prompt 0.98 / 2.65 s; Writing 0.96 / 2.41 s; model warm-up
+0.5–1.2 s on first use (prewarmed at recording start in the app). No new timers, threads or idle work; prompt files (a few KB)
+load once. App size 6.2 MB. Full results: ACCURACY.md §7.
+
+**Owner live test** (app log, VS Code): release → pasted 1.8–1.9 s (Developer, 8–9 s dictations), 3.9 s (Prompt, 35 s),
+4.5 s (Writing, 33 s), 3.0 s and 6.0 s (Clean + Smart Rewrite, 28 s and 65 s). Of that, the model took 1.1–3.4 s; for the
+two rejected Clean rewrites (1.8 s and 3.4 s) the time bought nothing. Long dictations are where Smart Rewrite costs most.
 
 ### 5.3 Phase 0 exploration, 2026-09-16 (for reference)
 llama.cpp `llama-bench`, Qwen2.5-1.5B Q4_K_M: Metal pp256 1,033 tok/s, tg64 85 tok/s; CPU 290 / 67 tok/s. A zero-shot

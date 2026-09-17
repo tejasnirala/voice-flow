@@ -19,13 +19,17 @@ public enum RewriteGuard {
 
     /// Grammar words a content-preserving rewrite may drop ("we move" → "Move", "so the plan" → "The plan"). Everything
     /// else is content, including words that change logic or meaning when swapped: negations, connectives (but, or, if,
-    /// when, because), modals (should, can, must), quantifiers (all, some), question words, "from", and time words.
+    /// when, because), modals (should, can, must), quantifiers (all, some), question words, "from", time words, and the
+    /// pronouns you/me/us/they ("I want you to write" ≠ "I want to write"). "So" is droppable only as a lead-in.
     static let functionWords: Set<String> = [
         "a", "an", "the", "is", "are", "was", "were", "be", "been", "being", "am", "do", "does", "did", "have", "has", "had",
         "to", "of", "in", "on", "at", "for", "with", "by", "into", "onto", "about", "as", "so", "and", "then", "that", "this",
-        "these", "those", "which", "it", "its", "there", "here", "also", "just", "please", "i", "me", "my", "we", "us", "our",
-        "you", "your", "they", "them", "their", "let", "s", "up", "out", "too", "very", "really", "actually", "okay", "well",
+        "these", "those", "which", "it", "its", "there", "here", "also", "just", "please", "i", "my", "we", "our",
+        "let", "s", "up", "out", "too", "very", "really", "actually", "okay", "well",
     ]
+
+    /// Words after which "so" is a lead-in ("Okay so the plan…") rather than "therefore" ("it failed so we rolled back").
+    static let leadIns: Set<String> = ["okay", "ok", "well", "yeah", "alright", "right", "hey", "and", "um", "uh"]
 
     /// The subset of grammar words a rewrite may add when absent from the input (sentence splitting and grammar only).
     /// Pronouns aren't here: "I will review" → "We will review" is a meaning change.
@@ -41,7 +45,7 @@ public enum RewriteGuard {
         if policy == .contentPreserving { return evaluateContent(input: input, output: trimmed, terms: terms) }
         let s = CleanupScorer.score(input: input, output: trimmed, reference: trimmed, terms: terms)
         var reasons: [String] = []
-        if !s.inventedPhrases.isEmpty { reasons.append("added words") }
+        if !s.inventedPhrases.isEmpty || !s.addedContentWords.isEmpty { reasons.append("added words") }
         if !s.droppedContentWords.isEmpty { reasons.append("dropped words") }
         if !s.substitutedWords.isEmpty { reasons.append("replaced words") }
         if !s.droppedTerms.isEmpty { reasons.append("dropped developer terms") }
@@ -53,13 +57,25 @@ public enum RewriteGuard {
     static func evaluateContent(input: String, output: String, terms: [String]) -> Verdict {
         let s = CleanupScorer.score(input: input, output: output, reference: output, terms: terms)
         let (_, variants) = AccuracyScorer.termVariants(terms)
+        let inputTokens = TranscriptNormalizer.mergeTerms(TranscriptNormalizer.words(input), variants: variants)
+        let (outputTokens, itemStarts) = ListScaffold.outputTokens(output, variants: variants)
+        let scaffold = ListScaffold.removableInputIndices(
+            input: inputTokens, ops: AccuracyScorer.alignment(reference: inputTokens, hypothesis: outputTokens), itemStarts: itemStarts)
         /// Content words in order of first appearance (repeats allowed: "uses Azure. The team uses GCP.").
-        func content(_ text: String) -> [String] {
+        func content(_ tokens: [String], skipping skipped: Set<Int> = []) -> [String] {
             var seen = Set<String>()
-            return TranscriptNormalizer.mergeTerms(TranscriptNormalizer.words(text), variants: variants)
-                .filter { !functionWords.contains($0) && !CleanupScorer.fillerWords.contains($0) && seen.insert($0).inserted }
+            return tokens.indices.filter { index in
+                let word = tokens[index]
+                guard !skipped.contains(index) else { return false }
+                if word == "so" { return index > 0 && !leadIns.contains(tokens[index - 1]) && seen.insert(word).inserted }
+                // "you know" is a filler only as a pair; a lone "you" is a person.
+                let youKnow = (word == "you" && index + 1 < tokens.count && tokens[index + 1] == "know")
+                    || (word == "know" && index > 0 && tokens[index - 1] == "you")
+                let filler = youKnow || (CleanupScorer.fillerWords.contains(word) && word != "you" && word != "know")
+                return !functionWords.contains(word) && !filler && seen.insert(word).inserted
+            }.map { tokens[$0] }
         }
-        let inputContent = content(input), outputContent = content(output)
+        let inputContent = content(inputTokens, skipping: scaffold), outputContent = content(outputTokens)
         let inputSet = Set(inputContent), outputSet = Set(outputContent)
         let inputWords = Set(TranscriptNormalizer.words(input))
         let addedGrammar = Set(TranscriptNormalizer.words(output)).subtracting(inputWords)

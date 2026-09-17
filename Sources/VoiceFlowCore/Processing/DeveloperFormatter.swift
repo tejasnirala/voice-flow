@@ -33,7 +33,19 @@ public enum DeveloperFormatter {
         (["web", "socket"], "WebSocket"), (["mongo", "db"], "MongoDB"), (["rabbit", "m", "q"], "RabbitMQ"),
     ]
 
+    /// Formats each line separately, keeping line breaks and list markers.
     public static func format(_ text: String) -> String {
+        text.split(separator: "\n", omittingEmptySubsequences: false).map { line in
+            let indent = line.prefix { $0 == " " || $0 == "\t" }
+            let body = line.dropFirst(indent.count)
+            for marker in ["- ", "* ", "• "] where body.hasPrefix(marker) {
+                return indent + marker + formatLine(String(body.dropFirst(marker.count)))
+            }
+            return indent + formatLine(String(body))
+        }.joined(separator: "\n")
+    }
+
+    static func formatLine(_ text: String) -> String {
         var tokens = text.split(whereSeparator: \.isWhitespace).map(String.init)
         tokens = applySpokenNames(tokens)
         tokens = applySymbols(tokens)

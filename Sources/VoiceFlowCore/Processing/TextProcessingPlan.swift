@@ -18,7 +18,7 @@ public enum TextProcessingPlan {
         let verdict = RewriteGuard.evaluate(input: prepared, output: rewrite, terms: terms, policy: mode.guardPolicy)
         switch verdict {
         case .accept:
-            let text = tidy(rewrite)
+            let text = tidy(rewrite, keepParagraphs: mode.guardPolicy == .contentPreserving)
             return (mode == .developer ? DeveloperFormatter.format(text) : text, verdict)
         case .reject:
             return (prepared, verdict)
@@ -26,7 +26,20 @@ public enum TextProcessingPlan {
     }
 
     /// Layout-only fixes to an accepted rewrite: trailing spaces on lines, runs of blank lines, and a lone "- " bullet.
-    static func tidy(_ text: String) -> String {
+    /// Without `keepParagraphs` (Clean, Developer), line breaks survive only around list items.
+    static func tidy(_ text: String, keepParagraphs: Bool = true) -> String {
+        guard keepParagraphs else {
+            var out: [String] = []
+            for line in tidy(text).split(separator: "\n").map({ $0.trimmingCharacters(in: .whitespaces) }) where !line.isEmpty {
+                if let last = out.last, !isListItem(line), !isListItem(last) {
+                    out[out.count - 1] = last + " " + line
+                } else {
+                    out.append(line)
+                }
+            }
+            let joined = out.joined(separator: "\n")
+            return out.count == 1 && joined.hasPrefix("- ") ? String(joined.dropFirst(2)) : joined
+        }
         var lines = text.split(separator: "\n", omittingEmptySubsequences: false).map { line in
             String(line.reversed().drop { $0 == " " || $0 == "\t" }.reversed())
         }
@@ -36,4 +49,6 @@ public enum TextProcessingPlan {
         if nonEmpty.count == 1, joined.hasPrefix("- ") { return String(joined.dropFirst(2)) }
         return joined
     }
+
+    static func isListItem(_ line: String) -> Bool { ["- ", "* ", "• "].contains { line.hasPrefix($0) } }
 }

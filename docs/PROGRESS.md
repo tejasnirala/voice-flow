@@ -15,7 +15,7 @@
 | 5 | Text insertion (first usable product) | ✅ Complete (2026-09-17, owner tested) |
 | 6 | Fast path optimization | ✅ Complete (2026-09-17, owner verified in real use) |
 | 7 | Local LLM (Smart Mode) | ✅ Complete (2026-09-17) |
-| 8 | Text modes | 🟡 Implemented + benchmarked 2026-09-17; awaiting owner test & approval |
+| 8 | Text modes | 🟡 Owner test 1 done, list support added 2026-09-17; awaiting re-test & approval |
 | 9 | Developer intelligence | ⬜ |
 | 10 | Application awareness | ⬜ |
 | 11 | Final performance optimization | ⬜ |
@@ -235,8 +235,18 @@ per 30–60 s, GPU 0, footprint 13 MB.
       +0.80–0.91 s mean. 41 accepted rewrites hand-reviewed: no meaning changes
 - [x] Guard holes found in review and closed (order check; logic/modal/quantifier/pronoun swaps); Clean bug fixed ("Do not…?")
 - [x] Clean: standalone "i" → "I"
-- [x] 117 core tests + 3 app tests pass; app builds (6.1 MB)
-- [ ] **Owner:** live test of each mode in real apps (Developer with spoken symbols; Prompt into an AI chat; Writing into a message)
+- [x] 117 core tests + 3 app tests pass; app builds (6.1 MB) (first delivery)
+- [x] Owner live test 1 (2026-09-17): Developer ✓, Writing ✓; Prompt and Clean + Smart Rewrite fell back (guard). Request: bullet
+      points for spoken enumerations, in Clean too
+- [x] Lists: `ListScaffold` (counting words removable only in front of 2+ list items), list rules in all three prompts, Clean/
+      Developer line breaks only around lists, Developer formatting per line. Prompt/Writing 4/4 test enumerations, Clean 1/4 + the
+      owner's own dictation (ACCURACY §7.3)
+- [x] Guard holes found in review and closed: dropped "you"; dropped causal "so"; single added word ("never"/"not") and article
+      replaced by any word in strict scoring (Phase 7 re-scored: Apple unchanged)
+- [x] 126 core tests + 3 app tests pass
+- [ ] **Owner:** re-test lists (Clean + Smart Rewrite, Writing, Prompt) and approve Phase 8
+- Known: Prompt often drops "I want you to"/an intro sentence and falls back; rejected rewrites on long dictations cost up to 3.4 s
+  for nothing (PERFORMANCE §5.2) → candidates for Phase 11
 - Not in Phase 8 (→ Phase 9): "engine x dot conf"/"nginx.com" → nginx.conf, "kube control" → kubectl, Helm; per-app automatic mode
   (→ Phase 10)
 
@@ -275,6 +285,7 @@ Per SPEC.md. Notes so far:
 | 2026-09-17 | Segment dictations > 29 s at pauses into independent chunks | Owner's long dictation lost speech and invented a loop; long-form WER 22.7% → 0.7%, no short-clip regression | ACCURACY §5.9 |
 | 2026-09-17 | Text modes: Raw / Clean (default) / Developer (rules) / Prompt / Writing (on-device model); Smart Rewrite toggle for Clean/Developer | Rules are instant and can't change meaning; model modes only behind a per-mode guard | ARCHITECTURE §3.5.1, ACCURACY §7 |
 | 2026-09-17 | Prompt/Writing guard = same content words in the same order; connectives, modals, quantifiers, "from" are content; pronouns may only be dropped | Hand review found swaps a set check would accept | ACCURACY §7.2 |
+| 2026-09-17 | Spoken enumerations become lists (Clean + Smart Rewrite, Prompt, Writing); guard accepts removing only counting words in front of 2+ items | Owner request after live test | ACCURACY §7.3 |
 | 2026-09-16 | Carbon RegisterEventHotKey; Esc cancel registered only while recording | Press+release, no permission, zero idle cost | ARCHITECTURE §3.3 |
 | 2026-09-16 | Clipboard + ⌘V with full snapshot/restore; never lose speech | Works in Electron/terminals/browsers | ARCHITECTURE §3.4 |
 | 2026-09-16 | llama.cpp in-process (provisional); Ollama rejected | No daemon/IPC; MLX re-evaluated in Phase 7 | ARCHITECTURE §3.5 |
@@ -282,8 +293,8 @@ Per SPEC.md. Notes so far:
 ## Session handoff notes
 _Overwrite at the end of every session._
 
-- **Last session (2026-09-17):** Phases 0–7 complete. Phase 8 (text modes) implemented, benchmarked and documented; waiting for the
-  owner's live test and approval. LLM test models were deleted earlier (5.0 GB) at the owner's request.
+- **Last session (2026-09-17):** Phases 0–7 complete. Phase 8 (text modes) implemented; owner tested once; list support and guard fixes
+  added from that test; waiting for re-test and approval. LLM test models were deleted earlier (5.0 GB) at the owner's request.
 - **Models on this machine** (`~/Library/Application Support/VoiceFlow/models/`): **in use:** whisper medium.en-q8_0 +
   ggml-medium.en-encoder.mlmodelc. Benchmark-only (deletable on request): whisper tiny.en, base.en, small.en, large-v3-turbo,
   large-v3-turbo-q8_0 (STT alternate), distil-large-v3; parakeet tdt-0.6b-v3-q8_0.
@@ -291,4 +302,4 @@ _Overwrite at the end of every session._
   `benchmarks-output/results/human/`. Rerunning `scripts/bench/stt.sh human` re-scores instantly.
 - **Mode benchmark data:** `benchmarks-output/results/modes/` (prepared inputs, model JSONL per mode, `report.md` with every
   accepted/rejected rewrite). Re-score after guard changes with `vf-bench modes report … --results …` (no model rerun needed).
-- **Next action:** owner tests the modes (menu Mode ▸) and approves Phase 8 → then Phase 9 (developer intelligence).
+- **Next action:** owner re-tests lists (Clean + Smart Rewrite, Prompt, Writing) and approves Phase 8 → then Phase 9 (developer intelligence).
