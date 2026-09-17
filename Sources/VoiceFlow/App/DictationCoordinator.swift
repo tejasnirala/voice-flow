@@ -7,6 +7,16 @@ import VoiceFlowCore
 final class DictationCoordinator {
     private(set) var machine = PipelineStateMachine()
     private let hotkeys = GlobalHotkeyManager()
+    private let modifierMonitor = ModifierKeyMonitor()
+    private var gesture = ModifierKeyGesture()
+    /// True only while a recording started by the ⌥ gesture is in progress; the gesture may finish or cancel only that.
+    private var gestureOwnsRecording = false
+    private var doubleTapWork: DispatchWorkItem?
+    /// Which trigger is actually active (⌥ may fall back to the key combination without Input Monitoring).
+    private(set) var activeTrigger: Settings.DictationTrigger = .hotkeyCombination
+    var isHandsFree: Bool { gesture.isHandsFree && machine.state == .recording }
+    /// Called when the active trigger, its warning, or hands-free mode changes (menu text).
+    var onTriggerInfoChange: (() -> Void)?
     private let recorder = AudioRecorder()
     private var settings: Settings
 
@@ -73,9 +83,39 @@ final class DictationCoordinator {
             self.finishRecording(event: .hotkeyReleased)
         }
 
+        modifierMonitor.onEvent = { [weak self] event, latencyMs in
+            self?.handleModifier(event, latencyMs: latencyMs)
+        }
+        activateTrigger()
+    }
+
+    /// Uses ⌥ alone when configured and Input Monitoring is granted; otherwise registers the key combination.
+    func activateTrigger() {
+        if settings.dictationTrigger == .option {
+            if ModifierKeyMonitor.hasPermission, modifierMonitor.start() {
+                if activeTrigger != .option {
+                    hotkeys.unregister(.dictation)
+                    hotkeyRegistered = false
+                }
+                activeTrigger = .option
+                triggerWarning = nil
+                Log.hotkey.notice("dictation trigger: ⌥ key (hold, double-tap for hands-free)")
+                onTriggerInfoChange?()
+                return
+            }
+            if !ModifierKeyMonitor.hasPermission { ModifierKeyMonitor.requestPermission() }
+            triggerWarning = "⌥-key dictation needs Input Monitoring — using \(settings.hotkey.displayName) until allowed"
+            Log.hotkey.error("⌥ trigger unavailable (Input Monitoring not granted); falling back to \(self.settings.hotkey.displayName, privacy: .public)")
+        } else {
+            modifierMonitor.stop()
+            triggerWarning = nil
+        }
+        guard activeTrigger != .hotkeyCombination || !hotkeyRegistered else { onTriggerInfoChange?(); return }
         let hotkey = settings.hotkey
         do {
             try hotkeys.register(.dictation, keyCode: hotkey.keyCode, carbonModifiers: hotkey.carbonModifiers)
+            hotkeyRegistered = true
+            activeTrigger = .hotkeyCombination
             Log.hotkey.notice("registered \(hotkey.displayName, privacy: .public)")
         } catch {
             let reason = error.isAlreadyTaken
@@ -84,11 +124,83 @@ final class DictationCoordinator {
             Log.hotkey.error("registration failed: \(reason, privacy: .public)")
             send(.failed(PipelineFailure(stage: .hotkey, message: reason)))
         }
+        onTriggerInfoChange?()
+    }
+
+    private var hotkeyRegistered = false
+    private(set) var triggerWarning: String?
+
+    /// Human-readable instruction for the idle menu line.
+    var triggerInstructions: String {
+        activeTrigger == .option
+            ? "hold ⌥ to dictate, double-tap ⌥ for hands-free"
+            : "hold \(settings.hotkey.displayName) to dictate"
+    }
+
+    // MARK: - ⌥ key gesture
+
+    private func handleModifier(_ event: ModifierKeyMonitor.Event, latencyMs: Double) {
+        guard activeTrigger == .option else { return }
+        if event == .down, latencyMs > Self.staleHotkeyThresholdMs {
+            Log.hotkey.error("ignored stale ⌥ press, latency \(latencyMs, format: .fixed(precision: 0), privacy: .public) ms")
+            return
+        }
+        let input: ModifierKeyGesture.Input = switch event {
+        case .down: .keyDown
+        case .up: .keyUp
+        case .chord: .chord
+        }
+        let eventTime = Double(DispatchTime.now().uptimeNanoseconds) / 1e9 - latencyMs / 1000
+        if event != .chord || gestureOwnsRecording {
+            Log.hotkey.info("⌥ \(String(describing: event), privacy: .public), latency \(latencyMs, format: .fixed(precision: 2), privacy: .public) ms")
+        }
+        perform(gesture.handle(input, at: eventTime), latencyMs: latencyMs)
+    }
+
+    private func perform(_ actions: [ModifierKeyGesture.Action], latencyMs: Double) {
+        for action in actions {
+            switch action {
+            case .startRecording:
+                guard machine.state == .idle || { if case .error = machine.state { return true } else { return false } }() else {
+                    Log.hotkey.notice("⌥ press ignored: dictation already in progress (\(Self.name(self.machine.state), privacy: .public))")
+                    continue
+                }
+                Log.hotkey.notice("⌥ down, dispatch latency \(latencyMs, format: .fixed(precision: 2), privacy: .public) ms")
+                pressUptimeNs = DispatchTime.now().uptimeNanoseconds - UInt64(max(0, latencyMs) * 1_000_000)
+                dictationApp = NSWorkspace.shared.frontmostApplication
+                send(.hotkeyPressed)
+                gestureOwnsRecording = machine.state == .recording
+            case .finishRecording:
+                guard gestureOwnsRecording, machine.state == .recording else { continue }
+                finishRecording(event: .hotkeyReleased)
+            case .cancelRecording:
+                guard gestureOwnsRecording, machine.state == .recording else { continue }
+                Log.hotkey.notice("⌥ tap or chord: recording discarded")
+                send(.cancelRequested)
+            case .enteredHandsFree:
+                guard gestureOwnsRecording, machine.state == .recording else { continue }
+                doubleTapWork?.cancel()
+                Log.hotkey.notice("hands-free dictation on")
+                onStateChange?(machine.state)
+                onTriggerInfoChange?()
+            case .scheduleDoubleTapTimeout(let seconds):
+                doubleTapWork?.cancel()
+                let work = DispatchWorkItem { [weak self] in
+                    guard let self else { return }
+                    let now = Double(DispatchTime.now().uptimeNanoseconds) / 1e9
+                    self.perform(self.gesture.handle(.doubleTapTimeout, at: now), latencyMs: 0)
+                }
+                doubleTapWork = work
+                DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: work)
+            }
+        }
     }
 
     func updateSettings(_ settings: Settings) {
+        let triggerChanged = settings.dictationTrigger != self.settings.dictationTrigger
         self.settings = settings
         refreshModelStatus()
+        if triggerChanged || (settings.dictationTrigger == .option && activeTrigger != .option) { activateTrigger() }
     }
 
     func dismissError() {
@@ -102,6 +214,7 @@ final class DictationCoordinator {
     /// Frees the model synchronously. Called on quit (ggml's Metal backend asserts if a context outlives exit).
     func shutdown() {
         unloadWork?.cancel()
+        modifierMonitor.stop()
         speechEngine?.unload()
     }
 
@@ -180,6 +293,12 @@ final class DictationCoordinator {
         if previous == .recording, next != .recording {
             hotkeys.unregister(.cancel)
             hotkeys.unregister(.cancelWithOption)
+            // Esc, max duration, errors or the gesture itself ended the recording: start the gesture fresh.
+            let wasHandsFree = gesture.isHandsFree
+            gesture.reset()
+            gestureOwnsRecording = false
+            doubleTapWork?.cancel()
+            if wasHandsFree { onTriggerInfoChange?() }
             if recorder.isRecording { // cancel or failure: the audio isn't kept
                 recorder.cancel()
                 Log.audio.notice("recording discarded (\(String(describing: event), privacy: .public))")

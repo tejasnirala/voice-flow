@@ -10,6 +10,14 @@ public struct Settings: Codable, Equatable, Sendable {
         case smart
     }
 
+    /// How dictation is triggered.
+    public enum DictationTrigger: String, Codable, Sendable, CaseIterable {
+        /// ⌥ alone: hold to dictate, double-tap for hands-free (next ⌥ press finishes). Needs Input Monitoring.
+        case option
+        /// The `hotkey` combination (default ⌥Space): hold to dictate. Needs no permission; also the fallback.
+        case hotkeyCombination
+    }
+
     /// A global hotkey as a virtual key code plus Carbon modifier flags.
     public struct Hotkey: Codable, Equatable, Sendable {
         public var keyCode: UInt32
@@ -36,6 +44,7 @@ public struct Settings: Codable, Equatable, Sendable {
     }
 
     public var processingMode: ProcessingMode
+    public var dictationTrigger: DictationTrigger
     public var hotkey: Hotkey
     /// Recording stops automatically after this many seconds.
     public var maxRecordingSeconds: Double
@@ -57,8 +66,9 @@ public struct Settings: Codable, Equatable, Sendable {
     public init(processingMode: ProcessingMode, hotkey: Hotkey, maxRecordingSeconds: Double,
                 saveRecordingsForDebugging: Bool = false, sttModelID: String = STTModel.mediumEnQ8.id,
                 useVocabularyPrompt: Bool = true, sttUnloadAfterSeconds: Double = 300,
-                pasteInto: InsertionPolicy.PasteTarget = .currentApp) {
+                pasteInto: InsertionPolicy.PasteTarget = .currentApp, dictationTrigger: DictationTrigger = .option) {
         self.pasteInto = pasteInto
+        self.dictationTrigger = dictationTrigger
         self.processingMode = processingMode
         self.hotkey = hotkey
         self.maxRecordingSeconds = maxRecordingSeconds
@@ -75,6 +85,7 @@ public struct Settings: Codable, Equatable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = Settings.default
         processingMode = (try? c.decodeIfPresent(ProcessingMode.self, forKey: .processingMode)) ?? d.processingMode
+        dictationTrigger = (try? c.decodeIfPresent(DictationTrigger.self, forKey: .dictationTrigger)) ?? d.dictationTrigger
         hotkey = (try? c.decodeIfPresent(Hotkey.self, forKey: .hotkey)) ?? d.hotkey
         let seconds = (try? c.decodeIfPresent(Double.self, forKey: .maxRecordingSeconds)) ?? d.maxRecordingSeconds
         maxRecordingSeconds = (1...600).contains(seconds) ? seconds : d.maxRecordingSeconds

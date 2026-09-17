@@ -22,6 +22,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBar.onDismissError = { [weak coordinator] in coordinator?.dismissError() }
         menuBar.onSettingsChanged = { [weak coordinator] settings in coordinator?.updateSettings(settings) }
         menuBar.onRetryTranscription = { [weak coordinator] in coordinator?.retryTranscription() }
+        let syncTrigger = { [weak menuBar, weak coordinator] in
+            guard let menuBar, let coordinator else { return }
+            menuBar.triggerInstructions = coordinator.triggerInstructions
+            menuBar.triggerWarning = coordinator.triggerWarning
+            menuBar.handsFree = coordinator.isHandsFree
+            menuBar.refreshTriggerInfo()
+        }
+        coordinator.onTriggerInfoChange = syncTrigger
+        menuBar.onOpenInputMonitoringSettings = { PermissionManager.openInputMonitoringSettings() }
+        // If Input Monitoring was granted since launch, switch to the ⌥ trigger when the menu is next opened.
+        menuBar.onMenuWillOpen = { [weak coordinator] in
+            guard let coordinator, coordinator.triggerWarning != nil, ModifierKeyMonitor.hasPermission else { return }
+            coordinator.activateTrigger()
+        }
         coordinator.onSpeechInfoChange = { [weak menuBar] status, transcript in
             menuBar?.update(modelStatus: status, lastTranscript: transcript)
         }

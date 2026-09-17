@@ -14,6 +14,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// Called when settings are reloaded or changed from the menu.
     var onSettingsChanged: ((Settings) -> Void)?
     var onRetryTranscription: (() -> Void)?
+    var onOpenInputMonitoringSettings: (() -> Void)?
+    /// Supplied by the coordinator: instructions for the active trigger, a fallback warning, hands-free state.
+    var triggerInstructions = "hold ⌥ to dictate"
+    var triggerWarning: String?
+    var handsFree = false
     private var modelStatus: STTModelStatus = .installed
     /// Held only in memory for display and copying.
     private var lastTranscript: String?
@@ -66,8 +71,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     private var statusText: String {
         switch state {
-        case .idle: "Ready — hold \(settings.hotkey.displayName) to dictate"
-        case .recording: "🎙 Recording… (Esc to cancel)"
+        case .idle: "Ready — \(triggerInstructions)"
+        case .recording: handsFree ? "🎙 Hands-free — press ⌥ to finish, Esc to cancel" : "🎙 Recording… (Esc to cancel)"
         case .transcribing: "Transcribing on this Mac…"
         case .processing: "Processing…"
         case .inserting: "Pasting…"
@@ -77,7 +82,17 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     // MARK: NSMenuDelegate
 
+    /// Refreshes trigger text without reloading settings (e.g. hands-free toggled).
+    func refreshTriggerInfo() {
+        if let menu = statusItem.menu, menu.numberOfItems > 0 { rebuild(menu) }
+        update(state: state)
+    }
+
+    /// Called just before the menu opens.
+    var onMenuWillOpen: (() -> Void)?
+
     func menuNeedsUpdate(_ menu: NSMenu) {
+        onMenuWillOpen?()
         // Pick up edits made in the settings file since the menu was last opened.
         let (loaded, outcome) = settingsStore.load()
         if loaded != settings { onSettingsChanged?(loaded) }
@@ -93,6 +108,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         menu.addItem(disabled("\(BuildInfo.name) \(BuildInfo.version)"))
         menu.addItem(disabled(statusText))
+        if let triggerWarning {
+            menu.addItem(disabled("⚠︎ \(triggerWarning)"))
+            let open = NSMenuItem(title: "Open Input Monitoring Settings…", action: #selector(openInputMonitoringSettings), keyEquivalent: "")
+            open.target = self
+            menu.addItem(open)
+        }
         if state == .idle, modelStatus != .installed {
             menu.addItem(disabled("⚠︎ Speech model \(modelStatusText) — run \(settings.sttModel.installCommand)"))
         }
@@ -179,6 +200,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         guard let lastTranscript else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(lastTranscript, forType: .string)
+    }
+
+    @objc private func openInputMonitoringSettings() {
+        onOpenInputMonitoringSettings?()
     }
 
     @objc private func openAccessibilitySettings() {

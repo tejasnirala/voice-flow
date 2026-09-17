@@ -130,6 +130,19 @@ straight into the final buffer. No intermediate files or formats.
 
 ### 3.3 Global hotkey
 
+**Current trigger (owner request, 2026-09-17): ⌥ alone.** Hold ⌥ to dictate; double-tap ⌥ for hands-free dictation,
+finished by the next ⌥ press; Esc cancels. A quick single tap does nothing; ⌥ used in a chord (⌥←, ⌥+letter, ⌘⌥…) cancels
+silently. Gesture timing (tap < 0.3 s, second tap within 0.4 s) is pure logic in `VoiceFlowCore/Hotkey/ModifierKeyGesture`
+(9 tests). Carbon hotkeys can't register a lone modifier, so `ModifierKeyMonitor` uses **listen-only event taps**: a
+modifier-changes tap (always on; fires only when modifier keys change) and a key-down tap **enabled only while ⌥ is held**
+to detect chords, without reading key identity. Listen-only taps can't delay or alter input. They need Input Monitoring,
+which was already satisfied on the owner's machine with Accessibility granted. Without it, VoiceFlow falls back to the
+⌥Space Carbon hotkey below and says so in the menu. Measured idle cost with the taps: 0.00 s CPU / 30 s, 6 wakeups, 13 MB.
+The gesture only finishes or cancels a recording it started, so a tap during transcription can't discard a result.
+`dictationTrigger = hotkeyCombination` selects the Carbon hotkey.
+
+**Carbon combination hotkey (fallback / option):**
+
 | Option | Advantages | Disadvantages | Performance | Permission | Decision |
 |---|---|---|---|---|---|
 | **Carbon `RegisterEventHotKey`** | Press **and** release events for exactly this combo; consumes the key (no stray character) | Legacy API, but still supported and widely used | Zero cost when not pressed | **None** | **Chosen** |

@@ -12,8 +12,8 @@
 | 2 | Global hotkey | ✅ Complete (2026-09-17, owner tested) |
 | 3 | Audio recording | ✅ Complete (2026-09-17, owner tested incl. AirPods) |
 | 4 | STT integration (+ accuracy gate) | ✅ Gate passed 2026-09-17 (medium.en q8_0 + vocab); owner live test pending |
-| 5 | Text insertion (first usable product) | 🟡 Working in VS Code/WhatsApp; long-dictation fix awaiting owner re-test |
-| 6 | Fast path optimization | ⬜ |
+| 5 | Text insertion (first usable product) | ✅ Complete (2026-09-17, owner tested) |
+| 6 | Fast path optimization | 🟡 In progress |
 | 7 | Local LLM (Smart Mode) | ⬜ |
 | 8 | Text modes | ⬜ |
 | 9 | Developer intelligence | ⬜ |
@@ -163,7 +163,7 @@ per 30–60 s, GPU 0, footprint 13 MB.
 - Known → Phase 6: release → text ~1.1 s (fixed 30 s encoder window); ~170 MB remains allocated in whisper.cpp after
   unload (baseline 14 MB) → evaluate a helper process or upstream fix; cold vs warm unload timing
 
-## Phase 5 — Text insertion 🟡
+## Phase 5 — Text insertion ✅
 - [x] Core `InsertionPolicy` (paste vs leave on clipboard: Accessibility, focus change, no focused app; restore only if the
       clipboard is unchanged since write) + 7 tests
 - [x] `ClipboardManager`: full snapshot (all items × all types), transcript written with nspasteboard.org transient/concealed
@@ -180,8 +180,15 @@ per 30–60 s, GPU 0, footprint 13 MB.
       Fix: `SpeechSegmenter` (Core, 8 tests) → WER 0.7%, terms 97.4%, no regression on the 50-clip set (ACCURACY.md §5.9)
 - [x] Owner request: paste into the app focused when the transcript is ready (start dictating in Terminal, switch to a browser field,
       the text lands there). `InsertionPolicy.PasteTarget` (`currentApp` default, `dictationApp` optional) + tests; setting `pasteInto`
-- [ ] **Owner re-test:** a long dictation (60 s+ with natural pauses); switch apps while dictating → pasted into the new field;
-      Terminal, a browser field, Slack/Discord or Notes; clipboard preserved with an image on the clipboard
+- [x] Owner: long dictation, app switching and paste behavior confirmed working (2026-09-17); declined a "paste last transcript" hotkey
+      (Copy Last Transcript in the menu is enough)
+- [x] **Owner request: ⌥ alone as the trigger**: hold ⌥ to dictate; double-tap ⌥ → hands-free, next ⌥ press
+      finishes; quick single tap discarded; chords (⌥+key, ⌥+other modifier) cancel silently. Core `ModifierKeyGesture` (9 tests);
+      `ModifierKeyMonitor` = listen-only event taps (modifier changes always; key-down tap enabled only while ⌥ is held, key identity
+      never read); falls back to ⌥Space with a menu warning if Input Monitoring is missing; setting `dictationTrigger` (`option` default |
+      `hotkeyCombination`). Gesture only finishes/cancels recordings it started. Idle unchanged: 0.00 s CPU / 30 s, 6 wakeups, 13 MB
+- [x] Owner tested the ⌥ trigger (2026-09-17): hold, hands-free double-tap, ⌥ to finish, app switch in hands-free (VS Code → Chrome),
+      shortcuts unaffected. Latency log bug (always 0 ms: nanosecond timestamp vs mach ticks) fixed; measure in Phase 6
 - Phase 6 notes: footprint with model loaded grew 1,185 → ~1,500 MB during the owner session (investigate); restore delay
   250 ms unproblematic so far
 
@@ -212,6 +219,7 @@ Per SPEC.md. Notes so far:
 | 2026-09-17 | Load STT model at recording start; idle unload via one-shot timer (300 s provisional) | Model ready at release; memory returned when idle (except ~170 MB whisper.cpp residue) | ARCHITECTURE §3.6 |
 | 2026-09-17 | Paste via clipboard snapshot → ⌘V → restore after 250 ms; paste only into the app focused at key press | Owner-tested in VS Code/WhatsApp; never loses text | ARCHITECTURE §3.4 |
 | 2026-09-17 | Paste into the app focused when the transcript is ready (switch apps while dictating); `pasteInto: dictationApp` keeps the old behavior | Owner request (Wispr Flow-style continuity); last transcript stays in the menu | ARCHITECTURE §3.4 |
+| 2026-09-17 | Trigger = ⌥ alone (hold; double-tap for hands-free), listen-only event taps; ⌥Space fallback | Owner request (Wispr Flow–style); no idle cost measured | ARCHITECTURE §3.3 |
 | 2026-09-17 | Segment dictations > 29 s at pauses into independent chunks | Owner's long dictation lost speech and invented a loop; long-form WER 22.7% → 0.7%, no short-clip regression | ACCURACY §5.9 |
 | 2026-09-16 | Carbon RegisterEventHotKey; Esc cancel registered only while recording | Press+release, no permission, zero idle cost | ARCHITECTURE §3.3 |
 | 2026-09-16 | Clipboard + ⌘V with full snapshot/restore; never lose speech | Works in Electron/terminals/browsers | ARCHITECTURE §3.4 |
@@ -220,10 +228,10 @@ Per SPEC.md. Notes so far:
 ## Session handoff notes
 _Overwrite at the end of every session._
 
-- **Last session (2026-09-17):** Phases 0–4 complete (gate passed with medium.en q8_0 + vocab). Owner live test of dictation pending.
+- **Last session (2026-09-17):** Phases 0–5 complete; VoiceFlow is usable end to end (⌥ trigger, local STT, paste). Phase 6 started.
 - **Models on this machine** (`~/Library/Application Support/VoiceFlow/models/`): whisper tiny.en, base.en,
   small.en, medium.en-q8_0, large-v3-turbo, large-v3-turbo-q8_0, distil-large-v3; parakeet tdt-0.6b-v3-q8_0;
   llm qwen2.5-1.5b-instruct-q4_k_m.
 - **Owner recordings:** `benchmarks-output/audio/human/macbook-mic/` (50 clips + `spoken-overrides.json`, gitignored). Results cached in
   `benchmarks-output/results/human/`. Rerunning `scripts/bench/stt.sh human` re-scores instantly.
-- **Next action:** owner re-tests long dictation + remaining apps → close Phase 5 → approval for Phase 6. Optional: second scripted take.
+- **Next action:** Phase 6 (fast path optimization), see its checklist.

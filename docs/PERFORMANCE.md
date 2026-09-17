@@ -74,6 +74,11 @@ State change to `recording` was logged in the same millisecond as the press in e
 closes (observed 2.6–12.6 s). Presses more than 500 ms late are ignored as stale (verified by the owner:
 pressing ⌥Space with the menu open does nothing). Idle cost after Phase 2: see §2.3.
 
+**⌥ trigger (event taps), 2026-09-17:** idle with both taps installed: launch 92.9 ms, CPU 0.00 s over 30 s, 6 idle
+wakeups, GPU 0, 13 MB. Dispatch latency for ⌥ wasn't measured correctly in the owner test (it compared a nanosecond
+event timestamp against `mach_absolute_time` ticks and always read 0). Fixed to use `CLOCK_UPTIME_RAW` nanoseconds;
+to be measured in Phase 6.
+
 ### 2.3 Idle after Phase 2, 2026-09-17
 `scripts/measure-idle.sh 30` with the hotkey registered: launch 88.9 ms, CPU 0.00 s (0.000 %), 1 idle wakeup
 in 30 s, GPU 0.000 ms, footprint 13 MB, quit 301 ms. The registered Carbon hotkey adds no measurable idle cost.
