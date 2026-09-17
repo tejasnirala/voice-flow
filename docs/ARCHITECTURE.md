@@ -41,8 +41,8 @@ MLX-Swift can't be built from source here.
 | **Global hotkey** | Carbon `RegisterEventHotKey` (press + release events). Esc registered only while recording, for cancel | Decided |
 | **STT runtime** | **whisper.cpp** (prebuilt `whisper.xcframework`) behind a `SpeechEngine` protocol: **encoder on the Neural Engine via Core ML** (optional `…-encoder.mlmodelc` beside the model; falls back to Metal), decoder on Metal | Decided by measurement (§4, PERFORMANCE.md §3.6) |
 | **STT model** | **Whisper medium.en q8_0 + developer vocabulary prompt** (alternate: large-v3-turbo q8_0 + prompt), §4.3 | Decided at Phase 4 gate (2026-09-17); second take to confirm |
-| **LLM runtime** | **llama.cpp**, in-process, lazily loaded, Smart Mode only | Provisional; MLX comparison in Phase 7 |
-| **LLM model** | Qwen2.5-1.5B-Instruct Q4_K_M as the starting candidate | Provisional; compared in Phase 7 |
+| **Text processing** | **Rule-based cleanup** (always, `cleanupTranscripts`); **Smart Mode** (optional): Apple on-device foundation model (FoundationModels) + deterministic `RewriteGuard`, falling back to the cleaned transcript | Decided by measurement (ACCURACY.md §6) |
+| **LLM model** | Apple's system model (no model files); llama.cpp models evaluated and not adopted | Decided (Phase 7) |
 | **Text insertion** | Full pasteboard snapshot → set text (transient/concealed markers) → CGEvent ⌘V → restore if unchanged | Decided |
 | **Storage** | Models: `~/Library/Application Support/VoiceFlow/models/<runtime>/`. Settings: `…/VoiceFlow/settings.json`. Logs: unified logging (`os.Logger`), no transcript content. Audio: memory only | Decided |
 | **Testing** | Swift Testing unit tests on `VoiceFlowCore` (pure logic). Protocol-based fakes at hardware/model boundaries. Corpus benchmark (`vf-bench`) for STT quality | Decided |
@@ -205,24 +205,22 @@ Clipboard algorithm (Phase 5):
 5. If ⌘V can't be posted (no permission, focus changed, secure input), leave the text on the clipboard,
    don't restore, and tell the user. Speech is never lost.
 
-### 3.5 Local LLM runtime (Smart Mode)
+### 3.5 Text processing and Smart Mode (Phase 7)
 
-| Option | Advantages | Disadvantages | Performance (measured here) | Memory | Integration | Decision |
+Measured on a 72-entry cleanup benchmark of real transcripts plus traps (ACCURACY.md §6).
+
+| Option | Advantages | Disadvantages | Performance | Memory | Integration | Decision |
 |---|---|---|---|---|---|---|
-| **llama.cpp** (in-process C API) | Mature. GGUF quantized models. Metal. No daemon. Prebuilt xcframework | Separate ggml copy from whisper.cpp's framework (duplicate Metal init, see risk below) | Qwen2.5-1.5B Q4_K_M: prompt 1033 t/s, generation 85 t/s (Metal); ~0.4 s for a short sentence | ~1.26 GB RSS while loaded | Medium | **Chosen (provisional)** |
-| MLX (mlx-swift) | Apple-optimized; often fast generation on Apple Silicon | Can't build from source without Xcode (Metal toolchain). Prebuilt `Cmlx.xcframework` is 202 MB zipped | Not measured yet (Phase 7, via mlx-lm CLI for a like-for-like comparison) | Unknown | High here | Re-evaluate in Phase 7 |
-| Ollama | Easy model management | Separate always-on daemon + localhost HTTP (spec §8, §10: no server, no IPC) | Same llama.cpp core plus IPC overhead | Daemon idle RAM | Low | **Rejected** |
-| Apple Foundation Models (on-device) | Zero model files; OS-managed | Model and prompt behavior not controllable or benchmarkable to the same degree; availability depends on Apple Intelligence settings | Not measured | OS-managed | Low | Worth one test in Phase 7 |
+| **Rule-based cleanup** (`RuleBasedCleanup`) | Can't change meaning; instant; testable | Only hesitations, stutters, first-word case, end punctuation | ~0 ms | 0 | Trivial | **Always on (default)** |
+| **Apple on-device foundation model** (FoundationModels) | Native API; no model files; runs in a system service; best formatting and fewest violations | Needs macOS 26+ and Apple Intelligence; model may change with OS updates; violated the contract in 5/72 | +0.79 s mean | not in VoiceFlow | Low | **Smart Mode, behind `RewriteGuard`** |
+| llama.cpp + Qwen2.5 0.5–3B / Llama 3.2 1B / Gemma 3 1B | Controllable model version; fast small models | 10–37/72 violations; worse formatting; 0.6–2.3 GB models; second inference runtime | +0.18–0.68 s | 0.6–2.3 GB | Medium (another helper) | Not adopted |
+| MLX | Fast on Apple Silicon | Can't build without Xcode | — | — | High here | Not evaluated |
+| Ollama | Model management | Localhost daemon (spec §8) | — | Daemon RAM | Low | Rejected |
 
-**Risk:** whisper.xcframework and llama.xcframework each embed ggml. Separate dynamic frameworks keep
-symbols apart (two-level namespace), but may double Metal pipeline setup. Phase 7 measures both frameworks
-side by side vs using llama.cpp's ggml build for both.
-
-**LLM guardrails (spec §5, §12):** few-shot "transform only" prompts at temperature 0. Output guard: reject
-output that adds code fences, answers, or is much longer or shorter than the input, and fall back to raw STT.
-Protected tokens: identifiers, commands, paths and URLs from the STT output must survive verbatim. The LLM
-never "corrects" a technical term that isn't already in the transcript. Phase 0 evidence of the need: a
-zero-shot prompt turned a dictated sentence into a TypeScript code block (see PERFORMANCE.md).
+**Pipeline:** STT → `TranscriptGuard` (Whisper artifacts) → `RuleBasedCleanup` (if enabled) → *[Smart Mode]* on-device
+rewrite (fresh session, greedy, bounded tokens, 5 s timeout, prewarmed at recording start) → `RewriteGuard` compares
+rewrite and input (no added phrases, no dropped or replaced content words, developer terms kept, no expansion, no code) →
+accept, or use the cleaned transcript. Speech is never lost: errors, timeouts and unavailability all fall back.
 
 ### 3.6 Model storage & loading
 

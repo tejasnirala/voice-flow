@@ -16,6 +16,7 @@ import Testing
         #expect(Settings.default.sttUnloadAfterSeconds == 60)
         #expect(Settings.default.pasteInto == .currentApp)
         #expect(Settings.default.dictationTrigger == .option)
+        #expect(Settings.default.cleanupTranscripts)
     }
 
     @Test func pasteTargetDecodes() throws {

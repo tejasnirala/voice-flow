@@ -65,6 +65,16 @@ python3 scripts/bench/make-longform.py macbook-mic
 build/VoiceFlow.app/Contents/MacOS/voiceflow-stt --transcribe-benchmark benchmarks-output/audio/longform/macbook-mic \
   --corpus benchmarks-output/longform-corpus.json --out benchmarks-output/results/longform/run.jsonl
 
+# Smart Mode cleanup benchmark (Phase 7)
+python3 scripts/bench/make-cleanup-corpus.py benchmarks-output/results/helper/clips.jsonl benchmarks-output/results/helper/long.jsonl
+swiftc -O scripts/bench/llm_apple.swift -o benchmarks-output/bin/llm_apple
+benchmarks-output/bin/llm_apple benchmarks-output/cleanup-corpus.json prompts/clean.json benchmarks-output/results/cleanup/apple.jsonl
+scripts/bench/fetch-llama-tools.sh && scripts/fetch-models.sh llm qwen2.5-0.5b-instruct-q4_k_m
+python3 scripts/bench/llm_llama.py benchmarks-output/tools/llama-b11005/llama-server \
+  "$HOME/Library/Application Support/VoiceFlow/models/llm/qwen2.5-0.5b-instruct-q4_k_m.gguf" \
+  benchmarks-output/cleanup-corpus.json prompts/clean.json benchmarks-output/results/cleanup/qwen05.jsonl qwen05
+swift run -c release vf-bench cleanup benchmarks-output/cleanup-corpus.json benchmarks-output/results/cleanup/*.jsonl --rule-based --guarded --errors
+
 # Subset of runs: regex filter on run names
 scripts/bench/stt.sh human 'large-v3-turbo|parakeet'
 ```

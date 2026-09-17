@@ -45,16 +45,7 @@ public enum AccuracyScorer {
     /// instead of inflating errors against a single merged reference token. Spoken separator words
     /// ("dot", "slash", …) are excluded from WER; term recognition covers them.
     public static func score(reference: String, spoken: String, hypothesis: String, terms: [String]) -> EntryScore {
-        var variantsByTerm: [(name: String, key: String, variants: [String: String])] = []
-        var allVariants: [String: String] = [:]
-        for term in terms {
-            let parts = term.split(separator: "|").map { String($0) }
-            let key = TranscriptNormalizer.key(parts[0])
-            var variants: [String: String] = [:]
-            for part in parts { variants[TranscriptNormalizer.key(part)] = key }
-            variantsByTerm.append((parts[0], key, variants))
-            allVariants.merge(variants) { a, _ in a }
-        }
+        let (variantsByTerm, allVariants) = termVariants(terms)
         let hypWords = TranscriptNormalizer.words(hypothesis)
         let hypAllMerged = Set(TranscriptNormalizer.mergeTerms(hypWords, variants: allVariants))
         let recognized = variantsByTerm.filter { hypAllMerged.contains($0.key) }
@@ -79,14 +70,30 @@ public enum AccuracyScorer {
         )
     }
 
-    static func formattedTokens(_ text: String) -> [String] {
+    /// Parses `canonical|variant|…` terms into per-term variant maps (variant key → canonical key) and their union.
+    public static func termVariants(_ terms: [String])
+        -> (terms: [(name: String, key: String, variants: [String: String])], all: [String: String]) {
+        var byTerm: [(name: String, key: String, variants: [String: String])] = []
+        var all: [String: String] = [:]
+        for term in terms {
+            let parts = term.split(separator: "|").map { String($0) }
+            let key = TranscriptNormalizer.key(parts[0])
+            var variants: [String: String] = [:]
+            for part in parts { variants[TranscriptNormalizer.key(part)] = key }
+            byTerm.append((parts[0], key, variants))
+            all.merge(variants) { a, _ in a }
+        }
+        return (byTerm, all)
+    }
+
+    public static func formattedTokens(_ text: String) -> [String] {
         text.split(whereSeparator: \.isWhitespace).map(String.init)
     }
 
-    enum AlignmentOp: Equatable { case match, substitution, deletion, insertion(String) }
+    public enum AlignmentOp: Equatable, Sendable { case match, substitution, deletion, insertion(String) }
 
     /// Minimum-edit alignment as a forward list of operations.
-    static func alignment(reference: [String], hypothesis: [String]) -> [AlignmentOp] {
+    public static func alignment(reference: [String], hypothesis: [String]) -> [AlignmentOp] {
         let n = reference.count, m = hypothesis.count
         var cost = [[Int]](repeating: [Int](repeating: 0, count: m + 1), count: n + 1)
         for i in 0...n { cost[i][0] = i }

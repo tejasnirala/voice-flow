@@ -50,6 +50,20 @@ public enum TranscriptNormalizer {
     }
 
     static func numbersToDigits(_ tokens: [String]) -> [String] {
+        var converted = numberWordsToDigits(tokens)
+        // Spoken codes: "four oh four" → "404" (digit, "oh", digit).
+        var i = 0
+        while i + 2 < converted.count {
+            if converted[i].count == 1, converted[i].first!.isNumber, converted[i + 1] == "oh",
+               converted[i + 2].count == 1, converted[i + 2].first!.isNumber {
+                converted.replaceSubrange(i...(i + 2), with: [converted[i] + "0" + converted[i + 2]])
+            }
+            i += 1
+        }
+        return converted
+    }
+
+    static func numberWordsToDigits(_ tokens: [String]) -> [String] {
         var out: [String] = []
         var i = 0
         while i < tokens.count {

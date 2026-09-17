@@ -40,6 +40,9 @@ func percentile(_ xs: [Double], _ p: Double) -> Double? {
 }
 
 let args = Array(CommandLine.arguments.dropFirst())
+if args.first == "cleanup" {
+    exit(try runCleanupReport(Array(args.dropFirst())))
+}
 guard args.first == "score", args.count >= 3 else {
     FileHandle.standardError.write(Data("usage: vf-bench score <corpus.json> <results.jsonl>... [--errors]\n".utf8))
     exit(2)
@@ -153,4 +156,96 @@ for run in order {
 if showErrors {
     print("\n## Errors\n")
     print(errorReport.joined(separator: "\n"))
+}
+
+
+// MARK: - Smart Mode cleanup report
+
+/// `vf-bench cleanup <cleanup-corpus.json> <results.jsonl>... [--errors]`
+/// Results lines: {"type":"clip","run","id","output","latency_s","output_tokens"?}
+func runCleanupReport(_ args: [String]) throws -> Int32 {
+    struct Entry: Decodable { let id, category, input, reference: String; let terms: [String] }
+    struct Corpus: Decodable { let entries: [Entry] }
+    struct Result: Decodable { let type: String; let run: String; let id: String?; let output: String?; let latency_s: Double?; let output_tokens: Int? }
+    guard args.count >= 2 else {
+        FileHandle.standardError.write(Data("usage: vf-bench cleanup <corpus.json> <results.jsonl>... [--errors]\n".utf8)); return 2
+    }
+    let showErrors = args.contains("--errors")
+    // --guarded: also report each run as the app would ship it, with unsafe outputs replaced by the raw transcript.
+    let guarded = args.contains("--guarded")
+    // --rule-based: add a run for the deterministic RuleBasedCleanup (no LLM).
+    let ruleBased = args.contains("--rule-based")
+    let corpus = try JSONDecoder().decode(Corpus.self, from: Data(contentsOf: URL(fileURLWithPath: args[0])))
+    let entries = Dictionary(uniqueKeysWithValues: corpus.entries.map { ($0.id, $0) })
+    var order: [String] = []
+    var results: [String: [Result]] = [:]
+    for file in args.dropFirst().filter({ !$0.hasPrefix("--") }) {
+        for raw in try String(contentsOfFile: file, encoding: .utf8).split(separator: "\n") where !raw.isEmpty {
+            let r = try JSONDecoder().decode(Result.self, from: Data(raw.utf8))
+            guard r.type == "clip" else { continue }
+            if !order.contains(r.run) { order.append(r.run) }
+            results[r.run, default: []].append(r)
+        }
+    }
+    if ruleBased {
+        order.insert("rule-based cleanup (no LLM)", at: 0)
+        results["rule-based cleanup (no LLM)"] = corpus.entries.map {
+            let t = DispatchTime.now().uptimeNanoseconds
+            let out = RuleBasedCleanup.clean($0.input)
+            return Result(type: "clip", run: "rule-based cleanup (no LLM)", id: $0.id, output: out,
+                          latency_s: Double(DispatchTime.now().uptimeNanoseconds - t) / 1e9, output_tokens: nil)
+        }
+    }
+    if guarded {
+        for run in order where !run.hasPrefix("rule-based") && !run.hasPrefix("fast-mode") {
+            let name = run + " + guard"
+            results[name] = (results[run] ?? []).map { r in
+                guard let e = entries[r.id ?? ""] else { return r }
+                let s = CleanupScorer.score(input: e.input, output: r.output ?? "", reference: e.reference, terms: e.terms)
+                return s.isUnsafe ? Result(type: r.type, run: name, id: r.id, output: e.input, latency_s: r.latency_s, output_tokens: r.output_tokens) : r
+            }
+            order.append(name)
+        }
+    }
+    let categories = Array(Set(corpus.entries.map { $0.category.hasPrefix("stt-") ? "stt" : $0.category })).sorted()
+    print("## Smart Mode cleanup\n")
+    print("Unsafe = invented phrase, dropped term, dropped content word, or code fence. Fmt WER = case/punctuation-sensitive error vs the ideal written text (input → output).\n")
+    print("| Run | Entries | **Unsafe** | Invented phrases | Dropped terms | Dropped content words | Added words | Fmt WER in → out | " + categories.map { "Unsafe \($0)" }.joined(separator: " | ") + " | Mean latency s | p95 s |")
+    print("|" + String(repeating: "---|", count: 10 + categories.count))
+    var errors: [String] = []
+    for run in order {
+        let rs = (results[run] ?? []).filter { entries[$0.id ?? ""] != nil }
+        var unsafe = 0, invented = 0, droppedTerms = 0, droppedWords = 0, added = 0
+        var before = EditCounts(), after = EditCounts()
+        var unsafeByCategory: [String: Int] = [:]
+        for r in rs {
+            guard let e = entries[r.id ?? ""] else { continue }
+            let s = CleanupScorer.score(input: e.input, output: r.output ?? "", reference: e.reference, terms: e.terms)
+            before = before + s.formattingBefore; after = after + s.formattingAfter
+            invented += s.inventedPhrases.count; droppedTerms += s.droppedTerms.count
+            droppedWords += s.droppedContentWords.count; added += s.addedWords
+            let cat = e.category.hasPrefix("stt-") ? "stt" : e.category
+            if s.isUnsafe {
+                unsafe += 1; unsafeByCategory[cat, default: 0] += 1
+                if showErrors {
+                    var why: [String] = []
+                    if !s.inventedPhrases.isEmpty { why.append("invented: " + s.inventedPhrases.map { "\"\($0)\"" }.joined(separator: ", ")) }
+                    if !s.droppedTerms.isEmpty { why.append("dropped terms: " + s.droppedTerms.joined(separator: ", ")) }
+                    if !s.droppedContentWords.isEmpty { why.append("dropped words: " + s.droppedContentWords.joined(separator: " ")) }
+                    if !s.substitutedWords.isEmpty { why.append("replaced: " + s.substitutedWords.joined(separator: " ")) }
+                    if s.expanded { why.append("expanded") }
+                    if s.hasCodeFence { why.append("code fence") }
+                    errors.append("- **\(run)** `\(e.id)` · \(why.joined(separator: " · "))\n  - in:  \(e.input)\n  - out: \((r.output ?? "").replacingOccurrences(of: "\n", with: " ⏎ "))")
+                }
+            }
+        }
+        let lat = rs.compactMap(\.latency_s).sorted()
+        let mean = lat.isEmpty ? 0 : lat.reduce(0, +) / Double(lat.count)
+        let p95 = lat.isEmpty ? 0 : lat[min(lat.count - 1, Int((Double(lat.count - 1) * 0.95).rounded()))]
+        let catCols = categories.map { "\(unsafeByCategory[$0] ?? 0)" }
+        print("| \(run) | \(rs.count) | **\(unsafe)** | \(invented) | \(droppedTerms) | \(droppedWords) | \(added) | \(pct(before.rate)) → \(pct(after.rate)) | "
+              + catCols.joined(separator: " | ") + String(format: " | %.3f | %.3f |", mean, p95))
+    }
+    if showErrors { print("\n## Unsafe outputs\n"); print(errors.joined(separator: "\n")) }
+    return 0
 }

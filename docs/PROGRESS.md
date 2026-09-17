@@ -14,8 +14,8 @@
 | 4 | STT integration (+ accuracy gate) | ✅ Gate passed 2026-09-17 (medium.en q8_0 + vocab); owner live test pending |
 | 5 | Text insertion (first usable product) | ✅ Complete (2026-09-17, owner tested) |
 | 6 | Fast path optimization | ✅ Complete (2026-09-17, owner verified in real use) |
-| 7 | Local LLM (Smart Mode) | 🟡 Started |
-| 8 | Text modes | ⬜ |
+| 7 | Local LLM (Smart Mode) | ✅ Complete (2026-09-17) |
+| 8 | Text modes | ⏭️ Next (after approval) |
 | 9 | Developer intelligence | ⬜ |
 | 10 | Application awareness | ⬜ |
 | 11 | Final performance optimization | ⬜ |
@@ -206,6 +206,20 @@ per 30–60 s, GPU 0, footprint 13 MB.
 - **Phase 6 outcome:** short dictation release → text ~0.95 s → ~0.6–0.75 s (Core ML encoder); app memory ~190 MB+ → 13–27 MB
   (helper process); accuracy unchanged on both sets
 
+## Phase 7 — Local LLM (Smart Mode) ✅
+- [x] Candidates: Apple on-device model (FoundationModels, available here), llama.cpp with Qwen2.5 0.5/1.5/3B, Llama 3.2 1B,
+      Gemma 3 1B (downloaded, SHA-256 verified). MLX not buildable without Xcode
+- [x] Cleanup safety benchmark: 57 real transcripts + 15 traps; `CleanupScorer` + `vf-bench cleanup` (`--guarded`, `--rule-based`)
+- [x] Finding: **every model violated the contract** (wrote poems/code, answered questions, changed meaning); Apple's model least (5/72)
+- [x] `RuleBasedCleanup` (Core, no LLM): 0 unsafe, formatting 15.6% → 10.6%, instant → **on by default** (`cleanupTranscripts`)
+- [x] `RewriteGuard` (Core): makes every model safe via fallback; observed unsafe outputs as tests
+- [x] **Smart Mode = Apple on-device model + guard** (optional, off by default): 0 unsafe, 10.2%, +0.79 s, 7% fallback. Menu
+      shows availability; prewarm at recording start; 5 s timeout; errors fall back
+- [x] No llama.cpp dependency added
+- [x] Live check: rewrites accepted in 877/1,181 ms; guard rejected an expanded 1-word rewrite
+- Notes for Phase 8: Clean-mode Smart gain over rules is small; Developer/Prompt/Writing modes change more words and need
+  per-mode guard policies (the current guard would reject most of their intended edits)
+
 ## Phases 6–13
 Per SPEC.md. Notes so far:
 - **5:** clipboard algorithm in ARCHITECTURE.md §3.4. Never lose speech on paste failure.
@@ -233,6 +247,7 @@ Per SPEC.md. Notes so far:
 | 2026-09-17 | Load STT model at recording start; idle unload via one-shot timer (300 s provisional) | Model ready at release; memory returned when idle (except ~170 MB whisper.cpp residue) | ARCHITECTURE §3.6 |
 | 2026-09-17 | Paste via clipboard snapshot → ⌘V → restore after 250 ms; paste only into the app focused at key press | Owner-tested in VS Code/WhatsApp; never loses text | ARCHITECTURE §3.4 |
 | 2026-09-17 | Paste into the app focused when the transcript is ready (switch apps while dictating); `pasteInto: dictationApp` keeps the old behavior | Owner request (Wispr Flow-style continuity); last transcript stays in the menu | ARCHITECTURE §3.4 |
+| 2026-09-17 | Rule-based cleanup on by default; Smart Mode = Apple on-device model + RewriteGuard (optional); no llama.cpp | All LLMs violated the transform-only contract; guard makes them safe; rules give most of the gain instantly | ACCURACY §6, ARCHITECTURE §3.5 |
 | 2026-09-17 | whisper.cpp in a helper process (`voiceflow-stt`) that exits 60 s after last use | Owner approved; app stays at 13–18 MB; no latency cost; frees whisper.cpp's leftover and leaked memory | ARCHITECTURE §Processes |
 | 2026-09-17 | Unload STT model 60 s after last use (was 300 s) | Cold dictation as fast as warm; ~0.7 MB leak per load cycle favors bursts sharing a load | PERFORMANCE §3.8 |
 | 2026-09-17 | Core ML (Neural Engine) Whisper encoder | Same accuracy, −17…25% latency; `audio_ctx` fitting rejected (fails gate) | PERFORMANCE §3.5–3.6 |
@@ -245,10 +260,10 @@ Per SPEC.md. Notes so far:
 ## Session handoff notes
 _Overwrite at the end of every session._
 
-- **Last session (2026-09-17):** Phases 0–6 complete. Phase 7 (Smart Mode) started.
+- **Last session (2026-09-17):** Phases 0–7 complete. Models also present: llm qwen2.5 0.5/1.5/3b, gemma-3-1b, Llama-3.2-1B (benchmark only; deletable).
 - **Models on this machine** (`~/Library/Application Support/VoiceFlow/models/`): whisper tiny.en, base.en,
   small.en, medium.en-q8_0, large-v3-turbo, large-v3-turbo-q8_0, distil-large-v3; parakeet tdt-0.6b-v3-q8_0;
   llm qwen2.5-1.5b-instruct-q4_k_m.
 - **Owner recordings:** `benchmarks-output/audio/human/macbook-mic/` (50 clips + `spoken-overrides.json`, gitignored). Results cached in
   `benchmarks-output/results/human/`. Rerunning `scripts/bench/stt.sh human` re-scores instantly.
-- **Next action:** Phase 7 (local LLM, Smart Mode): discovery and benchmark first.
+- **Next action:** owner tries Smart Mode (menu → Mode → Smart) → approval for Phase 8 (text modes).

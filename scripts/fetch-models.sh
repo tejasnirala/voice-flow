@@ -55,6 +55,9 @@ for m in "$@"; do
       echo "✓ installed ggml-$m-encoder.mlmodelc" ;;
     llm:qwen2.5-0.5b-instruct-q4_k_m) fetch "Qwen/Qwen2.5-0.5B-Instruct-GGUF" "$m.gguf" "$ROOT/llm" ;;
     llm:qwen2.5-1.5b-instruct-q4_k_m) fetch "Qwen/Qwen2.5-1.5B-Instruct-GGUF" "$m.gguf" "$ROOT/llm" ;;
+    llm:qwen2.5-3b-instruct-q4_k_m)   fetch "Qwen/Qwen2.5-3B-Instruct-GGUF" "$m.gguf" "$ROOT/llm" ;;
+    llm:gemma-3-1b-it-Q4_K_M)         fetch "unsloth/gemma-3-1b-it-GGUF" "$m.gguf" "$ROOT/llm" ;;
+    llm:Llama-3.2-1B-Instruct-Q4_K_M) fetch "bartowski/Llama-3.2-1B-Instruct-GGUF" "$m.gguf" "$ROOT/llm" ;;
     *) echo "unknown model: $KIND $m" >&2; exit 1 ;;
   esac
 done

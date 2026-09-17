@@ -74,7 +74,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         case .idle: "Ready — \(triggerInstructions)"
         case .recording: handsFree ? "🎙 Hands-free — press ⌥ to finish, Esc to cancel" : "🎙 Recording… (Esc to cancel)"
         case .transcribing: "Transcribing on this Mac…"
-        case .processing: "Processing…"
+        case .processing: "Smart rewrite on this Mac…"
         case .inserting: "Pasting…"
         case .error(let failure): "⚠︎ \(failure.message)"
         }
@@ -156,11 +156,15 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         let modeItem = NSMenuItem(title: "Mode", action: nil, keyEquivalent: "")
         let modes = NSMenu()
-        let fast = NSMenuItem(title: "Fast (no LLM)", action: #selector(selectFastMode), keyEquivalent: "")
+        let fast = NSMenuItem(title: "Fast (rule-based cleanup, no LLM)", action: #selector(selectFastMode), keyEquivalent: "")
         fast.target = self
         fast.state = settings.processingMode == .fast ? .on : .off
         modes.addItem(fast)
-        let smart = disabled("Smart (local LLM) — not available yet")
+        let smartReason = OnDeviceRewriter.unavailableReason
+        let smart = NSMenuItem(title: smartReason == nil ? "Smart (on-device Apple model, +~0.8 s)" : "Smart — \(smartReason!)",
+                               action: #selector(selectSmartMode), keyEquivalent: "")
+        smart.target = self
+        smart.isEnabled = smartReason == nil
         smart.state = settings.processingMode == .smart ? .on : .off
         modes.addItem(smart)
         modes.autoenablesItems = false
@@ -216,6 +220,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     @objc private func dismissError() {
         onDismissError?()
+    }
+
+    @objc private func selectSmartMode() {
+        guard settings.processingMode != .smart else { return }
+        settings.processingMode = .smart
+        persist()
     }
 
     @objc private func selectFastMode() {

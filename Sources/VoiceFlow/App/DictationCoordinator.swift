@@ -308,6 +308,8 @@ final class DictationCoordinator {
         switch next {
         case .transcribing:
             transcribePendingAudio()
+        case .processing:
+            rewriteLastTranscript()
         case .inserting:
             insertLastTranscript()
         case .idle:
@@ -341,6 +343,7 @@ final class DictationCoordinator {
 
         unloadWork?.cancel()
         prepareSpeechEngine()
+        if settings.processingMode == .smart, let prompt = smartPrompt { OnDeviceRewriter.prewarm(prompt: prompt) }
         cpuAtStart = ResourceUsage.cpuSeconds
         footprintAtStartMB = ResourceUsage.footprintMB
         do {
@@ -510,12 +513,53 @@ final class DictationCoordinator {
                 """)
             pendingAudio = nil
             scheduleUnload()
-            if result.text.isEmpty {
+            let prepared = TextProcessingPlan.prepare(result.text, cleanup: settings.cleanupTranscripts)
+            if prepared.isEmpty {
                 send(.transcriptionEmpty)
             } else {
-                lastTranscript = result.text
+                lastTranscript = prepared
                 onSpeechInfoChange?(modelStatus, lastTranscript)
-                send(.transcriptionSucceeded(needsProcessing: false))
+                let smart = settings.processingMode == .smart && smartPrompt != nil && OnDeviceRewriter.unavailableReason == nil
+                send(.transcriptionSucceeded(needsProcessing: smart))
+            }
+        }
+    }
+
+    // MARK: - Smart Mode
+
+    private lazy var smartPrompt: RewritePrompt? = RewritePrompt.bundled("clean")
+    private lazy var vocabularyTerms: [String] = RewriteGuard.terms(fromVocabulary: DeveloperVocabulary.prompt())
+
+    private func rewriteLastTranscript() {
+        guard let prepared = lastTranscript, let prompt = smartPrompt else {
+            send(.processingFellBackToTranscript)
+            return
+        }
+        let terms = vocabularyTerms
+        let start = DispatchTime.now().uptimeNanoseconds
+        Task { [weak self] in
+            var rewrite: String?
+            var failure: String?
+            do {
+                rewrite = try await OnDeviceRewriter.rewrite(prepared, prompt: prompt)
+            } catch {
+                failure = error.localizedDescription
+            }
+            guard let self, self.machine.state == .processing else { return }
+            let ms = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
+            let (text, verdict) = TextProcessingPlan.finalText(prepared: prepared, rewrite: rewrite, terms: terms)
+            self.lastTranscript = text
+            self.onSpeechInfoChange?(self.modelStatus, text)
+            switch verdict {
+            case .accept?:
+                Log.speech.notice("smart rewrite accepted in \(ms, format: .fixed(precision: 0), privacy: .public) ms")
+                self.send(.processingSucceeded)
+            case .reject(let reasons)?:
+                Log.speech.notice("smart rewrite rejected by guard (\(reasons.joined(separator: ", "), privacy: .public)) in \(ms, format: .fixed(precision: 0), privacy: .public) ms; using cleaned transcript")
+                self.send(.processingFellBackToTranscript)
+            case nil:
+                Log.speech.error("smart rewrite failed (\(failure ?? "unknown", privacy: .public)) after \(ms, format: .fixed(precision: 0), privacy: .public) ms; using cleaned transcript")
+                self.send(.processingFellBackToTranscript)
             }
         }
     }

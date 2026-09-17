@@ -397,30 +397,26 @@ Owner session (release build, medium.en q8_0 + vocab), from the `insertion` log:
 Insertion itself costs < 1 ms after the first event; release → pasted is dominated by transcription. The clipboard
 is restored 250 ms after ⌘V (no app pasted the old content in these tests).
 
-## 5. LLM (Smart Mode), preliminary
+## 5. LLM (Smart Mode)
 
-**2026-09-16**, llama.cpp b11005 official macOS arm64 binaries, Qwen2.5-1.5B-Instruct Q4_K_M (1.04 GiB).
+### 5.1 Phase 7 benchmark, 2026-09-17
+Full results: ACCURACY.md §6. Latency per rewrite (72 entries, warm):
 
-`llama-bench -p 256 -n 64 -r 3`:
-
-| Backend | Prompt processing | Generation |
-|---|---|---|
-| Metal | 1033.10 ± 2.38 tok/s | 85.13 ± 0.20 tok/s |
-| CPU (4 threads) | 289.56 ± 4.43 tok/s | 67.12 ± 0.84 tok/s |
-
-`llama-completion`, Metal, temperature 0. Input "create a function called get user by id that accepts a
-string id and returns a promise of user or null":
-
-| Prompt | Prompt eval | Generation | Max RSS | Output |
+| Candidate | Mean | p95 | Load | Memory |
 |---|---|---|---|---|
-| Zero-shot (98 tok), 2nd run | 144.4 ms | 435.7 ms / 37 tok | 1.26 GB | ❌ A TypeScript code block: the model *answered* (spec violation) |
-| Few-shot (167 tok) | 195.7 ms | 234.2 ms / 20 tok | — | ✅ `Create a function called getUserById that accepts a string id and returns a promise of user or null.` |
+| **Apple on-device model (chosen)** | **0.79 s** | 2.11 s | warm-up 1.49 s (first use) | system service; VoiceFlow unchanged |
+| Qwen2.5-0.5B Q4_K_M (llama.cpp, Metal) | 0.18 s | 0.65 s | 0.83 s | 638 MB |
+| Qwen2.5-1.5B Q4_K_M | 0.34 s | 1.35 s | 1.05 s | 1,293 MB |
+| Gemma-3-1B Q4_K_M | 0.32 s | 1.07 s | 1.06 s | 934 MB |
+| Llama-3.2-1B Q4_K_M | 0.32 s | 1.09 s | 1.06 s | 1,026 MB |
+| Qwen2.5-3B Q4_K_M | 0.68 s | 2.79 s | 1.45 s | 2,254 MB |
 
-Takeaways for Phase 7: warm Smart Mode ≈ 0.4 s per short sentence, dominated by generation
-(~11.8 ms/token). Few-shot prompts plus an output guard are mandatory. Prefix KV-cache reuse can remove most
-prompt-eval time. ~1.26 GB while loaded, so load lazily and unload when idle. MLX not yet compared.
+Rule-based cleanup: effectively 0 ms. Live Smart Mode in the app: rewrite 775–1,181 ms after transcription (model
+prewarmed at recording start).
 
----
+### 5.2 Phase 0 exploration, 2026-09-16 (for reference)
+llama.cpp `llama-bench`, Qwen2.5-1.5B Q4_K_M: Metal pp256 1,033 tok/s, tg64 85 tok/s; CPU 290 / 67 tok/s. A zero-shot
+prompt produced a TypeScript code block for a dictated sentence (the first sign of the contract problem in §5.1).
 
 ## 6. Open measurements (scheduled)
 
@@ -430,5 +426,4 @@ prompt-eval time. ~1.26 GB while loaded, so load lazily and unload when idle. ML
 | First-word clipping (built-in ~0.2 s, AirPods ~0.5 s): measure and mitigate | 6 |
 | Cold (unloaded) vs warm strategy; residual ~170 MB after unload (helper process?) | 6 |
 | End-to-end release→text latency | 5, 6 |
-| LLM runtime comparison (llama.cpp vs MLX vs Apple Foundation Models) | 7 |
 | Full audit | 11 |

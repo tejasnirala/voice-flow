@@ -6,7 +6,7 @@ A local-only macOS menu-bar dictation utility built for software development.
 Speech recognition and optional cleanup run entirely on your Mac. No cloud, no telemetry, no stored audio
 or transcripts.
 
-> **Status:** Phase 6 complete: hold ⌥ (or double-tap for hands-free) → speak → text pasted in ~0.6–1.1 s, clipboard preserved. The app uses ~13–27 MB; speech recognition runs in an on-demand helper process. Next: optional local LLM cleanup (Phase 7).
+> **Status:** Phase 6 complete: hold ⌥ (or double-tap for hands-free) → speak → text pasted in ~0.6–1.1 s, clipboard preserved. The app uses ~13–27 MB; speech recognition runs in an on-demand helper process. Phase 7 complete: rule-based cleanup by default, optional guarded Smart Mode.
 > See [`docs/PROGRESS.md`](docs/PROGRESS.md).
 
 ## Priorities
@@ -15,8 +15,9 @@ or transcripts.
 2. Latency 3. Resource efficiency (near-zero idle CPU/GPU, low idle RAM) 4. Features
 
 ## Modes
-- **Fast Mode:** audio → local STT → paste.
-- **Smart Mode:** audio → local STT → small local LLM (conservative cleanup, never guesses) → paste.
+- **Fast Mode (default):** audio → local STT → rule-based cleanup (fillers, stutters, capitalization, punctuation) → paste.
+- **Smart Mode (optional):** … → Apple's on-device model rewrites, and a deterministic guard rejects any rewrite that adds,
+  drops or changes words (falls back to the cleaned transcript) → paste.
 
 ## Quick start (development)
 ```sh
