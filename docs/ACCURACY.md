@@ -467,6 +467,37 @@ reliably in Prompt and Writing (8/8 enumerations) and sometimes in Clean + Smart
 Smart Rewrite, Clean has no model and makes no lists. About 1 in 5–7 real dictations falls back to the rule-cleaned text in
 the model modes.
 
+### 7.4 Apostrophes and agreement (after the Phase 10 owner test, 2026-09-17)
+
+**Owner report:** "Apple's Notes" came out as "Apples Notes". **Cause:** the rewrite guards compare normalized words, where
+apostrophes are removed (so "don't" = "do not"). A rewrite that dropped an apostrophe passed, and the prompts never asked the
+model to add missing ones. The text isn't logged (privacy), so both paths were fixed:
+
+1. `TextProcessingPlan.restoreApostrophes`: after an accepted rewrite, every word the transcript spelled with an apostrophe
+   ("Apple's", "users'") gets that spelling back, unless the transcript also used the bare form. ("it's" → "its" is a
+   different word and is rejected by the guards.)
+2. `RuleBasedCleanup`: contractions missing their apostrophe ("dont", "im", "theyre"…) are fixed by rule in every mode except
+   Raw and Code, only where the bare form isn't an English word ("cant", "wont", "its", "lets", "ill", "were" stay).
+3. Strict guard: subject–verb agreement swaps within is/are/am, was/were, has/have, do/does, and dropping "okay / so / well /
+   alright / yeah" at the start of a sentence (mid-sentence "so" = "therefore" is still content). Content-preserving: has, have,
+   do, does may be added; "it" is now content (Prompt dropped "merge it" → "merge").
+4. Prompts: one added sentence, "Add missing apostrophes in possessives and contractions ("apples notes application" →
+   "Apple's Notes application")" plus a Clean example.
+
+**Prompt experiments (same corpora, fallback on 57 real transcripts):**
+
+| Prompt variant | Clean + Smart | Developer + Smart | Prompt | Writing | Notes |
+|---|---|---|---|---|---|
+| Phase 9 prompts | 7 | 7 | 8 | 4 | Clean made 1/4 lists |
+| Broad grammar rules (apostrophes + agreement + "you may drop okay/so") | 10 | 10 | 8 | 7 | Model got bolder: dropped "It turns out", "I think", "Hey, quick update"; "Never" → "Don't" (all rejected). **Reverted** |
+| Narrow, example said "app" | 7 | 7 | 8 | 4 | Model copied "app" for "application" → owner's sentence rejected |
+| **Final: narrow apostrophe sentence** | **7** | **7** | **8** | **7** | Clean 4/4 lists; formatting all-94: Clean 10.4%, Writing 11.5% |
+
+Owner sentence "I have opened the apples notes application…": Clean → "the Apple's Notes application", Writing and Prompt →
+"Apple's Notes application" (all accepted). "the tests is failing" → "are" in all three. Traps: 0 unsafe outputs accepted;
+hand review of accepted changes found no meaning change. Plural vs singular possessive ("users session" → "user's") is the
+model's guess and can't be checked by word guards.
+
 ## 8. Developer intelligence (Phase 9, 2026-09-17)
 
 **Starting point:** errors in the owner's 50 recordings (medium.en + vocabulary prompt, ACCURACY §5) that are developer

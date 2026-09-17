@@ -41,6 +41,28 @@ public enum CleanupScorer {
     public static let articleWords: Set<String> = ["a", "an", "the"]
     /// Grammatically optional words a cleanup may delete (not replace): "the things that I need" → "the things I need".
     public static let optionalWords: Set<String> = ["that"]
+    /// Subject–verb agreement fixes a cleanup may make ("the tests is failing" → "are"): swaps within a group only.
+    static let agreementGroups: [Set<String>] = [["is", "are", "am"], ["was", "were"], ["has", "have"], ["do", "does"]]
+    /// Discourse markers a cleanup may drop at the start of a sentence ("Okay, so the plan is…" → "The plan is…").
+    static let sentenceOpeners: Set<String> = ["okay", "so", "well", "alright", "yeah"]
+
+    /// Token indices (in `words` + term merging) where a sentence starts.
+    static func sentenceStarts(_ text: String, variants: [String: String]) -> Set<Int> {
+        var starts: Set<Int> = [0]
+        var count = 0
+        var sentence = ""
+        func flush() {
+            count += TranscriptNormalizer.mergeTerms(TranscriptNormalizer.words(sentence), variants: variants).count
+            starts.insert(count)
+            sentence = ""
+        }
+        for ch in text {
+            sentence.append(ch)
+            if ".!?\n".contains(ch) { flush() }
+        }
+        flush()
+        return starts
+    }
 
     /// Whether the word at `index` belongs to a 1–4 word sequence immediately repeated ("when the when the").
     static func isStutter(_ tokens: [String], at index: Int) -> Bool {
@@ -62,6 +84,17 @@ public enum CleanupScorer {
 
         let ops = AccuracyScorer.alignment(reference: inputTokens, hypothesis: outputTokens)
         let scaffold = ListScaffold.removableInputIndices(input: inputTokens, ops: ops, itemStarts: itemStarts)
+        // Sentence starts are only trusted when per-sentence tokenization adds up to the whole (terms can span sentences).
+        var starts = sentenceStarts(input, variants: variants)
+        if starts.max() != inputTokens.count { starts = [0] }
+        func isOpener(_ index: Int) -> Bool {
+            var k = index
+            while k >= 0, sentenceOpeners.contains(inputTokens[k]) {
+                if starts.contains(k) { return true }
+                k -= 1
+            }
+            return false
+        }
         var inputIndex = 0, outputIndex = 0
         var added = 0
         var addedContent: [String] = []
@@ -82,6 +115,8 @@ public enum CleanupScorer {
                 let word = inputTokens[inputIndex], replacement = outputTokens[outputIndex]
                 if articleWords.contains(word), articleWords.contains(replacement) {
                     // "a" → "the"
+                } else if agreementGroups.contains(where: { $0.contains(word) && $0.contains(replacement) }) {
+                    articles += 1   // grammar edit
                 } else if fillerWords.contains(word) || articleWords.contains(word) {
                     noteAdded(replacement)
                 } else {
@@ -90,7 +125,8 @@ public enum CleanupScorer {
                 inputIndex += 1; outputIndex += 1
             case .deletion:
                 let word = inputTokens[inputIndex]
-                if fillerWords.contains(word) || isStutter(inputTokens, at: inputIndex) || scaffold.contains(inputIndex) {
+                if fillerWords.contains(word) || isStutter(inputTokens, at: inputIndex) || scaffold.contains(inputIndex)
+                    || isOpener(inputIndex) {
                     // allowed cleanup
                 } else if articleWords.contains(word) || optionalWords.contains(word) {
                     articles += 1

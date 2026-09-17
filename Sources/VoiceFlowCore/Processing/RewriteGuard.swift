@@ -24,7 +24,7 @@ public enum RewriteGuard {
     static let functionWords: Set<String> = [
         "a", "an", "the", "is", "are", "was", "were", "be", "been", "being", "am", "do", "does", "did", "have", "has", "had",
         "to", "of", "in", "on", "at", "for", "with", "by", "into", "onto", "about", "as", "so", "and", "then", "that", "this",
-        "these", "those", "which", "it", "its", "there", "here", "also", "just", "please", "i", "my", "we", "our",
+        "these", "those", "which", "there", "here", "also", "just", "please", "i", "my", "we", "our",
         "let", "s", "up", "out", "too", "very", "really", "actually", "okay", "well",
     ]
 
@@ -34,8 +34,8 @@ public enum RewriteGuard {
     /// The subset of grammar words a rewrite may add when absent from the input (sentence splitting and grammar only).
     /// Pronouns aren't here: "I will review" → "We will review" is a meaning change.
     static let insertableWords: Set<String> = [
-        "a", "an", "the", "is", "are", "was", "were", "be", "to", "of", "in", "on", "for", "with", "as", "and", "then", "that",
-        "this", "it", "its", "there", "also",
+        "a", "an", "the", "is", "are", "am", "was", "were", "be", "has", "have", "do", "does", "to", "of", "in", "on", "for",
+        "with", "as", "and", "then", "that", "this", "it", "its", "there", "also",
     ]
 
     /// - Parameter terms: developer vocabulary (e.g. "Next.js", "PostgreSQL") that must survive if present in `input`.

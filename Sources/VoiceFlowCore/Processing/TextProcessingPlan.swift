@@ -1,3 +1,5 @@
+import Foundation
+
 /// The deterministic part of turning a raw STT transcript into the text that gets pasted, per text mode.
 public enum TextProcessingPlan {
     /// Applied before any optional model rewrite (after Whisper artifact removal):
@@ -22,7 +24,7 @@ public enum TextProcessingPlan {
         let verdict = RewriteGuard.evaluate(input: prepared, output: rewrite, terms: terms, policy: mode.guardPolicy)
         switch verdict {
         case .accept:
-            let text = tidy(rewrite, keepParagraphs: mode.guardPolicy == .contentPreserving)
+            let text = restoreApostrophes(from: prepared, in: tidy(rewrite, keepParagraphs: mode.guardPolicy == .contentPreserving))
             return (dictionary.apply(to: mode == .developer ? DeveloperFormatter.format(text) : text), verdict)
         case .reject:
             return (prepared, verdict)
@@ -55,4 +57,44 @@ public enum TextProcessingPlan {
     }
 
     static func isListItem(_ line: String) -> Bool { ["- ", "* ", "• "].contains { line.hasPrefix($0) } }
+
+    /// Word boundaries without touching apostrophes ("users'" keeps its mark).
+    static let edgePunctuation = CharacterSet(charactersIn: ".,;:!?\"()[]{}“”«»-–—*")
+
+    /// A rewrite may not lose an apostrophe the transcript had ("Apple's" → "Apples", "it's" → "its"): the guard can't see
+    /// apostrophes, so the transcript's spelling is restored for every word that matches it letter for letter. Words the
+    /// transcript also wrote without an apostrophe are left as the rewrite has them.
+    static func restoreApostrophes(from prepared: String, in text: String) -> String {
+        func key(_ core: Substring) -> String { String(core.lowercased().filter { $0.isLetter || $0.isNumber }) }
+        func core(_ token: Substring) -> (lead: Substring, core: Substring, trail: Substring) {
+            let start = token.firstIndex { !$0.unicodeScalars.allSatisfy(edgePunctuation.contains) } ?? token.endIndex
+            let end = token[start...].lastIndex { !$0.unicodeScalars.allSatisfy(edgePunctuation.contains) }.map(token.index(after:)) ?? start
+            return (token[..<start], token[start..<end], token[end...])
+        }
+        var marked: [String: Substring] = [:]
+        var ambiguous = Set<String>()
+        for token in prepared.split(whereSeparator: \.isWhitespace) {
+            let c = core(token).core
+            let k = key(c)
+            guard !k.isEmpty else { continue }
+            if c.contains("'") || c.contains("’") {
+                if let existing = marked[k], existing.lowercased() != c.lowercased() { ambiguous.insert(k) }
+                marked[k] = c
+            } else {
+                ambiguous.insert(k)
+            }
+        }
+        guard !marked.isEmpty else { return text }
+        return text.split(separator: "\n", omittingEmptySubsequences: false).map { line in
+            line.split(separator: " ", omittingEmptySubsequences: false).map { token -> String in
+                let (lead, c, trail) = core(token)
+                let k = key(c)
+                guard !c.contains("'"), !c.contains("’"), !ambiguous.contains(k), var original = marked[k].map(String.init) else {
+                    return String(token)
+                }
+                if let first = c.first, first.isUppercase { original = original.prefix(1).uppercased() + original.dropFirst() }
+                return lead + original + trail
+            }.joined(separator: " ")
+        }.joined(separator: "\n")
+    }
 }

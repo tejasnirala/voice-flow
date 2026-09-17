@@ -85,6 +85,7 @@ import Testing
         ("I will review the design doc", "We will review the design doc."),
         ("we deploy to AWS but the analytics team uses Azure", "We deploy to AWS. The analytics team uses Azure."),
         ("I want you to write a function", "I want to write a function."),
+        ("update the migration before we merge it", "Update the migration before we merge."),
         ("can you send me the document", "Can you send the document?"),
         ("the first release failed so we shipped a second one", "The first release failed. We shipped a second one."),
     ])
@@ -116,5 +117,46 @@ import Testing
         #expect(clean.text == "Hey, quick update. The review went well. We need two things:\n- Tests.\n- Docs.\nThanks.")
         let writing = TextProcessingPlan.finalText(prepared: prepared, rewrite: rewrite, terms: [], mode: .writing)
         #expect(writing.text == "Hey, quick update.\nThe review went well.\n\nWe need two things:\n- Tests.\n- Docs.\nThanks.")
+    }
+}
+
+@Suite struct GrammarFixTests {
+    @Test func rewriteCannotLoseATranscriptApostrophe() {
+        let prepared = "I have opened the Apple's Notes application and the users' files."
+        let (text, verdict) = TextProcessingPlan.finalText(prepared: prepared,
+                                                           rewrite: "I have opened the Apples Notes application, and the users files.",
+                                                           terms: [], mode: .writing)
+        #expect(verdict == .accept)
+        #expect(text == "I have opened the Apple's Notes application, and the users' files.")
+        // "it's" → "its" is a different word, so the guard rejects it outright.
+        #expect(RewriteGuard.evaluate(input: "and it's slow", output: "And its slow.", terms: [], policy: .contentPreserving) != .accept)
+        // A word the transcript also wrote without an apostrophe is ambiguous: left as the rewrite has it.
+        #expect(TextProcessingPlan.restoreApostrophes(from: "its tail and it's here", in: "its tail and its here") == "its tail and its here")
+        #expect(TextProcessingPlan.restoreApostrophes(from: "the users' files", in: "The users files") == "The users' files")
+    }
+
+    @Test func modelMayAddPossessiveApostrophes() {
+        let (text, verdict) = TextProcessingPlan.finalText(prepared: "I have opened the apples notes application.",
+                                                           rewrite: "I have opened Apple's Notes application.", terms: [], mode: .clean)
+        #expect(verdict == .accept)
+        #expect(text == "I have opened Apple's Notes application.")
+    }
+
+    @Test(arguments: [
+        ("i dont think it works", "I don't think it works."),
+        ("Im not sure whats wrong but theyre looking", "I'm not sure what's wrong but they're looking."),
+        ("we cant go and its tail wont move", "We cant go and its tail wont move."),
+        ("Dont merge yet", "Don't merge yet."),
+    ])
+    func missingContractionApostrophes(input: String, expected: String) {
+        #expect(RuleBasedCleanup.clean(input) == expected)
+    }
+
+    @Test func strictAllowsAgreementAndSentenceOpeners() {
+        #expect(RewriteGuard.evaluate(input: "Okay, so the tests is failing. So we fix it.",
+                                      output: "The tests are failing. We fix it.", terms: []) == .accept)
+        // "so" meaning "therefore" mid-sentence is still content, and agreement swaps stay within their group.
+        #expect(RewriteGuard.evaluate(input: "It failed so we fixed it.", output: "It failed. We fixed it.", terms: []) != .accept)
+        #expect(RewriteGuard.evaluate(input: "The test is failing.", output: "The test was failing.", terms: []) != .accept)
     }
 }

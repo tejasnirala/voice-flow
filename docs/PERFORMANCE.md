@@ -432,8 +432,12 @@ idle cost; no new threads or timers.
 
 ### 5.2.2 Application awareness (Phase 10), 2026-09-17
 Per dictation: one `NSWorkspace.frontmostApplication` lookup and, for browsers only, two Accessibility calls (100 ms timeout).
-In-app detection time is logged per dictation (`mode … detected in … ms`); owner-use numbers pending. No idle cost: nothing
-observes app switches.
+No idle cost: nothing observes app switches.
+
+Owner test (5 dictations, 2026-09-17): detection 0.00 ms (VS Code, WhatsApp, Notes) and 0.10 ms (Chrome, window title read);
+all five got the intended mode (Developer, Clean, Prompt via ChatGPT/Claude tab, Writing, Developer). End-to-end release →
+pasted 3.1–4.1 s for 22–47 s dictations, of which the on-device rewrite took 1.9–2.6 s; 2 of 5 rewrites were rejected by the
+guard (time spent for nothing). The model step dominates latency in model modes → Phase 11.
 
 ### 5.3 Phase 0 exploration, 2026-09-16 (for reference)
 llama.cpp `llama-bench`, Qwen2.5-1.5B Q4_K_M: Metal pp256 1,033 tok/s, tg64 85 tok/s; CPU 290 / 67 tok/s. A zero-shot

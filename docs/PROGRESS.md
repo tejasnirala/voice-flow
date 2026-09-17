@@ -17,7 +17,7 @@
 | 7 | Local LLM (Smart Mode) | ✅ Complete (2026-09-17) |
 | 8 | Text modes | ✅ Complete (2026-09-17, owner approved) |
 | 9 | Developer intelligence | ✅ Complete (2026-09-17, owner tested) |
-| 10 | Application awareness | 🟡 Implemented 2026-09-17; awaiting owner test |
+| 10 | Application awareness | 🟡 Owner tested 2026-09-17; grammar fixes added, awaiting re-test & approval |
 | 11 | Final performance optimization | ⬜ |
 | 12 | Packaging | ⬜ |
 | 13 | Final audit | ⬜ |
@@ -263,7 +263,7 @@ per 30–60 s, GPU 0, footprint 13 MB.
 - [x] Owner tested Developer corrections, Code mode and the dictionary; approved (2026-09-17)
 - Not handled (no safe context): "we don't need help for now", "forms" vs "form's", Hinglish
 
-## Phase 10 — Application awareness 🟡 (awaiting owner test)
+## Phase 10 — Application awareness 🟡 (owner tested; grammar fixes awaiting re-test)
 - [x] `AppModePolicy` (Core): owner rule → browser AI tab → built-in bundle table → menu mode; `modeByApp` (default on), `appModes`
       (tolerant decoding); 6 tests
 - [x] `TargetApp` (app): receiving app (paste target), browser focused-window title via Accessibility (100 ms timeout, never logged)
@@ -271,9 +271,14 @@ per 30–60 s, GPU 0, footprint 13 MB.
       `mode <m> (<source>) for <bundle id>, detected in <ms>`
 - [x] Menu: resolved mode for the app in front, "Choose Mode by App", "For <App> ▸ Automatic / modes"
 - [x] 139 core tests + 3 app tests pass
-- [ ] **Owner:** dictate in VS Code, a terminal, Slack/WhatsApp, a ChatGPT/Claude browser tab, Notes; set one per-app override;
-      then detection latency is read from the log (PERFORMANCE §5.2.2)
-- Decision to confirm: terminals default to Developer (spec allows Raw/Developer); Code is available per terminal
+- [x] Owner test (2026-09-17): VS Code, WhatsApp, Chrome ChatGPT/Claude tab, Notes: correct mode every time; detection 0.00–0.10 ms
+- [x] Owner-reported grammar issue ("Apples Notes"): apostrophe restoration after rewrites, contraction rules, agreement and
+      sentence-opener allowances in the strict guard, one narrow prompt sentence; broad grammar prompt tried and reverted
+      (more rejections) (ACCURACY §7.4)
+- [x] 143 core tests + 3 app tests pass
+- [ ] **Owner:** re-test grammar (possessives, contractions, "the tests is") and approve Phase 10
+- Found for Phase 11: model modes take 3–4 s end to end (rewrite 1.9–2.6 s); rejected rewrites waste that time
+- Terminals default to Developer (spec allows Raw/Developer); Code available per terminal
 
 ## Phases 6–13
 Per SPEC.md. Notes so far:
@@ -320,7 +325,7 @@ Per SPEC.md. Notes so far:
 ## Session handoff notes
 _Overwrite at the end of every session._
 
-- **Last session (2026-09-17):** Phases 0–9 complete (owner approved). Phase 10 (application awareness) implemented; awaiting owner test.
+- **Last session (2026-09-17):** Phases 0–9 complete (owner approved). Phase 10 (application awareness) owner-tested; grammar fixes added; awaiting re-test.
 - **Models on this machine** (`~/Library/Application Support/VoiceFlow/models/`): **in use:** whisper medium.en-q8_0 +
   ggml-medium.en-encoder.mlmodelc. Benchmark-only (deletable on request): whisper tiny.en, base.en, small.en, large-v3-turbo,
   large-v3-turbo-q8_0 (STT alternate), distil-large-v3; parakeet tdt-0.6b-v3-q8_0.
@@ -328,4 +333,4 @@ _Overwrite at the end of every session._
   `benchmarks-output/results/human/`. Rerunning `scripts/bench/stt.sh human` re-scores instantly.
 - **Mode benchmark data:** `benchmarks-output/results/modes/` (prepared inputs, model JSONL per mode, `report.md` with every
   accepted/rejected rewrite). Re-score after guard changes with `vf-bench modes report … --results …` (no model rerun needed).
-- **Next action:** owner tests Phase 10 per-app modes; read detection latency from the log; then approval → Phase 11.
+- **Next action:** owner re-tests grammar fixes and approves Phase 10 → Phase 11 (performance: model-mode latency first).

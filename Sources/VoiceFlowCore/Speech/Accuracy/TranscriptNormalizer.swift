@@ -28,6 +28,13 @@ public enum TranscriptNormalizer {
         "shouldn't": ["should", "not"], "wouldn't": ["would", "not"], "couldn't": ["could", "not"],
         "ok": ["okay"],
     ]
+    .merging(["dont": ["do", "not"], "doesnt": ["does", "not"], "didnt": ["did", "not"], "isnt": ["is", "not"],
+              "arent": ["are", "not"], "wasnt": ["was", "not"], "werent": ["were", "not"], "havent": ["have", "not"],
+              "hasnt": ["has", "not"], "hadnt": ["had", "not"], "couldnt": ["could", "not"], "shouldnt": ["should", "not"],
+              "wouldnt": ["would", "not"], "im": ["i", "am"], "ive": ["i", "have"], "youre": ["you", "are"],
+              "youve": ["you", "have"], "youll": ["you", "will"], "theyre": ["they", "are"], "theyve": ["they", "have"],
+              "theyll": ["they", "will"], "weve": ["we", "have"], "thats": ["that", "is"], "whats": ["what", "is"],
+              "theres": ["there", "is"]]) { current, _ in current }
 
     /// Lowercased word tokens: punctuation removed (other symbols split), contractions expanded,
     /// number words 0–99 converted to digits so "fifteen" == "15".

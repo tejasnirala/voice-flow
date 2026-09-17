@@ -12,6 +12,17 @@ public enum RuleBasedCleanup {
     /// Lowercase tools and commands that must not be capitalized at the start of a sentence.
     static let keepLowercase: Set<String> = ["npm", "npx", "pnpm", "yarn", "git", "kubectl", "curl", "wget", "ssh", "sudo",
                                              "cd", "ls", "cat", "grep", "vim", "brew", "pip", "python3", "node", "deno", "bun", "make"]
+    /// Contractions written without an apostrophe, only where the bare form isn't also an English word
+    /// ("cant", "wont", "its", "lets", "ill", "were", "id", "hell", "shell", "well" are left alone).
+    static let contractions: [String: String] = [
+        "dont": "don't", "doesnt": "doesn't", "didnt": "didn't", "isnt": "isn't", "arent": "aren't", "wasnt": "wasn't",
+        "werent": "weren't", "havent": "haven't", "hasnt": "hasn't", "hadnt": "hadn't", "couldnt": "couldn't",
+        "shouldnt": "shouldn't", "wouldnt": "wouldn't", "mustnt": "mustn't", "neednt": "needn't", "im": "I'm", "ive": "I've",
+        "youre": "you're", "youve": "you've", "youll": "you'll", "theyre": "they're", "theyve": "they've", "theyll": "they'll",
+        "weve": "we've", "thats": "that's", "whats": "what's", "theres": "there's", "shes": "she's", "hes": "he's",
+        "wouldve": "would've", "couldve": "could've", "shouldve": "should've", "aint": "ain't", "heres": "here's",
+        "wheres": "where's", "whos": "who's", "hows": "how's", "itll": "it'll", "thatll": "that'll",
+    ]
     static let questionStarters: Set<String> = ["what", "why", "how", "when", "where", "who", "which", "should", "can", "could",
                                                 "would", "is", "are", "do", "does", "did", "will", "shall"]
 
@@ -44,6 +55,16 @@ public enum RuleBasedCleanup {
         }
         guard !words.isEmpty else { return "" }
         guard sentenceCase else { return words.joined(separator: " ") }
+
+        // Missing apostrophes in unambiguous contractions ("dont" → "don't"); keeps a capital first letter.
+        for index in words.indices {
+            let token = words[index]
+            let coreEnd = token.lastIndex { $0.isLetter }.map(token.index(after:)) ?? token.startIndex
+            let core = String(token[..<coreEnd])
+            guard core.allSatisfy(\.isLetter), let fixed = contractions[core.lowercased()] else { continue }
+            let cased = core.first!.isUppercase && fixed.first!.isLowercase ? fixed.prefix(1).uppercased() + fixed.dropFirst() : fixed
+            words[index] = cased + token[coreEnd...]
+        }
 
         // 3. Capitalize the first word when it's a plain lowercase word (not npm, getUserById, .env, …).
         let first = words[0]
