@@ -9,18 +9,19 @@ threshold a model must meet, and every result measured so far.
 
 `benchmarks/corpus/developer-speech.json`: **54 phrases** covering spec §4.
 
-| Category | Count | Examples |
-|---|---|---|
-| normal | 6 | "The meeting has been moved to three o'clock." |
-| technical | 12 | "The database is PostgreSQL with Redis for caching." · RabbitMQ, MongoDB, JWT, OAuth, WebSocket, GraphQL, Prisma, Mongoose, AWS/Azure/GCP, Nginx |
-| identifiers | 8 | getUserById, refreshAccessToken, createInvoice, handleSubmit/onSubmit, isAuthenticated/userSession, snake_case/user_session_id, camelCase, useEffect/fetchOrders |
-| commands | 8 | npm run dev, npm install, git rebase main, docker compose up/down, kubectl get pods, git checkout -b feature/login, pnpm |
-| files | 7 | package.json, tsconfig.json, docker-compose.yml, .env, .env.local, nginx.conf, DATABASE_URL |
-| architecture | 5 | "The access token expires after fifteen minutes and the refresh token lasts for one day." |
-| natural | 4 | 20–30 s conversational developer explanations (and one non-technical update) |
-| hinglish | 4 | "Is function mein get user by id call karo aur result ko Redis mein cache kar do." (human recordings only) |
+| Category     | Count | Examples                                                                                                                                                         |
+| ------------ | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| normal       | 6     | "The meeting has been moved to three o'clock."                                                                                                                   |
+| technical    | 12    | "The database is PostgreSQL with Redis for caching." · RabbitMQ, MongoDB, JWT, OAuth, WebSocket, GraphQL, Prisma, Mongoose, AWS/Azure/GCP, Nginx                 |
+| identifiers  | 8     | getUserById, refreshAccessToken, createInvoice, handleSubmit/onSubmit, isAuthenticated/userSession, snake_case/user_session_id, camelCase, useEffect/fetchOrders |
+| commands     | 8     | npm run dev, npm install, git rebase main, docker compose up/down, kubectl get pods, git checkout -b feature/login, pnpm                                         |
+| files        | 7     | package.json, tsconfig.json, docker-compose.yml, .env, .env.local, nginx.conf, DATABASE_URL                                                                      |
+| architecture | 5     | "The access token expires after fifteen minutes and the refresh token lasts for one day."                                                                        |
+| natural      | 4     | 20–30 s conversational developer explanations (and one non-technical update)                                                                                     |
+| hinglish     | 4     | "Is function mein get user by id call karo aur result ko Redis mein cache kar do." (human recordings only)                                                       |
 
 Each entry has:
+
 - `spoken`: what the speaker says. Identifiers are spoken as words ("get user by id"), symbols as words ("dot env").
 - `reference`: the ideal written result ("getUserById", ".env").
 - `terms`: key terms that must be recognized. Alternate pronunciations can be listed:
@@ -28,10 +29,10 @@ Each entry has:
 
 ## 2. Audio sets
 
-| Set | How | Purpose | Limitations |
-|---|---|---|---|
+| Set           | How                                                                                                                                | Purpose                                                        | Limitations                                                                                                                                                                                                                                                                 |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **synthetic** | `scripts/bench/make-audio.sh`: macOS TTS voices Rishi (en-IN), Samantha (en-US), Daniel (en-GB); 50 clips each (Hinglish excluded) | Validate the pipeline; measure performance; rough shortlisting | TTS is clean and evenly paced, and **mispronounces** developer terms ("middle way" for middleware, "database urla" for DATABASE_URL). These show up as identical misses across every model, so the set **can't separate the good models**. Never the basis for the decision |
-| **human** | `scripts/bench/record.sh <mic-label>`: the owner reads the corpus naturally on each microphone they dictate with | **The decision set** | One speaker (which is the actual user); a small set, so ±1 term ≈ ±0.4 pp term accuracy |
+| **human**     | `scripts/bench/record.sh <mic-label>`: the owner reads the corpus naturally on each microphone they dictate with                   | **The decision set**                                           | One speaker (which is the actual user); a small set, so ±1 term ≈ ±0.4 pp term accuracy                                                                                                                                                                                     |
 
 Human clips are retained deliberately for benchmarking under `benchmarks-output/audio/human/` (gitignored,
 never committed, deletable at any time).
@@ -40,29 +41,30 @@ never committed, deletable at any time).
 
 Scoring code: `Sources/VoiceFlowCore/Speech/Accuracy/` (14 unit tests). Report: `vf-bench score`.
 
-| Metric | Definition | Why |
-|---|---|---|
-| **WER** | Word error rate of the raw STT output against the **spoken** words. Case- and punctuation-insensitive. Number words = digits ("fifteen" = "15"). A term the engine recognized counts as one word in any spelling ("getUserById" = "get user by id"). A misheard term is scored word by word. Spoken symbol words ("dot", "slash", "dash", "underscore") are excluded | Did it hear the words? |
-| **Term recognition** | Share of key terms heard correctly in any spelling or listed pronunciation. "Postgresql", "PostgreSQL", "postgres QL" ✓; "post-guessql" ✗ | The developer-vocabulary requirement (spec §2, §13) |
-| **Exact terms** | Share of key terms with the exact canonical spelling in the raw output ("Next.js", "getUserById") | How much formatting is left for Developer mode (Phase 9) |
-| **Formatting WER** | Token error rate against the written reference, case- and punctuation-sensitive | Proxy for punctuation/capitalization quality |
-| Per-category WER | WER within each category | Catch a model that's good on prose but bad on commands |
-| Hallucination check | Manual review of error listings: terms inserted that weren't said (especially with vocabulary prompts) | Rules 8–9 |
+| Metric               | Definition                                                                                                                                                                                                                                                                                                                                                           | Why                                                      |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| **WER**              | Word error rate of the raw STT output against the **spoken** words. Case- and punctuation-insensitive. Number words = digits ("fifteen" = "15"). A term the engine recognized counts as one word in any spelling ("getUserById" = "get user by id"). A misheard term is scored word by word. Spoken symbol words ("dot", "slash", "dash", "underscore") are excluded | Did it hear the words?                                   |
+| **Term recognition** | Share of key terms heard correctly in any spelling or listed pronunciation. "Postgresql", "PostgreSQL", "postgres QL" ✓; "post-guessql" ✗                                                                                                                                                                                                                            | The developer-vocabulary requirement (spec §2, §13)      |
+| **Exact terms**      | Share of key terms with the exact canonical spelling in the raw output ("Next.js", "getUserById")                                                                                                                                                                                                                                                                    | How much formatting is left for Developer mode (Phase 9) |
+| **Formatting WER**   | Token error rate against the written reference, case- and punctuation-sensitive                                                                                                                                                                                                                                                                                      | Proxy for punctuation/capitalization quality             |
+| Per-category WER     | WER within each category                                                                                                                                                                                                                                                                                                                                             | Catch a model that's good on prose but bad on commands   |
+| Hallucination check  | Manual review of error listings: terms inserted that weren't said (especially with vocabulary prompts)                                                                                                                                                                                                                                                               | Rules 8–9                                                |
 
-Limitation: automatic metrics can't judge whether a punctuation choice is *acceptable* (e.g. comma vs
+Limitation: automatic metrics can't judge whether a punctuation choice is _acceptable_ (e.g. comma vs
 period). Formatting WER is a proxy. The error listing is reviewed by hand for the final decision.
 
 ### Proposed acceptance threshold (**needs owner approval**)
+
 Measured on the **human** set, per microphone the owner dictates with:
 
-| Criterion | Threshold |
-|---|---|
-| Overall WER | **≤ 5 %** |
-| Normal-English WER | **≤ 3 %** |
-| Key-term recognition, all categories combined | **≥ 95 %** |
-| Key-term recognition, any single category | **≥ 90 %** |
-| Hallucinated technical terms in normal-English clips | **0** |
-| Latency sanity bound (not a ranking criterion) | warm p95 ≤ 2 s for clips ≤ 10 s |
+| Criterion                                            | Threshold                       |
+| ---------------------------------------------------- | ------------------------------- |
+| Overall WER                                          | **≤ 5 %**                       |
+| Normal-English WER                                   | **≤ 3 %**                       |
+| Key-term recognition, all categories combined        | **≥ 95 %**                      |
+| Key-term recognition, any single category            | **≥ 90 %**                      |
+| Hallucinated technical terms in normal-English clips | **0**                           |
+| Latency sanity bound (not a ranking criterion)       | warm p95 ≤ 2 s for clips ≤ 10 s |
 
 **Selection rule (spec §23):** keep only models meeting every accuracy criterion. Among those, choose the
 lowest warm latency. If latencies are within ~20 %, choose the lower memory footprint. If **no** model
@@ -71,19 +73,20 @@ do not pass the Phase 4 gate until it's resolved (a better model, or an owner de
 
 ## 4. Candidates
 
-| Candidate | Runtime | Why considered | Size on disk |
-|---|---|---|---|
-| Whisper small.en | whisper.cpp | Baseline; fastest plausible English model | 465 MB |
-| Whisper medium.en q8_0 | whisper.cpp | English-only accuracy tier, quantized | 785 MB |
-| Whisper large-v3-turbo (f16) | whisper.cpp | Near large-v3 accuracy with a 4-layer decoder; multilingual (Hinglish possible) | 1549 MB |
-| Whisper large-v3-turbo q8_0 | whisper.cpp | Same, half the size: measures quantization loss | 834 MB |
-| Whisper large-v3-turbo q8_0 + vocabulary prompt | whisper.cpp | Developer-term biasing via `initial_prompt` (hallucination risk measured) | 834 MB |
-| Whisper distil-large-v3 | whisper.cpp | Distilled large-v3, English | 1449 MB |
-| NVIDIA Parakeet TDT 0.6B v3 q8_0 | whisper.cpp (`parakeet.h`) | Top-tier English accuracy on public leaderboards, very fast transducer; same framework, no new dependency. No Hindi | 638 MB |
-| Apple SpeechTranscriber (en-US, en-IN) | macOS Speech framework | Zero dependency; OS-managed model; ~20 MB in-process | OS-managed |
-| Apple SpeechTranscriber + contextual strings | macOS Speech framework | Native vocabulary biasing | OS-managed |
+| Candidate                                       | Runtime                    | Why considered                                                                                                      | Size on disk |
+| ----------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------ |
+| Whisper small.en                                | whisper.cpp                | Baseline; fastest plausible English model                                                                           | 465 MB       |
+| Whisper medium.en q8_0                          | whisper.cpp                | English-only accuracy tier, quantized                                                                               | 785 MB       |
+| Whisper large-v3-turbo (f16)                    | whisper.cpp                | Near large-v3 accuracy with a 4-layer decoder; multilingual (Hinglish possible)                                     | 1549 MB      |
+| Whisper large-v3-turbo q8_0                     | whisper.cpp                | Same, half the size: measures quantization loss                                                                     | 834 MB       |
+| Whisper large-v3-turbo q8_0 + vocabulary prompt | whisper.cpp                | Developer-term biasing via `initial_prompt` (hallucination risk measured)                                           | 834 MB       |
+| Whisper distil-large-v3                         | whisper.cpp                | Distilled large-v3, English                                                                                         | 1449 MB      |
+| NVIDIA Parakeet TDT 0.6B v3 q8_0                | whisper.cpp (`parakeet.h`) | Top-tier English accuracy on public leaderboards, very fast transducer; same framework, no new dependency. No Hindi | 638 MB       |
+| Apple SpeechTranscriber (en-US, en-IN)          | macOS Speech framework     | Zero dependency; OS-managed model; ~20 MB in-process                                                                | OS-managed   |
+| Apple SpeechTranscriber + contextual strings    | macOS Speech framework     | Native vocabulary biasing                                                                                           | OS-managed   |
 
 Not benchmarked (and why):
+
 - **tiny.en / base.en:** failed developer terms in the v1 exploration (e.g. "post-guessql", "npm run they've");
   below the accuracy tier. The accuracy-first rule says not to pursue them.
 - **large-v3 (full):** 2.9 GB. large-v3-turbo is the practical ceiling to try first. Added if nothing
@@ -103,30 +106,31 @@ Not benchmarked (and why):
 234 key-term occurrences. Report: `benchmarks-output/results/synthetic/report.md` (reproduce with
 `scripts/bench/make-audio.sh && scripts/bench/stt.sh synthetic`).
 
-| Configuration | WER | normal | technical | identifiers | commands | files | architecture | natural | **Terms** | Exact | Fmt WER |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| whisper large-v3-turbo (f16) | **2.2%** | 0.0% | 5.6% | 3.6% | 5.8% | 1.7% | 0.6% | 0.4% | **91.9%** (215) | 69.2% | 11.8% |
-| whisper large-v3-turbo q8_0 | **2.3%** | 0.0% | 5.6% | 3.6% | 6.4% | 1.7% | 0.6% | 0.4% | **91.5%** (214) | 68.4% | 11.7% |
-| whisper large-v3-turbo q8_0 + vocabulary prompt | 2.4% | 0.0% | 3.9% | 5.2% | 9.2% | 3.4% | 0.6% | 0.4% | 92.3% (216) | 71.8% | 11.5% |
-| whisper medium.en q8_0 | 2.8% | 0.0% | 5.0% | 3.7% | 5.8% | 3.4% | 3.6% | 1.3% | 91.5% (214) | 62.0% | 11.4% |
-| whisper small.en | 2.8% | 0.5% | 5.0% | 2.2% | 8.1% | 1.7% | 4.2% | 1.2% | 90.6% (212) | 62.0% | 12.3% |
-| Parakeet TDT 0.6B v3 q8_0 | 3.7% | 0.5% | 8.6% | 3.1% | 5.0% | 9.0% | 3.6% | 0.9% | 85.0% (199) | 54.3% | 14.7% |
-| whisper distil-large-v3 | 6.3% | 1.6% | 9.4% | 4.2% | 11.5% | 16.7% | 8.4% | 2.8% | 76.9% (180) | 41.0% | 17.8% |
-| Apple SpeechTranscriber en-US | 11.1% | 0.0% | 18.1% | 8.6% | 18.7% | 26.9% | 15.6% | 5.1% | 58.5% (137) | 18.4% | 24.7% |
-| Apple SpeechTranscriber en-US + contextual strings | 11.1% | 0.0% | 18.1% | 8.6% | 18.7% | 26.9% | 15.6% | 5.1% | 58.5% (137) | 18.4% | 24.7% |
-| Apple SpeechTranscriber en-IN | 11.2% | 0.0% | 18.1% | 8.6% | 18.7% | 26.9% | 15.6% | 5.5% | 58.5% (137) | 18.4% | 24.9% |
+| Configuration                                      | WER      | normal | technical | identifiers | commands | files | architecture | natural | **Terms**       | Exact | Fmt WER |
+| -------------------------------------------------- | -------- | ------ | --------- | ----------- | -------- | ----- | ------------ | ------- | --------------- | ----- | ------- |
+| whisper large-v3-turbo (f16)                       | **2.2%** | 0.0%   | 5.6%      | 3.6%        | 5.8%     | 1.7%  | 0.6%         | 0.4%    | **91.9%** (215) | 69.2% | 11.8%   |
+| whisper large-v3-turbo q8_0                        | **2.3%** | 0.0%   | 5.6%      | 3.6%        | 6.4%     | 1.7%  | 0.6%         | 0.4%    | **91.5%** (214) | 68.4% | 11.7%   |
+| whisper large-v3-turbo q8_0 + vocabulary prompt    | 2.4%     | 0.0%   | 3.9%      | 5.2%        | 9.2%     | 3.4%  | 0.6%         | 0.4%    | 92.3% (216)     | 71.8% | 11.5%   |
+| whisper medium.en q8_0                             | 2.8%     | 0.0%   | 5.0%      | 3.7%        | 5.8%     | 3.4%  | 3.6%         | 1.3%    | 91.5% (214)     | 62.0% | 11.4%   |
+| whisper small.en                                   | 2.8%     | 0.5%   | 5.0%      | 2.2%        | 8.1%     | 1.7%  | 4.2%         | 1.2%    | 90.6% (212)     | 62.0% | 12.3%   |
+| Parakeet TDT 0.6B v3 q8_0                          | 3.7%     | 0.5%   | 8.6%      | 3.1%        | 5.0%     | 9.0%  | 3.6%         | 0.9%    | 85.0% (199)     | 54.3% | 14.7%   |
+| whisper distil-large-v3                            | 6.3%     | 1.6%   | 9.4%      | 4.2%        | 11.5%    | 16.7% | 8.4%         | 2.8%    | 76.9% (180)     | 41.0% | 17.8%   |
+| Apple SpeechTranscriber en-US                      | 11.1%    | 0.0%   | 18.1%     | 8.6%        | 18.7%    | 26.9% | 15.6%        | 5.1%    | 58.5% (137)     | 18.4% | 24.7%   |
+| Apple SpeechTranscriber en-US + contextual strings | 11.1%    | 0.0%   | 18.1%     | 8.6%        | 18.7%    | 26.9% | 15.6%        | 5.1%    | 58.5% (137)     | 18.4% | 24.7%   |
+| Apple SpeechTranscriber en-IN                      | 11.2%    | 0.0%   | 18.1%     | 8.6%        | 18.7%    | 26.9% | 15.6%        | 5.5%    | 58.5% (137)     | 18.4% | 24.9%   |
 
 Latency and memory for the same runs: PERFORMANCE.md §3.
 
 ### 5.2 What the synthetic set shows (and doesn't)
 
-**Shared TTS artifacts.** Many misses are identical across *every* model, because the TTS voice
+**Shared TTS artifacts.** Many misses are identical across _every_ model, because the TTS voice
 mispronounced the term: "middle way" (middleware), "deploy tools / two of us" ("deploy to AWS"),
 "database urla" (DATABASE_URL), "Jitra base" (git rebase), "Cuba Control" (kube control), "eid" (id).
 Every Whisper model tops out at ~91–92% term recognition largely **because of the audio**, so this set
 **can't** separate small.en, medium.en and large-v3-turbo. The threshold can't be evaluated on it either.
 
 **What it does establish:**
+
 1. **Apple SpeechTranscriber is eliminated.** 58.5% term recognition; files 26.9% WER. Contextual strings
    produced byte-identical output (no measurable effect), and en-IN behaved the same as en-US.
 2. **distil-large-v3 is eliminated.** Worse than small.en on every developer category, and slower than large-v3-turbo.
@@ -143,15 +147,96 @@ Every Whisper model tops out at ~91–92% term recognition largely **because of 
 
 ### 5.3 Shortlist for the human-voice benchmark
 
-| Finalist | Why |
-|---|---|
-| **whisper large-v3-turbo q8_0** | Lowest WER; best technical/files/architecture/natural; multilingual (Hinglish possible). **Provisional default** |
-| whisper medium.en q8_0 | Same term recognition on synthetic, ~30% faster |
-| whisper small.en | Surprisingly close on synthetic; if it holds up on real speech it's ~4× faster and ~350 MB smaller |
-| Parakeet TDT 0.6B v3 q8_0 | Speed reference; must prove itself on real speech |
-| + large-v3-turbo q8_0 with vocabulary prompt | Only kept if it improves real speech without hallucinations |
+| Finalist                                     | Why                                                                                                              |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **whisper large-v3-turbo q8_0**              | Lowest WER; best technical/files/architecture/natural; multilingual (Hinglish possible). **Provisional default** |
+| whisper medium.en q8_0                       | Same term recognition on synthetic, ~30% faster                                                                  |
+| whisper small.en                             | Surprisingly close on synthetic; if it holds up on real speech it's ~4× faster and ~350 MB smaller               |
+| Parakeet TDT 0.6B v3 q8_0                    | Speed reference; must prove itself on real speech                                                                |
+| + large-v3-turbo q8_0 with vocabulary prompt | Only kept if it improves real speech without hallucinations                                                      |
 
-### 5.4 Human set
+### 5.4 Human set, macbook-mic, 2026-09-17 (the decision set)
 
-**Not yet recorded.** Pending the owner running `scripts/bench/record.sh <mic-label>` (see DEVELOPMENT.md).
-The STT model is decided here against the §3 threshold, at the latest during the Phase 4 accuracy gate.
+**Conditions:** owner's voice, MacBook Air built-in microphone, recorded with `scripts/bench/record.sh`;
+50 clips (Hinglish not recorded), 450 s total, 4.9–39.2 s per clip; 78 key-term occurrences. Engines and
+settings as §5.1, plus `+vocab` runs for small.en and medium.en. Scored after the contraction fix
+(§5.5). Report: `benchmarks-output/results/human/report.md`.
+
+| Configuration | WER | normal | technical | identifiers | commands | files | architecture | natural | **Terms** | Exact | Fmt WER |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| **whisper medium.en q8_0 + vocab** | **2.1%** | 0.0% | 1.7% | 0.0% | 0.0% | 7.5% | 5.5% | 2.2% | **97.4%** (76/78) | 79.5% | 12.4% |
+| **whisper large-v3-turbo q8_0 + vocab** | **2.0%** | 0.0% | 1.7% | 0.0% | 2.3% | 0.0% | 3.6% | 3.0% | **97.4%** (76/78) | 73.1% | 11.6% |
+| whisper large-v3-turbo (f16) | 2.1% | 0.0% | 1.7% | 0.0% | 4.3% | 0.0% | 7.3% | 2.2% | 93.6% (73/78) | 60.3% | 14.1% |
+| whisper large-v3-turbo q8_0 | 2.3% | 0.0% | 1.7% | 0.0% | 4.3% | 0.0% | 9.1% | 2.2% | 92.3% (72/78) | 59.0% | 15.1% |
+| whisper medium.en q8_0 | 3.1% | 0.0% | 3.3% | 0.0% | 4.3% | 10.0% | 5.5% | 2.6% | 92.3% (72/78) | 64.1% | 14.8% |
+| whisper small.en + vocab | 4.0% | 0.0% | 3.3% | 1.6% | 18.0% | 10.0% | 3.6% | 2.2% | 93.6% (73/78) | 70.5% | 17.3% |
+| whisper small.en | 4.1% | 0.0% | 7.5% | 0.0% | 2.3% | 10.0% | 10.9% | 2.2% | 92.3% (72/78) | 65.4% | 16.4% |
+| whisper distil-large-v3 | 6.7% | 1.5% | 8.3% | 1.6% | 8.0% | 19.6% | 12.7% | 4.3% | 75.6% (59/78) | 42.3% | 19.6% |
+| Parakeet TDT 0.6B v3 q8_0 | 6.8% | 1.5% | 8.3% | 1.6% | 13.5% | 18.6% | 16.4% | 3.0% | 79.5% (62/78) | 48.7% | 17.6% |
+| Apple SpeechTranscriber en-US (± contextual strings) | 11.1% | 0.0% | 16.4% | 11.1% | 9.8% | 28.9% | 16.4% | 7.2% | 61.5% (48/78) | 24.4% | 24.2% |
+| Apple SpeechTranscriber en-IN | 12.0% | 1.5% | 14.8% | 14.1% | 16.4% | 28.9% | 21.4% | 6.4% | 57.7% (45/78) | 21.8% | 25.8% |
+
+Term recognition by category (threshold: every category ≥ 90%):
+
+| Configuration | technical | identifiers | commands | files | architecture | natural |
+|---|---|---|---|---|---|---|
+| medium.en q8_0 + vocab | 100% (24/24) | 100% (12/12) | 100% (8/8) | **88.9%** (8/9) | 100% (10/10) | 93.3% (14/15) |
+| large-v3-turbo q8_0 + vocab | 100% (24/24) | 100% (12/12) | **87.5%** (7/8) | 100% (9/9) | 100% (10/10) | 93.3% (14/15) |
+| large-v3-turbo (f16) | 100% | 100% | 75.0% | 100% | 80.0% | 93.3% |
+| large-v3-turbo q8_0 | 100% | 100% | 75.0% | 100% | 70.0% | 93.3% |
+| medium.en q8_0 | 95.8% | 100% | 75.0% | 77.8% | 100% | 93.3% |
+| small.en + vocab | 100% | 100% | 62.5% | 88.9% | 100% | 93.3% |
+| small.en | 95.8% | 100% | 87.5% | 88.9% | 80.0% | 93.3% |
+
+**Every remaining error of the two finalists (reviewed by hand):**
+
+| Clip | medium.en q8_0 + vocab | large-v3-turbo q8_0 + vocab |
+|---|---|---|
+| files-06 | ❌ "nginx.**com**" for nginx.conf (substitution; changes meaning) | ✓ |
+| commands-06 | ✓ "kubectl" | "cube control get pods": homophone of the spoken "kube control" (see decision D2) |
+| natural-01 | ✓ | ❌ **inserted** "run dev": "run npm install, run dev and then npm run dev" (a phrase not spoken) |
+| natural-03 | "help" for Helm | "help" for Helm |
+| (shared by *all* Whisper runs) | "with **a** Redis", "documents **to** MongoDB", "message… result", dropped "the" (natural-01/02), "into Redis" | same |
+
+### 5.5 Findings from the human set
+
+1. **Real speech separates the models; synthetic speech didn't.** Without the vocabulary prompt, every
+   Whisper model misses 5–6 of 78 terms ("gate rebase", "Radis", "Reddish", "radius", "PostgresSQL",
+   "Rabit Amq", "nginx.com", "QuestGrace SQL"). **No configuration without the prompt meets the ≥95% term
+   threshold.**
+2. **The vocabulary prompt is decisive on real speech.** +4 terms for large-v3-turbo and medium.en.
+   Latency cost is modest here: +11% (1.28 → 1.42 s) and +14% (0.73 → 0.84 s), unlike the 1.6× seen on
+   synthetic audio. No technical terms were inserted into normal-English clips (normal WER 0.0%).
+   **But** large-v3-turbo + vocab inserted an unspoken phrase once (natural-01). That's a hallucination
+   risk to monitor (rules 8–9). small.en + vocab degraded commands badly ("npm rendev", "rungit").
+3. **Finalists are tied on accuracy** (76/78 terms each, WER 2.0% vs 2.1%). Each fails exactly one
+   per-category criterion by a single term (medium.en: files 8/9; large-v3-turbo: commands 7/8). With
+   8–10 terms per category, one term is 10+ pp, so **the per-category criterion is too noisy at this sample
+   size to separate them**.
+4. **Eliminated on real speech:** small.en (with and without vocab), distil-large-v3, Parakeet (79.5%;
+   commands 50%, files 55.6%), Apple SpeechTranscriber (≤61.5%).
+5. **Scoring fix applied:** the normalizer treated "I'll" vs "I will" (and "I'm/I am", "Ok/Okay") as
+   errors. That was the *entire* 3.2% normal-English WER of every Whisper model. Contractions and informal
+   spellings are now equivalent (unit-tested). No other numbers were changed.
+
+### 5.6 Provisional decision and what closes it (Phase 4 gate)
+
+**Provisional default: Whisper medium.en q8_0 + developer vocabulary prompt.** Equal accuracy to
+large-v3-turbo + vocab on the owner's voice, no hallucinated insertion observed, ~41% lower latency
+(0.84 s vs 1.42 s mean; PERFORMANCE.md §3.3). Trade-off: English-only (no Hinglish).
+**large-v3-turbo q8_0 + vocab stays the alternate.**
+
+Open items, to resolve before Phase 4 passes:
+
+| # | Item | Why |
+|---|---|---|
+| D1 | **Owner review of reading variations.** Listen to the flagged clips and confirm what was said; confirmed differences go into `benchmarks-output/audio/human/macbook-mic/spoken-overrides.json` | The corpus script isn't ground truth when the speaker paraphrased. All models are currently penalized for it |
+| D2 | **Accept "cube control" as a recognized pronunciation of kubectl?** It's phonetically what "kube control" sounds like; the exact spelling is still scored separately | Scoring policy (owner decision) |
+| D3 | **Approve the threshold**, possibly with the per-category criterion applied only to categories with ≥ 20 term occurrences (or pooled across two recording takes) | The per-category rule is noisy at 8–10 terms |
+| D4 | **More real speech:** a second take on the MacBook mic, plus any other mic you dictate with (AirPods/iPhone), and in-app recordings in Phase 4 | Break the tie; check the vocab-prompt insertion rate |
+| D5 | **Helm → "help" in every model:** listen to natural-03 | Pronunciation vs model limit |
+
+Clips to listen to for D1/D5 (`afplay benchmarks-output/audio/human/macbook-mic/<id>.wav`):
+technical-03 ("with a Redis"?), technical-04 ("documents to MongoDB"?), architecture-04 ("message… result"?),
+architecture-05 ("cache the responses"?), natural-01 (dropped "the" ×2, "into Redis"?), natural-02 (dropped
+"the"?), natural-03 ("Helm" or "help"?), commands-03 ("git" or "gate"?).

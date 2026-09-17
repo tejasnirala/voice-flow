@@ -12,6 +12,13 @@ import Testing
         #expect(TranscriptNormalizer.words("three o'clock") == ["3", "oclock"])
     }
 
+    @Test func expandsContractionsAndInformalSpellings() {
+        #expect(TranscriptNormalizer.words("I'll be there, I’m sure") == TranscriptNormalizer.words("I will be there, I am sure"))
+        #expect(TranscriptNormalizer.words("Ok, don't") == ["okay", "do", "not"])
+        #expect(TranscriptNormalizer.words("the form's prop") == ["the", "forms", "prop"])
+        #expect(TranscriptNormalizer.words("'quoted'") == ["quoted"])
+    }
+
     @Test func termKeysAreSeparatorFree() {
         #expect(TranscriptNormalizer.key("Next.js") == "nextjs")
         #expect(TranscriptNormalizer.key("npm run dev") == "npmrundev")

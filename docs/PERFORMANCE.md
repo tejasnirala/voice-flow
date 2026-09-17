@@ -105,6 +105,29 @@ framework is 15–30× slower and saturates ~4 cores, so Metal is required.** Th
 what the thread count alone explains. The prebuilt framework's CPU path may not be optimal; not investigated,
 since Metal is available on every target Mac.
 
+### 3.3 Human set (owner's voice, MacBook mic), 2026-09-17
+50 clips, 4.9–39.2 s (450 s total; recordings include natural pauses). Same harness and settings.
+
+| Configuration | Model MB | Load s | First run s | Mean latency s | p95 s | Max s | Mean RTF | CPU s/clip | GPU s/clip | Footprint after load MB | Peak MB |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| whisper small.en | 465 | 0.38 | 0.29 | 0.267 | 0.499 | 1.034 | 0.032 | 0.024 | 0.246 | 708 | 757 |
+| whisper small.en + vocab | 465 | 0.30 | 0.29 | 0.300 | 0.576 | 0.869 | 0.037 | 0.037 | 0.258 | 708 | 786 |
+| whisper medium.en q8_0 | 785 | 0.43 | 0.69 | 0.733 | 1.143 | 2.045 | 0.092 | 0.034 | 0.703 | 1131 | 1177 |
+| **whisper medium.en q8_0 + vocab** | 785 | 0.46 | 0.80 | **0.837** | **1.318** | 2.281 | 0.106 | 0.059 | 0.736 | 1131 | 1205 |
+| whisper large-v3-turbo (f16) | 1549 | 0.78 | 1.02 | 1.103 | 1.311 | 2.539 | 0.143 | 0.030 | 1.031 | 1827 | 1858 |
+| whisper large-v3-turbo q8_0 | 834 | 0.41 | 1.21 | 1.277 | 1.450 | 2.816 | 0.166 | 0.025 | 1.234 | 1051 | 1106 |
+| **whisper large-v3-turbo q8_0 + vocab** | 834 | 0.33 | 1.47 | **1.418** | **1.596** | 3.002 | 0.186 | 0.032 | 1.362 | 1052 | 1141 |
+| whisper distil-large-v3 | 1449 | 0.76 | 1.28 | 1.391 | 1.533 | 2.949 | 0.182 | 0.024 | 1.350 | 1712 | 1753 |
+| Parakeet TDT 0.6B v3 q8_0 | 638 | 0.28 | 0.15 | 0.158 | 0.421 | 0.733 | 0.017 | 0.023 | 0.145 | 727 | 773 |
+| Apple SpeechTranscriber en-US | OS | 0.00 | 0.36 | 0.118 | 0.280 | 0.449 | 0.014 | n/a | n/a | 3* | 14* |
+
+Notes:
+- On real speech the vocabulary prompt costs +11–14% latency for medium.en and large-v3-turbo (synthetic:
+  median +62%). Measure again in-app.
+- Unlike the synthetic run, f16 large-v3-turbo was faster than q8_0 here (1.10 vs 1.28 s mean). Both
+  runs were single passes; run-to-run variance hasn't been measured yet (Phase 6).
+- Both finalists are within the latency sanity bound (p95 ≤ 2 s) and use ~1.1–1.2 GB while loaded.
+
 ---
 
 ## 4. LLM (Smart Mode), preliminary

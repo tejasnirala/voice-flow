@@ -12,6 +12,7 @@
 # Output: benchmarks-output/results/<set>/*.jsonl and a markdown report on stdout
 # (also saved as benchmarks-output/results/<set>/report.md). Missing models are skipped.
 # Completed runs are reused (resume after interruption); FORCE=1 reruns everything.
+# Re-scoring only (e.g. after adding spoken-overrides.json) is instant: rerun the script; all runs are cached.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -33,7 +34,9 @@ fi
 # run name | engine | model (path or locale) | backend | prompt/vocabulary file
 CONFIGS=(
   "whisper-small.en|whisper|$M/whisper/ggml-small.en.bin|metal|"
+  "whisper-small.en+vocab|whisper|$M/whisper/ggml-small.en.bin|metal|$VOCAB"
   "whisper-medium.en-q8_0|whisper|$M/whisper/ggml-medium.en-q8_0.bin|metal|"
+  "whisper-medium.en-q8_0+vocab|whisper|$M/whisper/ggml-medium.en-q8_0.bin|metal|$VOCAB"
   "whisper-large-v3-turbo|whisper|$M/whisper/ggml-large-v3-turbo.bin|metal|"
   "whisper-large-v3-turbo-q8_0|whisper|$M/whisper/ggml-large-v3-turbo-q8_0.bin|metal|"
   "whisper-large-v3-turbo-q8_0+vocab|whisper|$M/whisper/ggml-large-v3-turbo-q8_0.bin|metal|$VOCAB"
@@ -79,6 +82,7 @@ for cfg in "${CONFIGS[@]}"; do
 done
 
 swift build -c release --product vf-bench 2>&1 | grep -E "error" || true
-"$(swift build -c release --show-bin-path)/vf-bench" score "$CORPUS" "$OUT"/*.jsonl --errors > "$OUT/report.md"
+"$(swift build -c release --show-bin-path)/vf-bench" score "$CORPUS" "$OUT"/*.jsonl --errors \
+  --overrides-dir "benchmarks-output/audio/$SET" > "$OUT/report.md"
 awk '/^## Errors/{exit} {print}' "$OUT/report.md"
 echo "Full report with per-clip errors: $OUT/report.md"

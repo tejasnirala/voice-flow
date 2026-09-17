@@ -4,6 +4,11 @@ import VoiceFlowCore
 // vf-bench — scores STT benchmark output against the developer-speech corpus.
 //
 //   swift run vf-bench score benchmarks/corpus/developer-speech.json results/*.jsonl [--errors] [--by-voice]
+//                            [--overrides-dir benchmarks-output/audio/human]
+//
+// --overrides-dir: for each voice, `<dir>/<voice>/spoken-overrides.json` ({"clip-id": "what was actually
+// said"}) replaces the corpus `spoken` text for that recording. It's for human-reviewed corrections when the
+// speaker deviated from the script, so a model isn't penalized for transcribing what was really said.
 //
 // Input: JSONL written by scripts/bench/stt_engines.swift. Each line is either a
 // transcription {"type":"clip",...} or a per-run summary {"type":"run",...}.
@@ -41,7 +46,19 @@ guard args.first == "score", args.count >= 3 else {
 }
 let showErrors = args.contains("--errors")
 let byVoice = args.contains("--by-voice")
-let files = args.dropFirst(2).filter { !$0.hasPrefix("--") }
+let overridesDir = args.firstIndex(of: "--overrides-dir").flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
+let files = args.dropFirst(2).filter { !$0.hasPrefix("--") && $0 != overridesDir }
+
+var overrideCache: [String: [String: String]] = [:]
+@MainActor func spokenText(for entry: BenchmarkCorpus.Entry, voice: String?) -> (text: String, overridden: Bool) {
+    guard let dir = overridesDir, let voice else { return (entry.spoken, false) }
+    if overrideCache[voice] == nil {
+        let url = URL(fileURLWithPath: dir).appendingPathComponent(voice).appendingPathComponent("spoken-overrides.json")
+        overrideCache[voice] = (try? JSONDecoder().decode([String: String].self, from: Data(contentsOf: url))) ?? [:]
+    }
+    if let text = overrideCache[voice]?[entry.id] { return (text, true) }
+    return (entry.spoken, false)
+}
 let corpus = try BenchmarkCorpus.load(from: URL(fileURLWithPath: args[1]))
 let entries = Dictionary(uniqueKeysWithValues: corpus.entries.map { ($0.id, $0) })
 
@@ -75,6 +92,7 @@ print("WER = word error rate vs the spoken words, spelling-agnostic (lower is be
 print("| Run | Clips | WER | " + categories.map { "WER \($0.rawValue)" }.joined(separator: " | ") + " | Terms | Exact | Fmt WER |")
 print("|" + String(repeating: "---|", count: 6 + categories.count))
 var errorReport: [String] = []
+var termsByCategory: [String: [BenchmarkCorpus.Category: (hit: Int, total: Int)]] = [:]
 for run in order {
     guard let lines = clips[run] else { continue }
     var total = EditCounts(), formatted = EditCounts()
@@ -82,12 +100,16 @@ for run in order {
     var termsTotal = 0, termsHit = 0, termsExact = 0
     for l in lines {
         guard let e = entries[l.id ?? ""] else { continue }
-        let s = AccuracyScorer.score(reference: e.reference, spoken: e.spoken, hypothesis: l.text ?? "", terms: e.terms)
+        let spoken = spokenText(for: e, voice: l.voice)
+        let s = AccuracyScorer.score(reference: e.reference, spoken: spoken.text, hypothesis: l.text ?? "", terms: e.terms)
+        termsByCategory[run, default: [:]][e.category, default: (0, 0)].hit += s.recognizedTerms.count
+        termsByCategory[run, default: [:]][e.category, default: (0, 0)].total += e.terms.count
         total = total + s.words; formatted = formatted + s.formatted
         perCategory[e.category, default: EditCounts()] = perCategory[e.category, default: EditCounts()] + s.words
         termsTotal += e.terms.count; termsHit += s.recognizedTerms.count; termsExact += s.exactTerms.count
         if showErrors && (s.words.errors > 0 || !s.missedTerms.isEmpty) {
             errorReport.append("- **\(run)** `\(e.id)` [\(l.voice ?? "")] WER \(pct(s.words.rate))"
+                + (spoken.overridden ? " (reviewed reference)" : "")
                 + (s.missedTerms.isEmpty ? "" : " · missed: \(s.missedTerms.joined(separator: ", "))")
                 + "\n  - ref: \(e.reference)\n  - hyp: \(l.text ?? "")")
         }
@@ -97,6 +119,18 @@ for run in order {
     let exactRate = termsTotal == 0 ? 0 : Double(termsExact) / Double(termsTotal)
     print("| \(run) | \(lines.count) | **\(pct(total.rate))** | " + catCols.joined(separator: " | ")
           + " | **\(pct(termRate))** (\(termsHit)/\(termsTotal)) | \(pct(exactRate)) | \(pct(formatted.rate)) |")
+}
+
+print("\n### Term recognition by category\n")
+let termCategories = categories.filter { c in termsByCategory.values.contains { ($0[c]?.total ?? 0) > 0 } }
+print("| Run | " + termCategories.map(\.rawValue).joined(separator: " | ") + " |")
+print("|" + String(repeating: "---|", count: 1 + termCategories.count))
+for run in order where clips[run] != nil {
+    let cols = termCategories.map { c -> String in
+        guard let t = termsByCategory[run]?[c], t.total > 0 else { return "—" }
+        return "\(pct(Double(t.hit) / Double(t.total))) (\(t.hit)/\(t.total))"
+    }
+    print("| \(run) | " + cols.joined(separator: " | ") + " |")
 }
 
 print("\n## Performance\n")

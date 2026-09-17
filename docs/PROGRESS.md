@@ -7,8 +7,8 @@
 
 | Phase | Name | Status |
 |---|---|---|
-| 0 | Machine & architecture discovery | 🟡 **Complete, awaiting owner approval** (2026-09-16) |
-| 1 | Native macOS shell | ⏭️ Next (after approval) |
+| 0 | Machine & architecture discovery | ✅ Complete (2026-09-17; STT model final at Phase 4 gate) |
+| 1 | Native macOS shell | ⏭️ **Next** |
 | 2 | Global hotkey | ⬜ |
 | 3 | Audio recording | ⬜ |
 | 4 | STT integration (+ accuracy gate) | ⬜ |
@@ -37,7 +37,7 @@ benchmark → fix → review → CPU/RAM check → docs + this file → show cha
   STT candidates re-evaluated at the accuracy tier, developer-speech corpus + scorer + harness built,
   docs consolidated to ARCHITECTURE / ACCURACY / PERFORMANCE / DEVELOPMENT.
 
-## Phase 0 — Machine & architecture discovery 🟡
+## Phase 0 — Machine & architecture discovery ✅
 
 **Done**
 - Machine and toolchain inspected → ARCHITECTURE.md §1
@@ -59,15 +59,21 @@ benchmark → fix → review → CPU/RAM check → docs + this file → show cha
 - Validated: clean build, 14 tests pass, app launches (14 MB footprint, 0.0% CPU) and quits; bundle 196 KB
   (executable grew 60 → 188 KB because it links VoiceFlowCore's scorer)
 
-**Owner decisions needed to close Phase 0**
-1. Approve the accuracy threshold (ACCURACY.md §3).
-2. Record the corpus with your own voice (`scripts/bench/record.sh macbook-mic`, ~15 min), plus
-   AirPods or iPhone if you dictate with them. The STT model decision is made on these recordings.
-   It can happen now or at the start of Phase 4, but must happen before Phase 4 finishes.
-3. Approve moving on to Phase 1.
+- **Owner-voice benchmark (MacBook mic, 50 clips), 2026-09-17** → ACCURACY.md §5.4–5.6:
+  - Without the developer vocabulary prompt, **no model meets ≥95% term recognition** (best 93.6%)
+  - **medium.en q8_0 + vocab**: 2.1% WER, 97.4% terms, 0.84 s mean → **provisional default**
+  - large-v3-turbo q8_0 + vocab: 2.0% WER, 97.4% terms, 1.42 s mean; one hallucinated insertion → alternate
+  - Eliminated on real speech: small.en (±vocab), Parakeet, distil-large-v3, Apple SpeechTranscriber
+  - Scorer fix: contractions / "ok" treated as equivalent (was the whole 3.2% normal-English WER); 15 tests
+  - `vf-bench`: per-category term table; `--overrides-dir` for reviewed "what was actually said" corrections
+- Owner approved moving forward (2026-09-17)
 
 **Leftovers carried forward**
-- Final STT model choice: pending human-voice benchmark (Phase 4 gate at the latest).
+- **Phase 4 gate (STT model final), open items D1–D5 in ACCURACY.md §5.6:**
+  D1 owner listens to flagged clips → `spoken-overrides.json`; D2 accept "cube control" for kubectl?;
+  D3 approve threshold (per-category rule noisy at 8–10 terms); D4 more recordings (second take, other mics,
+  in-app); D5 Helm → "help" in every model. Also measure the vocab-prompt insertion rate, and add an
+  inserted/repeated n-gram guard to the engine.
 - Hinglish: needs human recordings plus a multilingual model run (large-v3-turbo with language auto/hi).
 - MLX and Apple Foundation Models LLM comparison: Phase 7.
 - "VoiceFlow Dev" signing identity: create before Phase 3 (DEVELOPMENT.md).
@@ -76,7 +82,7 @@ benchmark → fix → review → CPU/RAM check → docs + this file → show cha
   targets macOS 14+). `scripts/bench/record.swift` still uses the old API (dev tool; warning only).
 - Phase 6: Whisper latency is ~fixed per clip (30 s encoder window). Evaluate `audio_ctx` reduction only with
   an unchanged human-set accuracy. Handle the one-time Metal shader compile per new binary.
-- Whisper vocabulary prompt: 1.6–6× slower with no clear gain on synthetic. Re-test on the human set.
+- Vocabulary prompt: decisive on real speech (+4 terms, +11–14% latency) but produced one unspoken insertion with large-v3-turbo. Keep, guard, and re-measure.
 
 ## Phase 1 — Native macOS shell ⏭️
 - [ ] Menu bar item + minimal menu (state line, Fast/Smart toggle placeholder, Settings…, Quit)
@@ -117,6 +123,7 @@ Per SPEC.md. Notes so far:
 | 2026-09-16 | whisper.cpp framework as STT runtime (runs Whisper and Parakeet) | In-process, Metal, no daemon, prebuilt, replaceable behind a protocol | ARCHITECTURE §4 |
 | 2026-09-16 | STT model chosen on the owner's recordings, never on synthetic audio alone | TTS audio isn't representative of real accents/pace (spec §3) | ACCURACY §2 |
 | 2026-09-17 | Provisional STT default: Whisper large-v3-turbo q8_0 on Metal; Apple Speech, distil-large-v3 and CPU backend eliminated | Synthetic benchmark: lowest WER; Apple 58.5% terms; CPU 15–30× slower | ARCHITECTURE §4 |
+| 2026-09-17 | Provisional STT: **medium.en q8_0 + developer vocabulary prompt**; large-v3-turbo q8_0 + prompt as alternate | Owner-voice benchmark: tied at 97.4% terms, no insertion observed, 41% faster; no prompt-less model reaches 95% | ARCHITECTURE §4.3, ACCURACY §5.6 |
 | 2026-09-16 | Carbon RegisterEventHotKey; Esc cancel registered only while recording | Press+release, no permission, zero idle cost | ARCHITECTURE §3.3 |
 | 2026-09-16 | Clipboard + ⌘V with full snapshot/restore; never lose speech | Works in Electron/terminals/browsers | ARCHITECTURE §3.4 |
 | 2026-09-16 | llama.cpp in-process (provisional); Ollama rejected | No daemon/IPC; MLX re-evaluated in Phase 7 | ARCHITECTURE §3.5 |
@@ -124,9 +131,10 @@ Per SPEC.md. Notes so far:
 ## Session handoff notes
 _Overwrite at the end of every session._
 
-- **Last session (2026-09-17):** Phase 0 redone for spec v2 (synthetic STT benchmark complete), awaiting owner approval.
+- **Last session (2026-09-17):** Phase 0 closed after the owner-voice benchmark; starting Phase 1.
 - **Models on this machine** (`~/Library/Application Support/VoiceFlow/models/`): whisper tiny.en, base.en,
   small.en, medium.en-q8_0, large-v3-turbo, large-v3-turbo-q8_0, distil-large-v3; parakeet tdt-0.6b-v3-q8_0;
   llm qwen2.5-1.5b-instruct-q4_k_m.
-- **Synthetic audio + results:** `benchmarks-output/` (gitignored; regenerate with the scripts).
-- **Next action:** owner approval → optionally record own-voice corpus → Phase 1.
+- **Owner recordings:** `benchmarks-output/audio/human/macbook-mic/` (50 clips, gitignored). Results cached in
+  `benchmarks-output/results/human/`. Rerunning `scripts/bench/stt.sh human` re-scores instantly.
+- **Next action:** Phase 1 checklist above. The Phase 4 gate items (D1–D5) are waiting on the owner.

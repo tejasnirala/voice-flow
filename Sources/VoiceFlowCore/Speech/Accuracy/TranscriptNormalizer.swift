@@ -1,3 +1,5 @@
+import Foundation
+
 /// Normalizes transcripts for spelling-agnostic accuracy scoring.
 ///
 /// Scoring asks "did the engine hear the right words?", separately from "did it format them
@@ -11,18 +13,40 @@ public enum TranscriptNormalizer {
                         "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"]
     static let tens = ["twenty": 20, "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90]
 
-    /// Lowercased word tokens: punctuation removed (apostrophes dropped, other symbols split),
+    /// Equivalent spellings that aren't recognition errors: contractions (a speaker saying "I'll" and an
+    /// engine writing "I will" heard the same words) and informal spellings. Matched before apostrophes are removed.
+    static let equivalents: [String: [String]] = [
+        "i'm": ["i", "am"], "i'll": ["i", "will"], "i've": ["i", "have"], "i'd": ["i", "would"],
+        "you're": ["you", "are"], "you'll": ["you", "will"], "you've": ["you", "have"],
+        "we're": ["we", "are"], "we'll": ["we", "will"], "we've": ["we", "have"],
+        "they're": ["they", "are"], "they'll": ["they", "will"], "they've": ["they", "have"],
+        "it's": ["it", "is"], "that's": ["that", "is"], "there's": ["there", "is"], "what's": ["what", "is"],
+        "let's": ["let", "us"], "can't": ["can", "not"], "cannot": ["can", "not"], "won't": ["will", "not"],
+        "don't": ["do", "not"], "doesn't": ["does", "not"], "didn't": ["did", "not"],
+        "isn't": ["is", "not"], "aren't": ["are", "not"], "wasn't": ["was", "not"], "weren't": ["were", "not"],
+        "haven't": ["have", "not"], "hasn't": ["has", "not"], "hadn't": ["had", "not"],
+        "shouldn't": ["should", "not"], "wouldn't": ["would", "not"], "couldn't": ["could", "not"],
+        "ok": ["okay"],
+    ]
+
+    /// Lowercased word tokens: punctuation removed (other symbols split), contractions expanded,
     /// number words 0–99 converted to digits so "fifteen" == "15".
     public static func words(_ text: String) -> [String] {
         var cleaned = ""
         cleaned.reserveCapacity(text.count)
         for ch in text.lowercased() {
-            if ch.isLetter || ch.isNumber { cleaned.append(ch) }
-            else if ch == "'" || ch == "’" { continue }
+            if ch.isLetter || ch.isNumber || ch == "'" { cleaned.append(ch) }
+            else if ch == "’" { cleaned.append("'") }
             else { cleaned.append(" ") }
         }
-        let raw = cleaned.split(separator: " ").map(String.init)
-        return numbersToDigits(raw)
+        var tokens: [String] = []
+        for raw in cleaned.split(separator: " ") {
+            let token = raw.trimmingCharacters(in: CharacterSet(charactersIn: "'"))
+            guard !token.isEmpty else { continue }
+            if let expansion = equivalents[token] { tokens.append(contentsOf: expansion) }
+            else { tokens.append(token.replacingOccurrences(of: "'", with: "")) }
+        }
+        return numbersToDigits(tokens)
     }
 
     static func numbersToDigits(_ tokens: [String]) -> [String] {
