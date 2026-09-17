@@ -5,35 +5,21 @@ import PackageDescription
 // Command Line Tools. `scripts/build-app.sh` wraps the executable in a .app bundle.
 //
 // Targets:
-//   VoiceFlowCore — pure logic (state machine, configuration, modes, prompts,
-//                   instrumentation). No AppKit/AVFoundation, fully unit-testable.
-//   VoiceFlow     — the menu-bar executable: hardware/OS boundaries (hotkey,
-//                   audio, permissions, insertion, UI) and native model runtimes.
+//   VoiceFlowCore — platform-independent logic (state machine, settings, text
+//                   processing, accuracy scoring). No AppKit/AVFoundation; unit-tested.
+//   VoiceFlow     — the menu-bar app: OS/hardware boundaries (hotkey, audio,
+//                   permissions, insertion, UI) and native inference runtimes.
+//   vf-bench      — developer tool: scores STT benchmark results against the corpus.
+//
+// Native STT benchmark engines live in scripts/bench/ (compiled with swiftc against
+// Vendor/whisper.xcframework) so a plain `swift build` never requires Vendor/.
 let package = Package(
     name: "VoiceFlow",
     platforms: [.macOS(.v14)],
     targets: [
-        .target(
-            name: "VoiceFlowCore",
-            path: "VoiceFlow",
-            // Both targets share the VoiceFlow/ root, so each lists its own folders in
-            // `sources` and the other target's folders in `exclude`. Add folders as they
-            // gain code (Core: Configuration, Intelligence; app: Audio, Speech, Input,
-            // Permissions, ApplicationContext, UI).
-            exclude: ["App"],
-            sources: ["Core"]
-        ),
-        .executableTarget(
-            name: "VoiceFlow",
-            dependencies: ["VoiceFlowCore"],
-            path: "VoiceFlow",
-            exclude: ["Core"],
-            sources: ["App"]
-        ),
-        .testTarget(
-            name: "VoiceFlowCoreTests",
-            dependencies: ["VoiceFlowCore"],
-            path: "Tests/VoiceFlowCoreTests"
-        ),
+        .target(name: "VoiceFlowCore"),
+        .executableTarget(name: "VoiceFlow", dependencies: ["VoiceFlowCore"]),
+        .executableTarget(name: "vf-bench", dependencies: ["VoiceFlowCore"]),
+        .testTarget(name: "VoiceFlowCoreTests", dependencies: ["VoiceFlowCore"]),
     ]
 )

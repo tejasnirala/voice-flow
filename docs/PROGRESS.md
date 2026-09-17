@@ -1,111 +1,132 @@
 # VoiceFlow — Progress Tracker
 
-> **Single source of truth for where the project stands.**
-> Read this first at the start of every session. Update it at the end of every phase
-> (and whenever a phase is paused mid-way). The full original spec lives in
-> [`docs/SPEC.md`](SPEC.md).
+> **Single source of truth for where the project stands.** Read first in every session. Update at the
+> end of every phase, and whenever work pauses mid-phase. Requirements: [`SPEC.md`](SPEC.md) (v2).
 
 ## Status at a glance
 
-| Phase | Name | Status | Commit |
-|---|---|---|---|
-| 0 | Machine & architecture discovery | ✅ Complete (2026-09-16) | `chore: initialize project` |
-| 1 | Lightweight native shell | ⏭️ **Next** | — |
-| 2 | Global hotkey | ⬜ Not started | — |
-| 3 | Audio | ⬜ Not started | — |
-| 4 | Local STT | ⬜ Not started | — |
-| 5 | Text insertion (**core product works**) | ⬜ Not started | — |
-| 6 | Performance pass | ⬜ Not started | — |
-| 7 | Local LLM | ⬜ Not started | — |
-| 8 | Processing modes | ⬜ Not started | — |
-| 9 | Developer optimization | ⬜ Not started | — |
-| 10 | Application awareness | ⬜ Not started | — |
-| 11 | Performance optimization round 2 | ⬜ Not started | — |
-| 12 | Packaging | ⬜ Not started | — |
-| 13 | Final offline audit | ⬜ Not started | — |
+| Phase | Name | Status |
+|---|---|---|
+| 0 | Machine & architecture discovery | 🟡 **Complete, awaiting owner approval** (2026-09-16) |
+| 1 | Native macOS shell | ⏭️ Next (after approval) |
+| 2 | Global hotkey | ⬜ |
+| 3 | Audio recording | ⬜ |
+| 4 | STT integration (+ accuracy gate) | ⬜ |
+| 5 | Text insertion (first usable product) | ⬜ |
+| 6 | Fast path optimization | ⬜ |
+| 7 | Local LLM (Smart Mode) | ⬜ |
+| 8 | Text modes | ⬜ |
+| 9 | Developer intelligence | ⬜ |
+| 10 | Application awareness | ⬜ |
+| 11 | Final performance optimization | ⬜ |
+| 12 | Packaging | ⬜ |
+| 13 | Final audit | ⬜ |
 
-Legend: ✅ complete · 🟡 in progress · ⏭️ next · ⬜ not started · ⚠️ blocked
+Legend: ✅ complete · 🟡 in progress / awaiting approval · ⏭️ next · ⬜ not started · ⚠️ blocked
 
-## Per-phase checklist (from the spec's development rule)
-
-Every phase ends with: build → tests → relevant benchmark → verify functionality →
-inspect `git diff` → update docs **and this file** → fix issues → commit → continue.
+**Per-phase routine (spec §25):** inspect → explain → implement only that phase → build → test →
+benchmark → fix → review → CPU/RAM check → docs + this file → show changes → commit → **stop for approval**.
 
 ---
 
-## Phase 0 — Machine & architecture discovery ✅
+## History
+
+- **2026-09-16, spec v1:** first Phase 0 pass (commit `d8e800f`): SwiftPM shell, whisper.cpp/llama.cpp
+  exploration, latency-first docs.
+- **2026-09-16, spec v2 (current):** owner replaced the spec. **Accuracy first.** Phase 0 redone:
+  STT candidates re-evaluated at the accuracy tier, developer-speech corpus + scorer + harness built,
+  docs consolidated to ARCHITECTURE / ACCURACY / PERFORMANCE / DEVELOPMENT.
+
+## Phase 0 — Machine & architecture discovery 🟡
 
 **Done**
-- Machine inspected → [`environment.md`](environment.md)
-- Decisions made and documented → [`architecture/`](architecture/)
-- SwiftPM project (no Xcode — only Command Line Tools installed) with `VoiceFlowCore` library,
-  `VoiceFlow` menu-bar executable, Swift Testing test target
-- `scripts/build-app.sh` assembles + signs `build/VoiceFlow.app` (68 KB); launches as `LSUIElement`
-- `scripts/test.sh` (works around CLT not finding the Swift Testing macro plugin)
-- `scripts/fetch-deps.sh` (whisper.cpp xcframework, SHA-256 pinned), `scripts/fetch-models.sh`
-- Preliminary benchmarks on synthetic (`say`) audio → [`benchmarks/stt.md`](benchmarks/stt.md),
-  [`benchmarks/llm.md`](benchmarks/llm.md); reproducible via `scripts/bench/`
+- Machine and toolchain inspected → ARCHITECTURE.md §1
+- Stack and alternatives for every component → ARCHITECTURE.md §2–3, privacy §5, dependencies §6
+- Project restructured to standard SwiftPM layout (`Sources/VoiceFlowCore`, `Sources/VoiceFlow`, `Sources/vf-bench`)
+- Accuracy benchmark scaffolding:
+  - Corpus `benchmarks/corpus/developer-speech.json`: 54 phrases (normal 6, technical 12, identifiers 8,
+    commands 8, files 7, architecture 5, long natural 4, Hinglish 4)
+  - Scorer in `VoiceFlowCore/Speech/Accuracy` (WER vs spoken words, term recognition, exact spelling,
+    formatting WER) with 14 unit tests
+  - `scripts/bench/stt_engines.swift`: whisper.cpp / Parakeet / Apple SpeechTranscriber harness
+    (latency, RTF, CPU time, per-process GPU time, memory footprint)
+  - `scripts/bench/make-audio.sh` (3 TTS voices), `scripts/bench/record.sh` (owner's voice), `scripts/bench/stt.sh` (driver + report)
+  - `scripts/fetch-models.sh` verifies SHA-256 against Hugging Face metadata
+- Synthetic-voice benchmark: 10 Metal/OS configurations × 150 clips + CPU-vs-Metal sample → ACCURACY.md §5, PERFORMANCE.md §3
+  - Eliminated: Apple SpeechTranscriber (58.5% term recognition), distil-large-v3 (76.9%), large-v3-turbo f16 (q8_0 equal accuracy, less memory), CPU backend (15–30× slower)
+  - Provisional default: **Whisper large-v3-turbo q8_0** (2.3% WER, 91.5% terms, 1.16 s/clip, ~1.05 GB loaded)
+  - Human-set finalists: large-v3-turbo q8_0, medium.en q8_0, small.en, Parakeet v3 (speed reference)
+- Validated: clean build, 14 tests pass, app launches (14 MB footprint, 0.0% CPU) and quits; bundle 196 KB
+  (executable grew 60 → 188 KB because it links VoiceFlowCore's scorer)
 
-**Left over / carried forward**
-- Benchmarks used synthetic TTS audio. Real-voice recordings needed in Phase 4 (own accent,
-  Hinglish, built-in mic vs AirPods).
-- Formal startup/idle measurement (Phase 1 — only a sanity check was done: 13–14 MB footprint, 0.0% CPU).
-- Only `VoiceFlow/App` and `VoiceFlow/Core` exist; the other spec folders are created as they get code.
-- Hindi/Hinglish: not yet tested (only `.en` Whisper models downloaded; multilingual `base`/`small` needed).
-- Code-signing identity "VoiceFlow Dev" not yet created (needed before Phase 3/5 so TCC grants survive rebuilds).
+**Owner decisions needed to close Phase 0**
+1. Approve the accuracy threshold (ACCURACY.md §3).
+2. Record the corpus with your own voice (`scripts/bench/record.sh macbook-mic`, ~15 min), plus
+   AirPods or iPhone if you dictate with them. The STT model decision is made on these recordings.
+   It can happen now or at the start of Phase 4, but must happen before Phase 4 finishes.
+3. Approve moving on to Phase 1.
 
-## Phase 1 — Lightweight native shell ⏭️ NEXT
+**Leftovers carried forward**
+- Final STT model choice: pending human-voice benchmark (Phase 4 gate at the latest).
+- Hinglish: needs human recordings plus a multilingual model run (large-v3-turbo with language auto/hi).
+- MLX and Apple Foundation Models LLM comparison: Phase 7.
+- "VoiceFlow Dev" signing identity: create before Phase 3 (DEVELOPMENT.md).
+- Phase 3: `AVAudioNode.installTap(onBus:bufferSize:format:block:)` is **deprecated in macOS 27**. Use
+  `installAudioTap(onBus:bufferSize:format:tapProvider:) throws` behind `#available(macOS 27, *)` (the app
+  targets macOS 14+). `scripts/bench/record.swift` still uses the old API (dev tool; warning only).
+- Phase 6: Whisper latency is ~fixed per clip (30 s encoder window). Evaluate `audio_ctx` reduction only with
+  an unchanged human-set accuracy. Handle the one-time Metal shader compile per new binary.
+- Whisper vocabulary prompt: 1.6–6× slower with no clear gain on synthetic. Re-test on the human set.
 
-**To do**
-- [ ] Menu-bar UI per spec §24 (status line, Mode submenu, Smart Processing toggle, Settings, Quit)
-- [ ] `Configuration` (Codable, `~/Library/Application Support/VoiceFlow/config.json`, defaults, tests)
-- [ ] `PipelineState` state machine (IDLE→RECORDING→TRANSCRIBING→PROCESSING→INSERTING→IDLE, ERROR, CANCELLED) with deterministic transition tests
-- [ ] `ProcessingMode` enum (Raw/Clean/Developer/Prompt/Writing) — selection + persistence only, no processing yet
-- [ ] Permission foundation: `PermissionsService` (microphone via AVCaptureDevice auth status, Accessibility via `AXIsProcessTrusted`), surfaced in menu
-- [ ] `PerformanceMonitor` skeleton (monotonic clock spans, os_signpost; no transcript content in logs)
-- [ ] `scripts/measure-idle.sh`: startup time, idle RSS/footprint, idle CPU, idle GPU (per-process `accumulatedGPUTime` from `ioreg`, no sudo)
-- [ ] Record → `benchmarks/startup.md`, `benchmarks/memory.md`
-- [ ] Create "VoiceFlow Dev" self-signed code-signing identity (see `development.md`)
+## Phase 1 — Native macOS shell ⏭️
+- [ ] Menu bar item + minimal menu (state line, Fast/Smart toggle placeholder, Settings…, Quit)
+- [ ] App lifecycle; `os.Logger` logging (no content), subsystem `local.voiceflow.VoiceFlow`
+- [ ] Settings foundation: Codable model + JSON persistence in Application Support, defaults, tests
+- [ ] `PipelineState` enum + explicit transition function with exhaustive tests (no behavior yet)
+- [ ] Validate: build, launch, quit, menu bar; measure startup time, idle footprint, idle CPU/GPU (`scripts/measure-idle.sh`)
 
 ## Phase 2 — Global hotkey
-- Carbon `RegisterEventHotKey` for ⌥Space with `kEventHotKeyPressed` + `kEventHotKeyReleased` (no polling, no Accessibility needed)
-- Measure hotkey detection latency
+Carbon ⌥Space press/release; Esc cancel registered only while recording; duplicate/auto-repeat
+handling; state transitions; tests. Measure hotkey latency.
 
-## Phase 3 — Audio
-- AVAudioEngine input tap → in-memory 16 kHz mono Float32 via AVAudioConverter
-- Measure recording startup latency (built-in mic vs AirPods vs iPhone Continuity mic — the default input on this machine is currently the iPhone)
-- Silence / too-short detection (RMS/energy gate) before any STT
+## Phase 3 — Audio recording
+AVAudioEngine tap → one resample to 16 kHz mono Float32 in memory; max duration; cancellation; silence
+and too-short detection; permission errors. Measure start latency per input device (built-in, AirPods,
+iPhone), memory, CPU.
 
-## Phase 4 — Local STT
-- Integrate whisper.cpp via `Vendor/whisper.xcframework` binary target
-- Re-run `scripts/bench/stt.sh` + real-voice clips; decide base.en vs small.en; test Apple SpeechTranscriber with contextual strings; test multilingual model for Hinglish
-- Write final `benchmarks/stt.md`
+## Phase 4 — STT integration (accuracy gate)
+`SpeechEngine` protocol → whisper.cpp engine (and Parakeet if still a finalist); STTModelManager
+(installed/missing/corrupted/incompatible); in-app instrumentation. Run the human corpus benchmark.
+**Don't pass this phase until the chosen model meets the approved threshold.**
 
-## Phase 5 — Text insertion
-- `TextInsertionService`: snapshot all pasteboard items/types → write text (+ transient/concealed markers) → CGEvent ⌘V → restore if changeCount unchanged
-
-## Phases 6–13
-See spec (`docs/SPEC.md` §41). Notes captured so far:
-- **Phase 6:** Metal shader compile costs ~15 s once per new binary (see `benchmarks/stt.md`). Investigate warming in background at low priority after launch vs CPU fallback for first request.
-- **Phase 7:** Qwen2.5-1.5B-Instruct Q4_K_M needs few-shot prompt + output guard (it wrote a TypeScript code block with a zero-shot prompt). Reuse KV cache of the fixed system/few-shot prefix to cut ~200 ms prompt eval. Consider ggml symbol duplication when linking both whisper and llama frameworks.
+## Phases 5–13
+Per SPEC.md. Notes so far:
+- **5:** clipboard algorithm in ARCHITECTURE.md §3.4. Never lose speech on paste failure.
+- **6:** cold vs warm decision from load time and footprint data (PERFORMANCE.md). First-ever Metal
+  shader compile (~15 s per new binary) needs handling.
+- **7:** Qwen2.5-1.5B zero-shot prompt produced a code block (spec violation); few-shot worked. Output
+  guard and fallback to raw STT are mandatory. Compare llama.cpp vs MLX vs Apple Foundation Models.
 
 ---
 
 ## Decision log
 
-| Date | Decision | Why | Doc |
+| Date | Decision | Why | Where |
 |---|---|---|---|
-| 2026-09-16 | Swift 6 + AppKit, SwiftPM only, script-built .app | Native APIs, tiny binary, no Xcode installed (user chose not to install) | architecture/overview.md |
-| 2026-09-16 | whisper.cpp (prebuilt xcframework) as primary STT candidate | Measured: base.en 0.08–0.26 s, small.en 0.22–0.82 s on Metal; in-process; no daemon | architecture/stt.md |
-| 2026-09-16 | Apple SpeechTranscriber kept as benchmarked alternative | Zero model files, ~20 MB in-process, but worse on tech vocab in initial test | architecture/stt.md |
-| 2026-09-16 | llama.cpp in-process as LLM runtime; Ollama rejected; MLX-Swift ruled out | Ollama = localhost daemon; MLX-Swift needs Xcode to build Metal shaders | architecture/llm.md |
-| 2026-09-16 | Carbon RegisterEventHotKey for hotkey | Event-driven press+release, no Accessibility/Input Monitoring permission | architecture/input.md |
-| 2026-09-16 | Clipboard + synthetic ⌘V for insertion, with full pasteboard restore | Works in Electron/terminals/browsers where AX value setting fails | architecture/input.md |
+| 2026-09-16 | Swift 6 + AppKit menu-bar app, SwiftPM + script-built .app | Native APIs, minimal footprint; no Xcode (owner choice) | ARCHITECTURE §3.1 |
+| 2026-09-16 | whisper.cpp framework as STT runtime (runs Whisper and Parakeet) | In-process, Metal, no daemon, prebuilt, replaceable behind a protocol | ARCHITECTURE §4 |
+| 2026-09-16 | STT model chosen on the owner's recordings, never on synthetic audio alone | TTS audio isn't representative of real accents/pace (spec §3) | ACCURACY §2 |
+| 2026-09-17 | Provisional STT default: Whisper large-v3-turbo q8_0 on Metal; Apple Speech, distil-large-v3 and CPU backend eliminated | Synthetic benchmark: lowest WER; Apple 58.5% terms; CPU 15–30× slower | ARCHITECTURE §4 |
+| 2026-09-16 | Carbon RegisterEventHotKey; Esc cancel registered only while recording | Press+release, no permission, zero idle cost | ARCHITECTURE §3.3 |
+| 2026-09-16 | Clipboard + ⌘V with full snapshot/restore; never lose speech | Works in Electron/terminals/browsers | ARCHITECTURE §3.4 |
+| 2026-09-16 | llama.cpp in-process (provisional); Ollama rejected | No daemon/IPC; MLX re-evaluated in Phase 7 | ARCHITECTURE §3.5 |
 
 ## Session handoff notes
+_Overwrite at the end of every session._
 
-_Update this at the end of every session (overwrite, don't append)._
-
-- **Last session (2026-09-16):** Completed Phase 0. Models already downloaded on this machine:
-  whisper `tiny.en`, `base.en`, `small.en`; LLM `qwen2.5-1.5b-instruct-q4_k_m`.
-- **Start next session with:** Phase 1 checklist above.
+- **Last session (2026-09-17):** Phase 0 redone for spec v2 (synthetic STT benchmark complete), awaiting owner approval.
+- **Models on this machine** (`~/Library/Application Support/VoiceFlow/models/`): whisper tiny.en, base.en,
+  small.en, medium.en-q8_0, large-v3-turbo, large-v3-turbo-q8_0, distil-large-v3; parakeet tdt-0.6b-v3-q8_0;
+  llm qwen2.5-1.5b-instruct-q4_k_m.
+- **Synthetic audio + results:** `benchmarks-output/` (gitignored; regenerate with the scripts).
+- **Next action:** owner approval → optionally record own-voice corpus → Phase 1.

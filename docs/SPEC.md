@@ -1,249 +1,227 @@
-# VoiceFlow — Product & Engineering Spec
+# VoiceFlow — Product & Engineering Spec (v2)
 
-> Condensed from the original project brief (2026-09-16). Every requirement from the brief
-> is preserved here; long ASCII diagrams and repeated examples were shortened. When in doubt,
-> this file is the contract. Progress against it is tracked in [`PROGRESS.md`](PROGRESS.md).
+> Condensed from the owner's updated brief (v2, 2026-09-16), which **supersedes v1**. Every requirement
+> is preserved; examples are shortened. This file is the contract. Progress is tracked in
+> [`PROGRESS.md`](PROGRESS.md). Section numbers match the brief.
 
-## 1. Objective
-A personal, lightweight, ultra-low-latency, 100% offline macOS voice-dictation utility for
-the owner's development workflow. Inspired by Wispr Flow's workflow — **not a clone**.
+## 1. Core product goal
+A personal, local-first native macOS dictation utility (inspired by Wispr Flow; not SaaS):
+hold a global shortcut (default **⌥ Option + Space**) → speak naturally → release → record locally →
+transcribe locally with an **accurate** STT model → optionally clean/transform with a local LLM →
+insert into the focused app. Example: "create a next js api route using typescript and postgres" →
+`Create a Next.js API route using TypeScript and PostgreSQL.` It must feel like a fast native utility,
+not a browser app.
 
-Flow: hold global hotkey (default **⌥ Option + Space**) → speak → release → local STT →
-optional local text processing → paste into the focused app.
+## 2. Non-negotiable priorities (in order)
+1. **Transcription accuracy.** Normal English, conversational speech, technical discussion, programming
+   terminology, developer vocabulary, framework/database/cloud names, CLI commands, filenames, environment
+   variables, identifiers. Reference terms: Next.js, TypeScript, JavaScript, React, Node.js, Express,
+   PostgreSQL, MongoDB, Redis, RabbitMQ, Docker, Docker Compose, Kubernetes, AWS, Azure, GCP, JWT, OAuth,
+   WebSocket, REST API, GraphQL, middleware, camelCase, snake_case, getUserById, refreshToken, package.json,
+   .env, npm run dev, docker compose up, kubectl, git rebase. STT must not routinely turn these into
+   everyday words.
+2. Then latency. 3. Then resource efficiency. 4. Then features.
 
-Example: "create a function called get user by id which accepts a string id and returns a
-promise of user or null" → `Create a function called getUserById that accepts a string id and returns a Promise<User | null>.`
+**Critical rule:** smaller ≠ better. Choose the smallest/fastest model that **actually meets the required
+accuracy**. If a larger model is needed, use it. Optimize performance only after accuracy is established.
 
-## 2. Priorities (in order)
-1. Speed / latency 2. Lightweight resource usage 3. Offline privacy 4. Reliability
-5. Transcription quality 6. Developer-oriented intelligence 7. UI 8. Feature breadth
+## 3. Accuracy benchmarking is mandatory
+Before committing to an STT model/runtime, evaluate realistic candidates on this machine (whisper.cpp,
+MLX-based Whisper, other mature Apple-Silicon local STT). Measure: accuracy, WER where meaningful,
+technical-term accuracy, identifier accuracy, punctuation quality, capitalization quality, transcription
+latency, cold start, warm latency, RAM, CPU, GPU, model size, disk footprint. Never fabricate. If WER
+can't be measured automatically, document it and use a human-reviewed set.
 
-Never add a feature that materially increases RAM, CPU, GPU, startup time, latency, binary
-size, or background consumption without clear benefit.
+## 4. Realistic developer speech benchmark
+Local suite with categories: normal English ("I need to send an email to the customer tomorrow morning.",
+"The meeting has been moved to three o'clock.", "Please review this document before the end of the day."),
+technical terminology ("We are using Next.js with TypeScript on the frontend.", "The backend is running on
+Node.js and Express.", "The database is PostgreSQL with Redis for caching."), programming identifiers
+(getUserById, refreshAccessToken, createInvoice, handleSubmit, isAuthenticated, userSession), developer
+commands (npm run dev, npm install, git rebase main, docker compose up/down, kubectl get pods), files and
+config (package.json, tsconfig.json, docker-compose.yml, .env, .env.local, nginx.conf), architecture
+discussion ("The request goes through the reverse proxy before reaching the Express API.", "The access
+token expires after fifteen minutes and the refresh token lasts for one day.", "Redis stores the temporary
+session data."), longer natural speech, optional English/Hindi/Hinglish. Don't add multilingual support
+at the expense of English/developer accuracy unless benchmarks show it's viable.
 
-## 3. Performance philosophy
-Runs all day. Idle: ~0% CPU, ~0% GPU, minimal RAM. No polling loops, unnecessary timers,
-busy waiting, continuous mic processing, background threads, continuous inference, or
-unnecessary filesystem activity. Event-driven architecture.
+## 5. The LLM must not hide bad STT
+If STT says "react router" when the user said "Redis router", the LLM must not guess from context.
+Uncertain identifiers must not be silently invented. Pipeline: speech → accurate STT → conservative
+transcript → optional transformation. The LLM does punctuation, capitalization, formatting, filler removal,
+sentence structure, spoken-command readability, and term preservation. It preserves uncertain content
+rather than inventing.
 
-## 4. Latency is first-class
-Release → very short delay → text. Measure, don't claim. Instrument:
-`recording_duration, audio_processing_duration, stt_duration, llm_duration,
-text_insertion_duration, total_latency`. Recording duration is not latency.
+## 6. Local only
+No runtime network requirement. No cloud speech APIs (OpenAI, Google, Azure…), remote transcription,
+remote LLMs, telemetry, analytics, tracking, background network calls, or uploading audio or transcripts.
+Temporary recordings are deleted after processing unless explicitly retained for debugging/benchmarking.
+Works offline.
 
-## 5. Do not over-engineer
-No microservices, backend, REST API, database, cloud, Docker/K8s, auth, accounts, web
-frontend, Electron, unnecessary networking, or abstraction layers. Native executable +
-local model runtime + local model files.
+## 7. Dependencies
+Personal app, not published. Evaluate mature local runtimes pragmatically. Every dependency needs a clear
+reason. Prefer native macOS APIs, Apple frameworks, lightweight native libraries, efficient local inference.
+Avoid bloat.
 
-## 6. Native technology
-Evaluate Swift / Objective-C / Rust / C++ on performance, binary size, macOS API integration,
-hotkeys, mic, Accessibility, clipboard, concurrency, maintainability, AI runtime integration.
-Default expectation Swift + AppKit/SwiftUI (validate). A small C/C++/Rust module only with a
-measurable or important advantage.
+## 8. Native architecture
+No Electron, React wrappers, browser architecture, local web server as the primary architecture, or
+Python desktop runtime. Prefer Swift, SwiftUI, AppKit, native APIs. C++/Rust only with demonstrated
+performance benefit (inference/audio).
 
-## 7. Architecture
-Menu bar app → Global Hotkey Manager → Audio Recorder (AVAudioEngine) → Local STT (Whisper)
-→ Transcript Processor (optional local LLM) → Text Insertion (clipboard + paste) → current app.
+## 9. Lightweight
+Low idle RAM (not hundreds of MB idle), near-zero idle CPU/GPU, fast startup and hotkey response, minimal
+background activity, disk footprint and dependencies. Don't keep large models loaded unnecessarily.
+Consider lazy loading, unloading, warm vs cold, mmap, quantization, efficient inference and buffers.
+But never sacrifice accuracy for footprint. Decide from measurements.
 
-## 8. Lightweight app
-Models are external resources in `~/Library/Application Support/VoiceFlow/models/`
-(`whisper/`, `llm/`), never embedded in the bundle.
+## 10. Fast UX
+IDLE → hotkey pressed → RECORDING → released → TRANSCRIBING → OPTIONAL PROCESSING → INSERTING → IDLE.
+Avoid polling, unnecessary workers/IPC/serialization/process spawning, loading the LLM per transcription,
+and loading models at startup unless benchmarks justify it. Measure latency; never claim "instant"
+without measurement.
 
-## 9. Model memory strategy
-Don't load multiple large models simultaneously. Ideal: idle = nothing loaded; recording =
-audio only; STT = Whisper; processing = LLM only if required; release when appropriate.
-Benchmark **A** unload after every request / **B** keep Whisper warm, unload LLM /
-**C** keep both warm — measure latency, RAM, CPU, GPU, choose from data.
+## 11. Two modes
+**Fast Mode:** audio → STT → paste (no LLM, lowest latency). **Smart Mode:** audio → STT → local LLM →
+paste (grammar, punctuation, fillers, readability, technical formatting, term preservation). Fast Mode
+stays available.
 
-## 10–11. Speech-to-text
-Evaluate whisper.cpp, MLX Whisper, other mature Apple-Silicon Whisper implementations. Must be
-local, offline, Apple Silicon, accurate, low latency, reasonable memory, strong English,
-ideally Hindi/Hinglish, technical vocabulary. Benchmark tiny/base/small; pick the **smallest
-sufficiently accurate** model (accuracy, latency, RAM, GPU, startup, Apple Silicon perf).
-Benchmark script/utility required; test sentences include:
-- Create a Next.js middleware for authentication.
-- Create a function called getUserById.
-- Run npm install and then npm run dev.
-- Create a PostgreSQL index on the email column.
-- Use Redis for caching the API response.
-- The refresh token expires after one day.
-- Open the authentication middleware.
+## 12. Local LLM
+Secondary to STT. Evaluate MLX, llama.cpp, or another native local runtime on this machine; don't assume.
+Model: local, quantized where appropriate, small, fast, memory-conscious, deterministic/conservative.
+A text transformation engine, not a chatbot. It doesn't answer questions, browse, execute commands,
+invent information, needlessly rewrite identifiers, or change meaning.
 
-Document in `docs/benchmarks/stt.md`.
+## 13. Developer-aware transcription
+Optional local developer vocabulary/lexicon (frameworks, languages, libraries, databases, cloud,
+CLI commands, identifiers, file names, env vars, architecture terms). Must be **conservative**: no global
+replacement of words that merely resemble technical terms. Context matters.
 
-## 12–15. Local LLM
-Not required for basic dictation. **Fast Mode** (default, lowest latency): audio → Whisper →
-paste. **Smart Mode**: audio → Whisper → local LLM → paste. User chooses.
-Small and fast over large; narrow job: transcript → clean/format/preserve intent → text.
-Prioritize latency, memory, determinism, instruction following, technical vocabulary.
-Runtimes to evaluate: MLX, llama.cpp, Ollama — by startup latency, warm latency, RAM, GPU, CPU,
-Apple Silicon acceleration, integration complexity, model availability, offline. Prefer native
-in-process integration over a permanently running daemon unless benchmarks justify it.
+## 14. Text insertion
+Clipboard + ⌘V. Preserve existing clipboard as reliably as practical (save → set → paste → restore).
+Never permanently overwrite it. Handle paste failures gracefully.
 
-## 16. Processing modes
-Raw (minimal), Clean (remove fillers, punctuation), Developer (technical formatting),
-Prompt (spoken thoughts → clean AI prompt), Writing (polished prose).
-Text-processing modes, never autonomous agents.
+## 15. Global hotkey
+Default ⌥Space; press-and-hold records, release stops. Configurable later. Handle key-down, key-up,
+cancellation, duplicate events, permission failures, application focus changes.
 
-## 17. Strict LLM behavior
-Must NOT answer questions, invent information, add explanations, change technical meaning,
-hallucinate APIs, create facts, execute commands, browse, or call tools. It TRANSFORMS text.
+## 16. Permissions
+Microphone, Accessibility, Input Monitoring where required. Explain why each is needed. Never fail
+silently; give useful error messages.
 
-## 18. Developer mode
-Understands camelCase, PascalCase, snake_case, kebab-case; JavaScript, TypeScript, React,
-Next.js, Node.js, Python, Java, SQL; PostgreSQL, MongoDB, Redis, RabbitMQ; Docker, Kubernetes;
-AWS, Azure, GCP; npm, pnpm, yarn, git, docker, kubectl; HTTP, REST, JWT, OAuth, API, JSON.
-Preserves identifiers, filenames, paths, commands, URLs, package names, API names.
-"get user by id" → `getUserById` (not "get user by ID") in Developer mode.
+## 17. UI
+Minimal menu-bar utility. States: Idle, Recording, Transcribing, Processing, Error. Clear recording
+feedback (e.g. "🎙 Recording…"). An optional lightweight floating indicator. No large settings-heavy UI.
 
-## 19. Global hotkey
-Default ⌥Space. Key down → start recording immediately; held → record; key up → stop →
-process → paste. Works while other apps are active. Native events, no polling.
+## 18. State machine
+Explicit: IDLE, RECORDING, TRANSCRIBING, PROCESSING, INSERTING, ERROR. Explicit transitions
+(IDLE →hotkey→ RECORDING →release→ TRANSCRIBING →STT ok→ PROCESSING →ok→ INSERTING →paste ok→ IDLE).
+Failures return to a safe state.
 
-## 20. Audio
-Native APIs (AVAudioEngine or better, per evaluation). Mic permission, low-latency capture,
-correct sample rate, minimal conversion, in-memory buffering, minimal disk I/O, no unnecessary
-audio files. Recording only while actively dictating.
+## 19. Reliability
+No crash when: microphone fails, transcription fails, model load fails, LLM fails, paste fails,
+Accessibility is missing, user cancels, active app changes, model files are missing, memory is short.
+If Smart Mode fails, fall back to the STT result. **Never silently lose user speech.**
 
-## 21. Silence handling
-Empty / extremely short / silent recording → do nothing; no LLM, no expensive processing.
+## 20. Model storage
+Large models are not in the app bundle. Separate application, models, configuration, temporary audio,
+logs. Models live in a user-local app directory. Detect installed / missing / incompatible / corrupted.
+No automatic runtime downloads unless the user explicitly chooses that.
 
-## 22. Text insertion
-Save clipboard → set text → ⌘V → restore clipboard. Preserve all representations (text,
-images, rich content, others) where feasible. Abstraction: `TextInsertionService`.
+## 21. Performance benchmarking
+STT: model, size, audio duration, latency, real-time factor, RAM, CPU, GPU, accuracy, technical-term
+accuracy. LLM: model, size, input/output tokens, latency, RAM, CPU, GPU. App: startup time, idle RAM/CPU,
+recording start latency, STT latency, LLM latency, end-to-end latency. Measure first, then optimize.
 
-## 23. Application context
-`ActiveApplicationProvider`: app name + bundle identifier. Later: Cursor/VS Code/Terminal →
-Developer, ChatGPT → Prompt, Slack → Writing. No complicated automation initially.
+## 22. Cold vs warm model
+Compare cold (record → load → transcribe → unload) vs warm (model kept available) on latency, RAM,
+CPU, GPU, battery. Choose by measurement. Keeping STT warm is acceptable if the latency benefit is
+significant and memory reasonable.
 
-## 24. Menu bar UI
-Extremely lightweight menu-bar utility:
-```
-VoiceFlow
-──────────────
-● Ready
-Mode ▸ Developer / Clean / Prompt / Writing / Raw
-Smart Processing ▸ ✓ Enabled
-Settings
-Quit
-```
-No dashboard, animations, heavy rendering, React, webview, or continuous visual effects.
+## 23. Decision rule (never reverse)
+1. Accurate enough? No → better model. Yes → 2. Improve latency (inference/runtime) → 3. Reduce RAM
+(loading/quantization) → 4. Expand features. Never "tiny is faster, so use it"; ask "which model gives
+acceptable accuracy with reasonable latency/resources?"
 
-## 25. State machine
-IDLE → RECORDING → TRANSCRIBING → PROCESSING → INSERTING → IDLE.
-ANY → ERROR → IDLE. ANY ACTIVE → CANCELLED → IDLE. Deterministic transitions.
+## 24. Project structure
+Modular. Suggested: App (AppDelegate, MenuBar, ApplicationState), Audio (AudioRecorder, AudioSession,
+AudioBuffer), Hotkey (GlobalHotkeyManager), Speech (SpeechEngine, STTModelManager, TranscriptionResult,
+AccuracyBenchmark), Processing (TextProcessor, LocalLLMEngine, PromptProcessor, DeveloperVocabulary),
+Insertion (ClipboardManager, TextInserter), Permissions (PermissionManager), Settings (SettingsManager),
+Diagnostics (Logger, PerformanceMonitor), Tests. May be changed if implementation suggests better.
 
-## 26. Concurrency
-Native/structured concurrency. No excessive threads, thread-per-request, busy waiting,
-unnecessary queues, or UI blocking. Menu stays responsive during STT/LLM.
+## 25. Methodology (every phase)
+1 Inspect project · 2 Explain the plan · 3 Implement only that phase · 4 Build · 5 Run tests ·
+6 Run relevant benchmarks · 7 Fix problems · 8 Review · 9 Check CPU/RAM/performance implications ·
+10 Update docs · 11 Show what changed · 12 Only then move on. **Stop for owner approval at phase ends.**
 
-## 27. Startup
-Do: load config, init menu bar, register hotkey, prepare lightweight services.
-Don't: load Whisper/LLM, init GPU inference, scan large files. Lazy initialization.
+## 26–39. Phases
+- **0 Machine & architecture discovery:** inspect machine/tools/frameworks; evaluate STT, LLM, model
+  loading, audio, hotkey, Accessibility, clipboard options; several STT candidates; benchmark strategy
+  and initial harness; `docs/ARCHITECTURE.md` with Machine (CPU, GPU, RAM, macOS, architecture, Swift,
+  Xcode), Proposed stack (UI, audio, hotkey, STT runtime/model, LLM runtime/model, insertion, storage,
+  testing), Alternatives considered per component (option, advantages, disadvantages, performance,
+  memory, integration complexity, decision), STT decision (models evaluated, why, which to benchmark,
+  accuracy threshold, performance measurements). No fabricated results. **Stop for approval.**
+- **1 Native macOS shell:** menu bar, minimal UI, lifecycle, logging, settings foundation, buildable.
+  No STT. Validate build, launch, quit, menu bar, memory, CPU.
+- **2 Global hotkey:** ⌥Space key-down/up, cancellation, permission handling, state transitions,
+  extensive tests.
+- **3 Audio recording:** native APIs, correct sample format for the STT runtime, no unnecessary
+  resampling, temp storage or memory buffer, automatic cleanup, duration limits, cancellation.
+  Validate quality, memory, CPU, recording latency.
+- **4 STT integration:** local inference, no network, model manager, error handling, benchmark
+  instrumentation. Run the accuracy benchmark (normal, technical, developer, identifiers, commands,
+  long, natural). **Don't proceed until STT quality is acceptable**; evaluate a better model if not.
+- **5 Text insertion:** clipboard + ⌘V, tested in VS Code, Terminal, browser, Slack, Discord, Notes,
+  text editors. Clipboard restoration. First usable end-to-end product.
+- **6 Fast path optimization:** recording, STT, insertion. Measure end-to-end, STT, RAM, CPU, GPU.
+  Optimize by measurement only (warm-up, mmap, threading, buffering, loading, inference config,
+  quantization, allocations, process boundaries). Never reduce quality to improve benchmarks.
+- **7 Local LLM:** optional Smart Mode, conservative, prompts for cleanup, punctuation, grammar,
+  term preservation, developer formatting. Transforms, never answers.
+- **8 Text modes:** Raw, Clean, Developer, Prompt, Writing. All preserve meaning.
+- **9 Developer intelligence:** terms, identifiers, commands, filenames, URLs, code terminology.
+  Dictionary, protected terms, conservative correction, context-aware formatting, code mode. No
+  overcorrection.
+- **10 Application awareness:** detect the active app; configurable per-app defaults (VS Code →
+  Developer, Terminal → Raw/Developer, Slack → Clean, Browser → Clean, ChatGPT → Prompt, Notes → Writing).
+- **11 Final performance optimization:** audit idle RAM/CPU/GPU, startup, hotkey latency, recording
+  start latency, STT, LLM, end-to-end, model memory, disk. Optimize where justified.
+- **12 Packaging:** proper app bundle, clean config, model discovery, settings persistence, permission
+  handling, logging, crash/error handling, easy local install. No unnecessary installers or services.
+- **13 Final audit:** accuracy (reliable STT, terms, identifiers, punctuation), performance (idle CPU/RAM,
+  startup, transcription speed), privacy (audio/text never leave, no network, no telemetry), reliability
+  (STT fail, model missing, permission denied, paste fail, LLM fail), UX (recording feedback, hotkey
+  reliability, unobtrusive).
 
-## 28–29. Memory & GPU targets
-Set practical targets after benchmarking. Idle very low; recording small increment; STT only
-required model; LLM only when Smart Processing enabled. Use smaller/quantized models under
-memory pressure. GPU ≈0% idle; use GPU during inference only when it reduces latency enough
-to justify it — benchmark CPU vs Metal.
+## 40. Engineering rules
+1 Don't over-engineer. 2 No unjustified dependencies. 3 No cloud functionality. 4 Don't sacrifice
+accuracy for speed. 5 Don't sacrifice speed unnecessarily for features. 6 Measure before optimizing.
+7 Never fabricate benchmark results. 8 Never hide poor STT behind an LLM. 9 Never silently hallucinate
+technical terms. 10 Prefer native macOS APIs. 11 Keep large models out of the bundle. 12 No permanent
+background CPU/GPU activity. 13 No permanent audio storage by default. 14 No data to external services.
+15 Keep the STT model/runtime replaceable.
 
-## 30–31. Network & privacy
-Works with Wi-Fi off / no internet. No cloud APIs, telemetry, analytics, remote logging,
-remote inference/transcription. Do not persist recordings, raw or processed transcripts.
-Temporary audio deleted after processing. Logs contain no transcript content by default.
+## 41. Git
+After each phase: `git status`, `git diff`, review, one meaningful commit (e.g. `feat: add global hotkey
+recording trigger`). No unrelated changes in a commit.
 
-## 32. Security doc
-`docs/security.md`: microphone and accessibility permissions, clipboard behavior, temp files,
-local model files, network behavior, data retention.
+## 42. Documentation
+Maintain `README.md`, `docs/ARCHITECTURE.md`, `docs/PERFORMANCE.md`, `docs/ACCURACY.md`,
+`docs/DEVELOPMENT.md`. Explain: why this STT runtime, STT model, LLM runtime, LLM model, architecture,
+model loading strategy, and the measured performance characteristics.
 
-## 33–34. Benchmarks (required, never fabricated)
-`docs/benchmarks/`: `stt.md`, `llm.md`, `startup.md`, `memory.md`, `latency.md`. Record startup
-time, idle RAM/CPU/GPU, recording overhead, STT latency, LLM latency, end-to-end latency, peak
-RAM/CPU/GPU. Only values measured on this machine.
-Test cases: **Short** "Hello, this is a test." · **Medium** "Create a Next.js API route that
-validates the request body and stores the user in PostgreSQL." · **Developer** "Create a
-function called getUserById that accepts a string ID and returns a Promise of User or null."
-· **Long** natural 20–30 s developer explanation.
+## 43. Final product
+A tiny native menu-bar utility with extremely accurate local STT, fast global hotkey, optional local AI
+cleanup, developer-aware vocabulary, reliable insertion, minimal resources, no cloud, no telemetry, no
+unnecessary background processes. Hold → speak naturally → release → wait briefly → accurate text appears.
+The user shouldn't need to think about models or infrastructure.
 
-## 35. Dependencies
-Minimal; each must answer "why do we need this?". Prefer Apple frameworks, system APIs, small
-native libraries. Document in `docs/dependencies.md`.
+## 44. Guiding statement
+Accuracy first, then latency, then resource efficiency, then features. A fast inaccurate app is not
+acceptable. A slightly larger app with consistently reliable transcription beats a tiny one that often
+gets words wrong.
 
-## 36. Model downloads
-May download during setup; runtime never needs network. Models in
-`~/Library/Application Support/VoiceFlow/models/{whisper,llm}`. Detect missing / valid /
-invalid / incompatible.
-
-## 37. Project structure
-`VoiceFlow/{App,Core,Audio,Speech,Intelligence,Input,Permissions,Configuration,ApplicationContext,UI}`,
-`Tests/`, `prompts/{clean,developer,prompt,writing}.txt`, `scripts/`,
-`docs/{architecture/,benchmarks/,environment.md,security.md,dependencies.md,development.md}`,
-`README.md`, `.gitignore`. Adjust if architecture requires.
-
-## 38. Abstractions
-Boundaries: AudioRecorder, SpeechToTextEngine, TranscriptProcessor, TextInsertionService,
-ActiveApplicationProvider, HotkeyManager, ModelManager, PerformanceMonitor. No excessive
-interfaces — only at hardware, native-library, and model boundaries.
-
-## 39. Testing
-Unit: state machine, mode selection, prompt loading, configuration, clipboard preservation,
-transcript processing, error handling. Integration: audio→STT, STT→processor,
-processor→insertion. Mocks where hardware/models unavailable.
-
-## 40. Git
-Meaningful conventional commits (`chore: initialize project`, `feat: add global hotkey`, …).
-Never commit models, recordings, secrets, build artifacts, temp data.
-
-## 41. Phases
-0 Machine & architecture discovery (docs + initial project that builds) · 1 Lightweight native
-shell (menu bar, config, state machine, permissions; measure startup/idle RAM/CPU/GPU) ·
-2 Global hotkey (measure detection latency) · 3 Audio (measure recording startup latency,
-memory) · 4 Local STT (benchmark sizes, choose smallest acceptable) · 5 Text insertion —
-**core product must work end-to-end offline** · 6 Performance pass (audio startup, model init,
-STT, memory, concurrency, insertion; don't continue until the fast path feels good) ·
-7 Local LLM (Smart Processing only; cold/warm, RAM, CPU, GPU) · 8 Processing modes ·
-9 Developer optimization (+ tests for identifiers, paths, commands, frameworks, DBs, APIs) ·
-10 Application awareness (per-app mode defaults) · 11 Perf round 2 (warm vs cold, loaded vs
-unloaded, CPU vs Metal, small vs larger, LLM on vs off) · 12 Packaging (release build, bundle,
-icon, versioning, model setup, launch at login, install docs) · 13 Final offline audit.
-
-## 42. Development rule (after EVERY phase)
-1 Build · 2 Run tests · 3 Run relevant benchmark · 4 Verify functionality · 5 Inspect git diff ·
-6 Update documentation · 7 Fix issues · 8 Commit · 9 Only then continue. Never stack
-unverified phases.
-
-## 43. Never
-Electron; React desktop UI; localhost server; cloud APIs; remote LLMs; unnecessarily large
-models; continuously running mic; polling keyboard or app state; persisting transcripts or
-audio; analytics/telemetry; unnecessary dependencies; building an agent; arbitrary shell
-execution; prioritizing features over latency.
-
-## 44. Future (do NOT implement now)
-Voice commands, voice editing, context-aware prompts, custom vocabulary, streaming
-transcription/insertion, voice macros, per-app intelligence, local command execution.
-
-## 45. Future command execution safety
-Voice → interpretation → visible preview → explicit confirmation → execution. Never execute
-solely because something was spoken.
-
-## 46. Product feel
-"A tiny macOS utility that quietly sits in the menu bar and turns my voice into text almost
-instantly" — not "a giant AI application running in the background."
-
-## 47. Final acceptance test
-1. Start VoiceFlow → lightweight menu-bar app. 2. Internet disconnected. 3. Open Cursor, focus a
-text field. 4. Hold ⌥Space, say "create a function called get user by id that accepts a string
-id and returns a promise of user or null", release. 5. Local STT → Developer mode →
-inserted `Create a function called getUserById that accepts a string id and returns a Promise<User | null>.`
-6. Clipboard preserved. 7. No data leaves the machine. 8. CPU/GPU return near idle; memory
-reasonable. 9. Repeat in Terminal, VS Code, Browser, ChatGPT, Claude.
-
-## 48. Guiding principle
-**Use the minimum amount of computation necessary to produce the desired result.** No LLM if
-not needed; native API over library; smaller model if sufficient; lazy-load; don't run what
-needn't run; don't store what needn't be stored; don't add unnecessary dependencies.
-
-## Addendum (2026-09-16, owner request)
-Track phases (completed, next, leftovers) in `docs/PROGRESS.md` so any new session has full
-context. Build tooling: SwiftPM + script-assembled .app; do not require Xcode.
+## Addenda (owner requests)
+- Track phases (completed, next, leftovers, handoff) in `docs/PROGRESS.md` so any new session has full context.
+- Build with SwiftPM + a script-assembled .app; Xcode not required (owner's choice, 2026-09-16).

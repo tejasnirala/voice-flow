@@ -1,37 +1,38 @@
 # VoiceFlow
 
-A tiny, offline macOS menu-bar utility that turns your voice into text almost instantly.
+A local-only macOS menu-bar dictation utility built for software development.
 
-**Hold ⌥ Space → speak → release → text appears in the focused app.**
-Speech recognition (whisper.cpp) and optional cleanup (a small local LLM) run entirely on your
-Mac. No cloud, no telemetry, no stored audio or transcripts.
+**Hold ⌥ Space → speak naturally → release → accurate text appears in the focused app.**
+Speech recognition and optional cleanup run entirely on your Mac. No cloud, no telemetry, no stored audio
+or transcripts.
 
-> **Status:** Phase 0 complete (architecture + buildable shell). Not usable for dictation yet.
+> **Status:** Phase 0 (machine & architecture discovery). Not usable for dictation yet.
 > See [`docs/PROGRESS.md`](docs/PROGRESS.md).
 
-## Design goals (in priority order)
-1. Latency · 2. Lightweight (≈0% idle CPU/GPU, small RAM) · 3. Offline privacy · 4. Reliability
-· 5. Transcription quality · 6. Developer-aware formatting · 7. UI · 8. Features
+## Priorities
+1. **Transcription accuracy**, especially developer vocabulary (Next.js, PostgreSQL, `getUserById`,
+   `docker compose up`, `.env.local` …)
+2. Latency 3. Resource efficiency (near-zero idle CPU/GPU, low idle RAM) 4. Features
 
 ## Modes
-- **Fast Mode** (default): audio → Whisper → paste.
-- **Smart Processing**: audio → Whisper → local LLM (Clean / Developer / Prompt / Writing) → paste.
+- **Fast Mode:** audio → local STT → paste.
+- **Smart Mode:** audio → local STT → small local LLM (conservative cleanup, never guesses) → paste.
 
 ## Quick start (development)
 ```sh
 scripts/fetch-deps.sh
-scripts/fetch-models.sh whisper base.en
 scripts/build-app.sh && open build/VoiceFlow.app
+scripts/test.sh
 ```
-Needs only the Command Line Tools. Details in [`docs/development.md`](docs/development.md).
+Needs only the Command Line Tools. See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md), including how to run
+the accuracy benchmark on your own voice.
 
 ## Documentation
 | Doc | Contents |
 |---|---|
-| [`docs/SPEC.md`](docs/SPEC.md) | Product and engineering requirements |
-| [`docs/PROGRESS.md`](docs/PROGRESS.md) | Phase status, next steps, decision log |
-| [`docs/architecture/`](docs/architecture/) | Overview, STT, LLM, audio, input, performance |
-| [`docs/benchmarks/`](docs/benchmarks/) | Measured results (this machine only) |
-| [`docs/environment.md`](docs/environment.md) | Development machine inventory |
-| [`docs/security.md`](docs/security.md) | Permissions, data handling, network behavior |
-| [`docs/dependencies.md`](docs/dependencies.md) | Every dependency and why |
+| [`docs/SPEC.md`](docs/SPEC.md) | Requirements (v2) |
+| [`docs/PROGRESS.md`](docs/PROGRESS.md) | Phase status, next steps, decision log, session handoff |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Machine, stack, alternatives, STT decision, privacy, dependencies |
+| [`docs/ACCURACY.md`](docs/ACCURACY.md) | Benchmark corpus, metrics, threshold, results |
+| [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) | Measurement methodology and results |
+| [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | Setup, commands, benchmarks, gotchas |

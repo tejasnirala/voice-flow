@@ -1,13 +1,28 @@
 #!/usr/bin/env bash
-# Generates synthetic 16 kHz mono test clips with macOS `say` into benchmarks-output/audio.
-# Synthetic speech is cleaner than a real microphone: treat results as a lower bound
-# on error rate. Real-voice recordings are added in Phase 4.
+# Generates synthetic 16 kHz mono clips for every synthesizable corpus entry with several macOS
+# TTS voices → benchmarks-output/audio/synthetic/<voice>/<id>.wav
+#
+# Synthetic speech is NOT a substitute for real recordings: it is cleaner, perfectly paced, and its
+# pronunciation of technical terms is often unnatural. Use it to validate the pipeline and to
+# shortlist; decide on human recordings (scripts/bench/record.sh).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-OUT=benchmarks-output/audio; mkdir -p "$OUT"
-gen() { say -o "$OUT/$1.wav" --data-format=LEI16@16000 "$2"; }
-gen short     "Hello, this is a test."
-gen medium    "Create a Next.js API route that validates the request body and stores the user in PostgreSQL."
-gen developer "Create a function called get user by id that accepts a string ID and returns a Promise of User or null."
-gen long      "So the plan for the authentication refactor is this. First, we move the token validation out of the Express middleware and into a dedicated service. The refresh token expires after one day, and we store the session in Redis so that the API response can be cached. Then we add a PostgreSQL index on the email column, run npm install, and then npm run dev to verify that everything still works locally before opening the pull request."
-ls "$OUT"
+CORPUS=benchmarks/corpus/developer-speech.json
+VOICES=("Rishi:rishi-en-IN" "Samantha:samantha-en-US" "Daniel:daniel-en-GB")
+
+mkdir -p benchmarks-output
+python3 -c '
+import json, sys
+for e in json.load(open(sys.argv[1]))["entries"]:
+    if e["synthesizable"]: print(e["id"] + "\t" + e["spoken"])' "$CORPUS" > benchmarks-output/.spoken.tsv
+
+for pair in "${VOICES[@]}"; do
+  voice="${pair%%:*}" label="${pair#*:}"
+  if ! say -v '?' | grep -q "^$voice "; then echo "skip voice $voice (not installed)"; continue; fi
+  out="benchmarks-output/audio/synthetic/$label"; mkdir -p "$out"
+  while IFS=$'\t' read -r id text; do
+    [[ -f "$out/$id.wav" ]] || say -v "$voice" -o "$out/$id.wav" --data-format=LEI16@16000 "$text"
+  done < benchmarks-output/.spoken.tsv
+  echo "✓ $label: $(ls "$out" | wc -l | tr -d ' ') clips"
+done
+rm -f benchmarks-output/.spoken.tsv
