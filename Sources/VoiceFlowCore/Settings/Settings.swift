@@ -78,8 +78,10 @@ public struct Settings: Codable, Equatable, Sendable {
     public var hindiScript: HindiScript
     /// Shortcut that cycles the language (default ⌃⇧L).
     public var languageHotkey: Hotkey
-    /// Model used for German and Hindi (`STTModel.id`).
-    public var multilingualModelID: String
+    /// Model used for German (`STTModel.id`).
+    public var germanModelID: String
+    /// Model used for Hindi and Hinglish (`STTModel.id`); also the language detector, so Auto keeps one model fewer.
+    public var hindiModelID: String
     /// Show the floating pill while dictating.
     public var showIndicator: Bool
     /// Where the owner dragged the pill (window origin in screen coordinates); nil = bottom center of the main screen.
@@ -100,11 +102,14 @@ public struct Settings: Codable, Equatable, Sendable {
                 textMode: TextMode = .clean, modeByApp: Bool = true, appModes: [String: TextMode] = [:],
                 showIndicator: Bool = true, indicatorPosition: IndicatorPosition? = nil,
                 language: DictationLanguage = .auto, hindiScript: HindiScript = .devanagari,
-                languageHotkey: Hotkey = .controlShiftL, multilingualModelID: String = STTModel.largeV3Q5.id) {
+                languageHotkey: Hotkey = .controlShiftL, germanModelID: String = STTModel.largeV3Q5.id,
+                hindiModelID: String = STTModel.largeV3TurboQ8.id) {
+        self.germanModelID = germanModelID
+        self.hindiModelID = hindiModelID
         self.language = language
         self.hindiScript = hindiScript
         self.languageHotkey = languageHotkey
-        self.multilingualModelID = multilingualModelID
+
         self.showIndicator = showIndicator
         self.indicatorPosition = indicatorPosition
         self.pasteInto = pasteInto
@@ -122,7 +127,11 @@ public struct Settings: Codable, Equatable, Sendable {
     }
 
     /// The configured model, or the default if the configured id isn't in the catalog.
-    public var multilingualModel: STTModel { STTModel.model(id: multilingualModelID) ?? .largeV3Q5 }
+    public var germanModel: STTModel { STTModel.model(id: germanModelID) ?? .largeV3Q5 }
+    public var hindiModel: STTModel { STTModel.model(id: hindiModelID) ?? .largeV3TurboQ8 }
+
+    /// Models for the current language setting, for status and loading.
+    public var languageModels: [SpokenLanguage: STTModel] { [.en: sttModel, .de: germanModel, .hi: hindiModel] }
 
     public var sttModel: STTModel { STTModel.model(id: sttModelID) ?? .mediumEnQ8 }
 
@@ -154,8 +163,12 @@ public struct Settings: Codable, Equatable, Sendable {
         language = (try? c.decodeIfPresent(DictationLanguage.self, forKey: .language)) ?? d.language
         hindiScript = (try? c.decodeIfPresent(HindiScript.self, forKey: .hindiScript)) ?? d.hindiScript
         languageHotkey = (try? c.decodeIfPresent(Hotkey.self, forKey: .languageHotkey)) ?? d.languageHotkey
-        let multilingualID = (try? c.decodeIfPresent(String.self, forKey: .multilingualModelID)) ?? d.multilingualModelID
-        multilingualModelID = STTModel.multilingual.contains { $0.id == multilingualID } ? multilingualID : d.multilingualModelID
+        func multilingualID(_ key: CodingKeys, default fallback: String) -> String {
+            let id = (try? c.decodeIfPresent(String.self, forKey: key)) ?? fallback
+            return STTModel.multilingual.contains { $0.id == id } ? id : fallback
+        }
+        germanModelID = multilingualID(.germanModelID, default: d.germanModelID)
+        hindiModelID = multilingualID(.hindiModelID, default: d.hindiModelID)
         indicatorPosition = (try? c.decodeIfPresent(IndicatorPosition.self, forKey: .indicatorPosition)) ?? nil
     }
 }

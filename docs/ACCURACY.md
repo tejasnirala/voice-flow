@@ -549,3 +549,80 @@ comparison is the stronger evidence; it is small (owner-read sentences), so real
 **Speech recognition unchanged:** with an empty dictionary the Whisper prompt is byte-identical, so §5.8 still holds. Owner terms
 are appended to the prompt (max 40); a long custom list changes recognition and should be re-checked with `scripts/bench/stt.sh human`.
 
+## 9. Languages: Hindi, Hinglish, German (Phase 14, 2026-09-17/18)
+
+Owner decisions: Auto-detect by default plus a manual choice and a switch shortcut; the owner records Hindi (German judged on
+synthetic voices only); Hindi keeps English words in Latin letters.
+
+**Corpora:** `benchmarks/corpus/multilingual.json` — German 26 sentences (normal, technical, commands, files, identifiers,
+natural), Hindi 24 written in both Devanagari and Hinglish. Audio: 3 macOS German voices (Anna, Flo, Sandy), 1 Hindi voice
+(Lekha) for shortlisting, and **24 owner recordings (3.6 min, MacBook mic)** for the decision. Scoring: Devanagari tokens keep
+their vowel signs; Hinglish scoring accepts spelling variants ("nahi"/"nahin", "mein"/"main"), applied to reference and
+transcript alike (`vf-bench score --hinglish`).
+
+### 9.1 Hindi and Hinglish on the owner's voice (the decision set)
+
+| Model + prompt | Devanagari WER | Hinglish WER | Terms | Mean latency | Memory |
+|---|---|---|---|---|---|
+| **large-v3-turbo q8_0 + Devanagari prompt (chosen)** | **5.7%** | **3.5%** | **96.2%** (25/26) | **0.65 s** | 1.07 GB |
+| large-v3-turbo f16 + prompt | 5.4% | 3.5% | 96.2% | 0.73 s | 1.84 GB |
+| large-v3 q5_0 + Devanagari prompt | 5.9% | 3.0% | 92.3% | 1.65 s | 1.58 GB |
+| medium q8_0 + prompt | 16.3% | 12.2% | 96.2% | 1.29 s | 1.18 GB |
+| large-v3-turbo q8_0, no prompt | 20.4% | 17.7% | 61.5% | 0.70 s | 1.07 GB |
+| large-v3-turbo q8_0 as English + romanized prompt | 56.0% | 19.6% | 96.2% | 0.60 s | 1.07 GB |
+
+0 invented phrases in every run. The vocabulary prompt is decisive (terms 61% → 96%). turbo-q8 was chosen: within 0.2–0.5
+points of the best on both scripts, the best term score, 2.5× faster than large-v3 and 0.5 GB smaller — and it is also the
+detector, so Auto keeps one model fewer in memory.
+
+**Hinglish is produced from the Devanagari transcript by rules** (`HindiTransliteration`): Whisper cannot write Hinglish
+directly — asked to, it mixes scripts mid-sentence and writes "may" for "में" (best direct attempt 19.6% WER, 40.7% on
+synthetic). Rule conversion gives **3.5%**. Devanagari output also maps English loanwords Whisper wrote in Devanagari back to
+Latin (चेक → check) and ends sentences with "।".
+
+### 9.2 German (synthetic voices only — weaker evidence)
+
+| Model + prompt | WER (3 voices, 78 clips) | Terms | Mean latency |
+|---|---|---|---|
+| **large-v3 q5_0 + German prompt (chosen)** | **8.3%** (8.8% with the Neural Engine encoder) | **79.6%** | 2.01 s → **1.14 s** with the encoder |
+| large-v3-turbo q8_0 + prompt | 11.3% | 71.0% | 1.21 s |
+| large-v3-turbo f16 + prompt | 14.2% | 51.6% | 1.23 s |
+| medium q8_0 + prompt | 16.5% | 78.5% | — |
+| Parakeet tdt-0.6b-v3 | 16.4% | 49.5% | — |
+| any of them without the prompt | 13.4–18.0% | 46–52% | — |
+
+German is **not owner-verified**: synthetic voices mispronounce English technical terms (the "files" category alone is 50% WER
+because the voices read "package.json" oddly). Expect real German to be better on everyday words and worse on terms than these
+numbers suggest. Apple's SpeechTranscriber was skipped: its per-locale download waits indefinitely for system approval.
+
+### 9.3 Language detection
+
+| Detector | Owner English (50) | Owner Hindi (24) | German synthetic (26) | Hindi synthetic (24) | Time |
+|---|---|---|---|---|---|
+| **large-v3-turbo q8_0 (chosen)** | 50/50, min margin 0.90 | **24/24, min margin 0.84** | 26/26, 1.00 | 24/24, 0.79 | 1.05 s → **0.48 s** with the Neural Engine encoder |
+| base (multilingual) | 50/50, min margin 0.10 | 24/24, min margin 0.47 | 26/26, 0.18 | 24/24, 0.01 | 57 ms |
+| small (multilingual) | 50/50, 0.12 | — | 26/26, 0.15 | 23/24, −0.02 | 190 ms |
+
+All models chose correctly on real speech, but only turbo has margins wide enough to trust on short or noisy dictations. A
+cascade (base first, turbo when its margin is below 0.5) would cut the average to ~0.2 s and was 100% correct here; not adopted
+yet — it needs more real data per language, and turbo must stay loaded anyway for Hindi.
+
+### 9.4 Rewrite modes in other languages
+
+Apple's on-device model supports German but **not Hindi** (checked on this Mac): Hindi and Hinglish use the rule-based modes,
+and Prompt/Writing fall back to Clean text. German rewrites get one extra instruction ("write in German, never translate").
+Measured on 86 German entries (STT output + 8 traps): **no trap accepted** — answers ("Die Hauptstadt von Frankreich ist
+Paris"), poems, TypeScript code and translations into English were all rejected. Gain is small (formatting 12.9% → 12.3% Clean,
+12.4% Prompt, 13.4% Writing, i.e. Writing slightly worse) and ~30% of rewrites fall back, because the guards' grammar-word
+lists are English, which makes them stricter on German.
+
+### 9.5 Accepted thresholds (owner approval pending)
+
+Hindi/Hinglish on the owner's recordings: WER 5.7% Devanagari / 3.5% Hinglish, terms 96.2%, 0 invented phrases. The Devanagari
+figure is above the 5% English threshold mainly because script and loanword spelling differences count as errors; the Hinglish
+figure is well inside it. German: no owner recordings, so no gate — treated as best effort and flagged in the UI docs.
+
+**Known limits:** identifiers spoken as words inside Hindi ("get user by id call करो") are not camel-cased (the Developer rules
+need English context words); German technical-term accuracy is uncertain; Hinglish spelling follows the built-in lexicon plus
+letter rules, so it won't match every personal spelling habit.
+

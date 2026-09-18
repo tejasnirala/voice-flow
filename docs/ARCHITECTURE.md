@@ -382,6 +382,32 @@ settings-heavy UI"); accepted as the owner's decision, built so it costs nothing
   with Xcode). View-local state lives in small `@Observable` classes (`WindowModel`, `PillInteraction`); `@Observable` and
   `@Bindable` work.
 
+### 3.9 Languages (Phase 14)
+- **Setting:** `language` (auto default, english, german, hindi, hinglish) + `hindiScript` for Auto; `⌃⇧L` cycles (Carbon hotkey,
+  no ⌥ so it can't collide with the trigger); menu, window and pill show the language.
+- **Routing** (`LanguageRouting`): English → medium.en q8_0 (unchanged, the model that passed the English gate);
+  Hindi/Hinglish → large-v3-turbo q8_0; German → large-v3 q5_0. Each with a vocabulary prompt in that language
+  (`Resources/vocabulary-*.txt`) plus the owner's dictionary terms.
+- **Auto:** the helper loads the detector (turbo) and medium.en at recording start; the detector also transcribes Hindi, so only
+  German needs an extra model, loaded when German is detected. Detection runs on the first ≤30 s of speech
+  (`whisper_lang_auto_detect`) restricted to en/de/hi.
+- **Hindi output:** always transcribed in Devanagari; `HindiTransliteration` converts to Hinglish by rules (lexicon +
+  code-point romanization with schwa deletion) or, for Devanagari output, maps Devanagari-written English loanwords back to
+  Latin and ends sentences with "।".
+- **Text processing** follows the output language: hesitations, stutter words, question words, end punctuation; English-only
+  rules (contractions, "I") stay English-only. Developer/Code symbol rules still apply to Latin words in any language.
+- **Rewrites:** English and German only (Apple's model has no Hindi); German prompts get "write in German, never translate".
+- **Helper protocol:** `prepare` loads a model (several at once), `transcribe` carries model/language/prompt per request, and
+  `detectLanguage` returns probabilities per candidate.
+
+| Option | Pros | Cons | Decision |
+|---|---|---|---|
+| One multilingual model for all languages | Simplest, least memory | English accuracy regresses (large-v3-turbo failed the English gate) | Rejected |
+| Model per language (chosen) | Best accuracy per language; Hindi shares the detector | Up to 3 models loaded (3.5 GB) | **Adopted** |
+| Whisper writing Hinglish directly | No conversion step | 19.6–40.7% WER, mixed scripts | Rejected |
+| Devanagari + rule transliteration (chosen) | 3.5% WER, stable | Spelling conventions are ours, not personal habits | **Adopted** |
+| base-model detection cascade | ~0.2 s instead of 0.48 s | Thin margins (0.01–0.47) on current data | Not yet |
+
 ## 4. STT decision
 
 Data: ACCURACY.md §5 and PERFORMANCE.md §3. Measured 2026-09-16/17 on this machine.

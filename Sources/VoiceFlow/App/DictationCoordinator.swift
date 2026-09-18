@@ -271,8 +271,8 @@ final class DictationCoordinator {
     private(set) var modelNeedingInstall: STTModel?
 
     private func refreshModelStatus() {
-        var needed = LanguageRouting.modelsToPrepare(setting: settings.language, multilingual: settings.multilingualModel)
-        if settings.language == .auto { needed.append(settings.multilingualModel) }
+        var needed = LanguageRouting.modelsToPrepare(setting: settings.language, models: settings.languageModels)
+        if settings.language == .auto { needed.append(settings.germanModel) }
         modelStatus = .installed
         modelNeedingInstall = nil
         for model in needed {
@@ -496,7 +496,7 @@ final class DictationCoordinator {
     /// Verifies and loads the models for the language setting in the background while the user is still speaking.
     /// For Auto, a missing detector isn't fatal: dictation continues in English (see `transcribePendingAudio`).
     private func prepareSpeechEngine() {
-        let models = LanguageRouting.modelsToPrepare(setting: settings.language, multilingual: settings.multilingualModel)
+        let models = LanguageRouting.modelsToPrepare(setting: settings.language, models: settings.languageModels)
         guard models.contains(where: { !speechEngine.isLoaded(STTModelManager.url(for: $0)) }) else { return }
         let engine = speechEngine
         let optionalDetector = settings.language == .auto ? LanguageRouting.detectorModel.id : nil
@@ -562,9 +562,9 @@ final class DictationCoordinator {
         releaseUptimeNs = releasedAt
         let cpuBefore = ResourceUsage.cpuSeconds
         let engine = speechEngine
-        let setting = settings.language, hindiScript = settings.hindiScript, multilingual = settings.multilingualModel
+        let setting = settings.language, hindiScript = settings.hindiScript, languageModels = settings.languageModels
         let prompts = Dictionary(uniqueKeysWithValues: SpokenLanguage.allCases.map { spoken in
-            (spoken, speechPrompt(for: spoken, model: LanguageRouting.transcriptionModel(for: spoken, multilingual: multilingual)))
+            (spoken, speechPrompt(for: spoken, model: LanguageRouting.transcriptionModel(for: spoken, models: languageModels)))
         })
 
         Task { [weak self] in
@@ -584,7 +584,7 @@ final class DictationCoordinator {
                         detectionSeconds = seconds
                     }
                     let output = OutputLanguage.resolve(setting: setting, detected: detected, hindiScript: hindiScript)
-                    let model = LanguageRouting.transcriptionModel(for: output.spoken, multilingual: multilingual)
+                    let model = LanguageRouting.transcriptionModel(for: output.spoken, models: languageModels)
                     let url = STTModelManager.url(for: model)
                     if !engine.isLoaded(url) {
                         let status = STTModelManager.quickStatus(for: model)

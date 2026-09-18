@@ -21,7 +21,7 @@
 | 11 | Final performance optimization | ✅ Complete (2026-09-17, owner approved) |
 | 12 | Packaging | ✅ Complete (2026-09-17, installed, owner approved) |
 | 13 | Final audit | ✅ Complete (2026-09-17, owner reviewed; follow-up: languages → Phase 14) |
-| 14 | Languages: Hindi (Devanagari), Hinglish, German | 🟡 Implemented; awaiting owner Hindi recordings for the accuracy gate |
+| 14 | Languages: Hindi (Devanagari), Hinglish, German | 🟡 Complete + benchmarked 2026-09-18; awaiting owner live test |
 
 Legend: ✅ complete · 🟡 in progress / awaiting approval · ⏭️ next · ⬜ not started · ⚠️ blocked
 
@@ -336,8 +336,11 @@ synthetic voices only); Hindi keeps English words in Latin; benchmark models kep
       per-language cleanup (German/Hindi fillers, questions, danda); on-device rewrite English/German only (German prompt: never translate)
 - [x] German model modes: 0 traps accepted (answers, poems, code, translations rejected); small gain, ~30% fallback
 - [x] `--measure-files` (dictate audio files without the microphone); live routing: EN/DE/HI detected correctly; Auto adds ~0.5 s
-- [ ] **Owner:** record Hindi (`scripts/bench/record.sh macbook-mic --hindi`) → human gate for Hindi/Hinglish (model: large-v3 vs turbo)
-- [ ] Then: docs (ACCURACY §9, PERFORMANCE, ARCHITECTURE), memory/latency write-up, owner live test, approval
+- [x] Owner recorded 24 Hindi clips (2026-09-18). Decision: **Hindi/Hinglish = large-v3-turbo q8_0 + Devanagari prompt**
+      (WER 5.7% Devanagari / 3.5% Hinglish, terms 96.2%, 0.65 s; also the detector → one model fewer in Auto);
+      **German = large-v3 q5_0 + German prompt** (synthetic only); detection = turbo (24/24 on owner Hindi, margin ≥ 0.84)
+- [x] Docs: ACCURACY §9, PERFORMANCE §5.7, ARCHITECTURE §3.9, README, DEVELOPMENT
+- [ ] **Owner:** live test (dictate Hindi/Hinglish/German, ⌃⇧L switching, Auto in real apps) and approve Phase 14
 
 ## Phases 6–13
 Per SPEC.md. Notes so far:
@@ -380,6 +383,7 @@ Per SPEC.md. Notes so far:
 | 2026-09-17 | Rewrite in the prewarmed session; no model for ≤ 10-word Clean/Developer/Prompt dictations; red icon when audio flows | Measured −0.12…−0.31 s and ~0.65 s with ≤ 0.4 pt formatting cost; chunking/early abort rejected | PERFORMANCE §5.4–5.5 |
 | 2026-09-17 | Packaging: script install to ~/Applications, SMAppService login item, local diagnostics; no installer/daemon/notarization | Spec Phase 12 "no unnecessary installers or services"; personal build | ARCHITECTURE §3.7 |
 | 2026-09-17 | Full app window + draggable floating pill with saved position (owner request; spec §17 said minimal menu-bar UI) | Owner decision; built to cost nothing when closed/idle | ARCHITECTURE §3.8, PERFORMANCE §5.6 |
+| 2026-09-18 | Hindi/Hinglish = large-v3-turbo q8_0 + Devanagari prompt (also the detector); German = large-v3 q5_0; Hinglish by rule transliteration | Owner recordings: 5.7%/3.5% WER, terms 96.2%, 2.5× faster than large-v3; Whisper can't write Hinglish directly | ACCURACY §9 |
 | 2026-09-16 | Carbon RegisterEventHotKey; Esc cancel registered only while recording | Press+release, no permission, zero idle cost | ARCHITECTURE §3.3 |
 | 2026-09-16 | Clipboard + ⌘V with full snapshot/restore; never lose speech | Works in Electron/terminals/browsers | ARCHITECTURE §3.4 |
 | 2026-09-16 | llama.cpp in-process (provisional); Ollama rejected | No daemon/IPC; MLX re-evaluated in Phase 7 | ARCHITECTURE §3.5 |
@@ -395,4 +399,4 @@ _Overwrite at the end of every session._
   `benchmarks-output/results/human/`. Rerunning `scripts/bench/stt.sh human` re-scores instantly.
 - **Mode benchmark data:** `benchmarks-output/results/modes/` (prepared inputs, model JSONL per mode, `report.md` with every
   accepted/rejected rewrite). Re-score after guard changes with `vf-bench modes report … --results …` (no model rerun needed).
-- **Next action:** Phase 14: owner records Hindi (`scripts/bench/record.sh macbook-mic --hindi`), then `scripts/bench/stt-multilingual.sh human-hi` + transliteration scoring decides the Hindi model. Do NOT delete benchmark models until the owner explicitly asks.
+- **Next action:** owner live-tests Phase 14 (Hindi/Hinglish/German, ⌃⇧L, Auto) and approves. Do NOT delete benchmark models until the owner explicitly asks.

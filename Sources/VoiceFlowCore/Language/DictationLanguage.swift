@@ -88,24 +88,27 @@ public enum OutputLanguage: String, Sendable, CaseIterable {
 
 /// Model choice and text conversion per language.
 public enum LanguageRouting {
-    /// Detects English/German/Hindi: widest margins on the owner's English recordings (docs/ACCURACY.md §9).
+    /// Detects English/German/Hindi. large-v3-turbo: 100% correct on the owner's English and Hindi recordings and on German
+    /// with the widest margins (docs/ACCURACY.md §9); it also transcribes Hindi, so Auto keeps one model fewer in memory.
     public static let detectorModel = STTModel.largeV3TurboQ8
 
-    /// English keeps the model that passed the English gate; German and Hindi use the multilingual model.
-    public static func transcriptionModel(for spoken: SpokenLanguage, multilingual: STTModel) -> STTModel {
-        spoken == .en ? .mediumEnQ8 : multilingual
+    /// English keeps the model that passed the English gate; German and Hindi use their own multilingual models.
+    public static func transcriptionModel(for spoken: SpokenLanguage, models: [SpokenLanguage: STTModel]) -> STTModel {
+        models[spoken] ?? .mediumEnQ8
     }
 
-    /// Models to load when recording starts.
-    public static func modelsToPrepare(setting: DictationLanguage, multilingual: STTModel) -> [STTModel] {
-        var models: [STTModel]
+    /// Models to load when recording starts. Auto loads the detector (which also transcribes Hindi) and the English
+    /// model; German's model is loaded only if German is detected.
+    public static func modelsToPrepare(setting: DictationLanguage, models: [SpokenLanguage: STTModel]) -> [STTModel] {
+        var wanted: [STTModel]
         switch setting {
-        case .english: models = [.mediumEnQ8]
-        case .german, .hindi, .hinglish: models = [multilingual]
-        case .auto: models = [detectorModel, .mediumEnQ8]
+        case .english: wanted = [models[.en] ?? .mediumEnQ8]
+        case .german: wanted = [models[.de] ?? .largeV3Q5]
+        case .hindi, .hinglish: wanted = [models[.hi] ?? .largeV3TurboQ8]
+        case .auto: wanted = [detectorModel, models[.en] ?? .mediumEnQ8]
         }
         var seen = Set<String>()
-        return models.filter { seen.insert($0.id).inserted }
+        return wanted.filter { seen.insert($0.id).inserted }
     }
 
     /// Bundled vocabulary prompt resource (Resources/<name>.txt) for a language and model.
@@ -114,7 +117,8 @@ public enum LanguageRouting {
         case .en: "developer-vocabulary"
         case .de: "vocabulary-de"
         // large-v3 did best with a romanized prompt, turbo with a Devanagari one (still writing Devanagari): §9.
-        case .hi: model.id.hasPrefix("large-v3-turbo") ? "vocabulary-hi-devanagari" : "vocabulary-hi-romanized"
+        // Both large models did best on the owner's recordings with the Devanagari prompt (§9).
+        case .hi: "vocabulary-hi-devanagari"
         }
     }
 

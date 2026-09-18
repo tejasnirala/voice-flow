@@ -43,6 +43,13 @@ guard, and a rejected rewrite falls back to the rule-based text.
 - **Floating pill while dictating:** live microphone level, finish ■ and cancel ✕, then Transcribing / Rewriting / Pasted.
   Drag it anywhere; it reappears where you left it (Settings → Reset Position).
 
+## Languages
+English, German, Hindi (Devanagari) and Hinglish. **Auto-detect** is the default: VoiceFlow recognizes which of the three
+languages you spoke (0.5 s) and writes it accordingly; ⌃⇧L switches to a fixed language, and the pill shows which one.
+Hindi keeps English words in Latin ("इस function में getUserById call करो"); Hinglish is produced from the Devanagari
+transcript by rules. Prompt, Writing and Smart Rewrite work in English and German (Apple's on-device model has no Hindi).
+Languages other than English need `scripts/install.sh --with-languages` (~4.2 GB of models).
+
 ## Install (this Mac)
 ```sh
 scripts/install.sh --with-models   # first time: whisper.cpp framework, speech model (1.4 GB, verified), build, tests, ~/Applications

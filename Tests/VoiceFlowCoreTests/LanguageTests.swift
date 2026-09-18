@@ -12,14 +12,17 @@ import Testing
         #expect(OutputLanguage.german.supportsOnDeviceRewrite && !OutputLanguage.hinglish.supportsOnDeviceRewrite)
     }
 
-    @Test func routingKeepsTheEnglishModelForEnglish() {
-        #expect(LanguageRouting.transcriptionModel(for: .en, multilingual: .largeV3Q5) == .mediumEnQ8)
-        #expect(LanguageRouting.transcriptionModel(for: .hi, multilingual: .largeV3Q5) == .largeV3Q5)
-        #expect(LanguageRouting.modelsToPrepare(setting: .auto, multilingual: .largeV3Q5).map(\.id) == ["large-v3-turbo-q8_0", "medium.en-q8_0"])
-        #expect(LanguageRouting.modelsToPrepare(setting: .german, multilingual: .largeV3Q5).map(\.id) == ["large-v3-q5_0"])
+    @Test func routingUsesTheRightModelPerLanguage() {
+        let models = Settings.default.languageModels
+        #expect(LanguageRouting.transcriptionModel(for: .en, models: models) == .mediumEnQ8)
+        #expect(LanguageRouting.transcriptionModel(for: .de, models: models) == .largeV3Q5)
+        // Hindi uses the detector model, so Auto loads one model fewer.
+        #expect(LanguageRouting.transcriptionModel(for: .hi, models: models) == LanguageRouting.detectorModel)
+        #expect(LanguageRouting.modelsToPrepare(setting: .auto, models: models).map(\.id) == ["large-v3-turbo-q8_0", "medium.en-q8_0"])
+        #expect(LanguageRouting.modelsToPrepare(setting: .hinglish, models: models) == [.largeV3TurboQ8])
+        #expect(LanguageRouting.modelsToPrepare(setting: .german, models: models) == [.largeV3Q5])
         #expect(LanguageRouting.pick([.en: 0.2, .de: 0.7, .hi: 0.1]) == .de)
         #expect(DeveloperVocabulary.prompt(resource: "vocabulary-de")?.contains("Kubernetes") == true)
-        #expect(DeveloperVocabulary.prompt(resource: LanguageRouting.promptResource(for: .hi, model: .largeV3Q5)) != nil)
         #expect(DeveloperVocabulary.prompt(resource: LanguageRouting.promptResource(for: .hi, model: .largeV3TurboQ8)) != nil)
     }
 
@@ -32,9 +35,10 @@ import Testing
 
     @Test func settingsDecodeLanguageTolerantly() throws {
         #expect(Settings.default.language == .auto && Settings.default.hindiScript == .devanagari)
-        let s = try JSONDecoder().decode(Settings.self, from: Data(#"{"language": "german", "hindiScript": "hinglish", "multilingualModelID": "medium.en-q8_0"}"#.utf8))
+        let s = try JSONDecoder().decode(Settings.self, from: Data(#"{"language": "german", "hindiScript": "hinglish", "germanModelID": "medium.en-q8_0", "hindiModelID": "medium-q8_0"}"#.utf8))
         #expect(s.language == .german && s.hindiScript == .hinglish)
-        #expect(s.multilingualModelID == STTModel.largeV3Q5.id) // English-only model can't be the multilingual one
+        #expect(s.germanModelID == STTModel.largeV3Q5.id)      // English-only model can't transcribe German
+        #expect(s.hindiModelID == STTModel.mediumQ8.id)        // a multilingual model is accepted
         #expect(Settings.default.languageHotkey.displayName == "⌃⇧L")
     }
 

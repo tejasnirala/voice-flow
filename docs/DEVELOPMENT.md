@@ -94,6 +94,14 @@ $B modes report benchmarks-output/cleanup-corpus.json benchmarks/corpus/mode-tra
 # Developer intelligence (Phase 9): corrections, Code mode and over-correction traps
 $B modes intel benchmarks/corpus/developer-intel.json
 
+# Languages (Phase 14)
+scripts/bench/make-audio-multilingual.sh                    # synthetic German/Hindi clips
+scripts/bench/record.sh macbook-mic --hindi                 # owner Hindi recordings (scored in both scripts)
+scripts/bench/stt-multilingual.sh synthetic                 # shortlist + detection (APPLE=1 adds Apple SpeechTranscriber)
+scripts/bench/stt-multilingual.sh human-hi                  # decision set
+$B hindi-script <results.jsonl> --to hinglish --run <name>  # convert transcripts, then score with --hinglish
+open build/VoiceFlow.app --args --measure-files a.wav,b.wav --measure-output out.txt   # dictate files, no microphone
+
 # Subset of runs: regex filter on run names
 scripts/bench/stt.sh human 'large-v3-turbo|parakeet'
 ```

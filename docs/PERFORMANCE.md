@@ -487,6 +487,21 @@ that don't trade away accuracy. A rejected rewrite still costs its generation ti
 | Pill while recording | level meter ~20 Hz; panel created on first dictation, ordered out when idle |
 | App size | 7.6 MB (app binary 2.2 MB with SwiftUI views) |
 
+## 5.7 Languages (Phase 14), 2026-09-18
+Release build, app pipeline with audio files (`--measure-files`), Neural Engine encoders installed.
+
+| Measurement | Result |
+|---|---|
+| Language detection (large-v3-turbo, Neural Engine) | 0.48–0.63 s per dictation in Auto (1.05 s on Metal) |
+| English in Auto, release → text | 1.3 s (9 s dictation), 2.2 s (28 s) — about +0.5 s vs a fixed English setting |
+| Hindi, release → text | 1.3–2.3 s (8–14 s dictations); transcription 0.6–0.8 s |
+| German, release → text | 4.4 s the first time (large-v3 loads for 2.6 s), 2.4 s afterwards |
+| Hindi transcription (owner clips, harness) | 0.65 s mean, 0.87 s max |
+| German transcription (synthetic, harness) | 1.14 s mean with the Neural Engine encoder (2.01 s on Metal) |
+| Speech helper memory | English + detector/Hindi: **2.1 GB**; with German's model too: **3.5 GB**; released 60 s after the last dictation |
+| First use of each model | 12–20 s one-time Neural Engine compile, then cached |
+| Model files on disk | English 1.39 GB + turbo 0.83 GB + large-v3 1.03 GB + encoders 2.35 GB ≈ 5.6 GB with all languages |
+
 ## 6. Open measurements (scheduled)
 
 | Measurement | Phase |
