@@ -46,6 +46,8 @@ guard, and a rejected rewrite falls back to the rule-based text.
 ## Languages
 English, German, Hindi (Devanagari) and Hinglish. **Auto-detect** is the default: VoiceFlow recognizes which of the three
 languages you spoke (0.5 s) and writes it accordingly; ⌃⇧L switches to a fixed language, and the pill shows which one.
+Set a language per app (Mode ▸ For <App>, or the window's Apps page), e.g. WhatsApp → Hinglish: very short dictations are
+hard to detect, and an app rule makes them certain (and 0.5 s faster).
 Hindi keeps English words in Latin ("इस function में getUserById call करो"); Hinglish is produced from the Devanagari
 transcript by rules. Prompt, Writing and Smart Rewrite work in English and German (Apple's on-device model has no Hindi).
 Languages other than English need `scripts/install.sh --with-languages` (~4.2 GB of models).

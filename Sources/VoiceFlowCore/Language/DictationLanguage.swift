@@ -136,4 +136,27 @@ public enum LanguageRouting {
     public static func pick(_ probabilities: [SpokenLanguage: Double]) -> SpokenLanguage {
         probabilities.max { $0.value < $1.value }?.key ?? .en
     }
+
+    /// Whisper languages to ask the detector about. Urdu is asked for because spoken Hindi and Urdu are one language:
+    /// on short owner Hindi clips Whisper's top guess was often Urdu (docs/ACCURACY.md §9.6).
+    public static let detectionCandidates = ["en", "de", "hi", "ur"]
+
+    /// Below this share of probability on the candidates, Whisper is guessing some other language (typical for 2–3 s of
+    /// casual speech) and the detection isn't trusted.
+    public static let confidentMass = 0.5
+
+    public struct Detection: Equatable, Sendable {
+        public var language: SpokenLanguage
+        /// Probability per supported language (Urdu folded into Hindi).
+        public var probabilities: [SpokenLanguage: Double]
+        public var confident: Bool
+    }
+
+    /// Folds Urdu into Hindi and decides whether the detection is trustworthy.
+    public static func interpret(_ raw: [String: Double]) -> Detection {
+        var p: [SpokenLanguage: Double] = [.en: raw["en"] ?? 0, .de: raw["de"] ?? 0, .hi: (raw["hi"] ?? 0) + (raw["ur"] ?? 0)]
+        p = p.mapValues { max(0, $0) }
+        let mass = p.values.reduce(0, +)
+        return Detection(language: pick(p), probabilities: p, confident: mass >= confidentMass)
+    }
 }

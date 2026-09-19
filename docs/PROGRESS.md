@@ -343,6 +343,9 @@ synthetic voices only); Hindi keeps English words in Latin; benchmark models kep
 - [x] Owner real use in English with Auto (2026-09-19/20): all dictations detected English (0.91–1.00), detection 570–710 ms
 - [x] Hindi identifier calls camel-cased in Developer mode ("get user by id call करो" → getUserById); owner transcripts: 1 intended
       change per script, nothing else
+- [x] Owner report (2026-09-20): short Hindi in WhatsApp came out English. Cause: Whisper labels 2–3 s Hindi as Urdu (or other
+      languages); fix: Urdu counted as Hindi, per-app language, unsure detections use the app's last confident language
+      (ACCURACY §9.6); tie-break by transcription confidence rejected (flipped 5/50 short English clips)
 - [ ] **Owner:** live test Hindi/Hinglish/German and ⌃⇧L (English with Auto already verified in use); `scripts/install.sh` picks up
       the identifier fix; approve Phase 14
 

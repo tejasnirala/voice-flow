@@ -53,4 +53,23 @@ import Testing
     func cleanupFollowsTheLanguage(input: String, language: OutputLanguage, expected: String) {
         #expect(RuleBasedCleanup.clean(input, language: language) == expected)
     }
+
+    @Test func urduCountsAsHindiAndLowMassIsUncertain() {
+        // Owner's short WhatsApp Hindi looked like this before: only English scored among the three.
+        let d = LanguageRouting.interpret(["en": 0.06, "de": 0.0, "hi": 0.02, "ur": 0.61])
+        #expect(d.language == .hi && d.confident)
+        let noise = LanguageRouting.interpret(["en": 0.13, "de": 0.0, "hi": 0.0, "ur": 0.02])
+        #expect(!noise.confident)
+        #expect(LanguageRouting.interpret(["en": 0.97, "de": 0.01, "hi": 0.0, "ur": 0.0]) == .init(language: .en, probabilities: [.en: 0.97, .de: 0.01, .hi: 0.0], confident: true))
+    }
+
+    @Test func perAppLanguage() throws {
+        var s = Settings.default
+        s.appLanguages = ["net.whatsapp.WhatsApp": .hinglish]
+        #expect(s.language(forApp: "net.whatsapp.WhatsApp") == .hinglish)
+        #expect(s.language(forApp: "com.microsoft.VSCode") == .auto)
+        #expect(s.language(forApp: nil) == .auto)
+        let decoded = try JSONDecoder().decode(Settings.self, from: Data(#"{"appLanguages": {"a": "hindi", "b": "klingon"}}"#.utf8))
+        #expect(decoded.appLanguages == ["a": .hindi])
+    }
 }

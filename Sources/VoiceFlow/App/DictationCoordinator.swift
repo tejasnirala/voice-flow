@@ -496,10 +496,11 @@ final class DictationCoordinator {
     /// Verifies and loads the models for the language setting in the background while the user is still speaking.
     /// For Auto, a missing detector isn't fatal: dictation continues in English (see `transcribePendingAudio`).
     private func prepareSpeechEngine() {
-        let models = LanguageRouting.modelsToPrepare(setting: settings.language, models: settings.languageModels)
+        let startLanguage = settings.language(forApp: (dictationApp ?? NSWorkspace.shared.frontmostApplication)?.bundleIdentifier)
+        let models = LanguageRouting.modelsToPrepare(setting: startLanguage, models: settings.languageModels)
         guard models.contains(where: { !speechEngine.isLoaded(STTModelManager.url(for: $0)) }) else { return }
         let engine = speechEngine
-        let optionalDetector = settings.language == .auto ? LanguageRouting.detectorModel.id : nil
+        let optionalDetector = startLanguage == .auto ? LanguageRouting.detectorModel.id : nil
         prepareTask = Task.detached(priority: .userInitiated) {
             for model in models {
                 let url = STTModelManager.url(for: model)
@@ -545,10 +546,18 @@ final class DictationCoordinator {
     /// Language outcome of a transcription (for text processing, the pill and logs).
     struct LanguageOutcome: Sendable {
         var output: OutputLanguage
-        /// Probabilities when Auto detected the language; nil when fixed.
+        /// Probabilities when Auto detected the language (Urdu folded into Hindi); nil when fixed.
         var probabilities: [SpokenLanguage: Double]?
         var detectionSeconds: Double
+        /// How the language was decided, for the log.
+        var source: String
+        /// A confident detection, remembered for this app.
+        var confidentDetection: SpokenLanguage?
     }
+
+    /// Last language detected with confidence per app (this session only, in memory). Used when a short dictation's
+    /// detection is unsure: 2–3 s of casual Hindi is often guessed as another language (docs/ACCURACY.md §9.6).
+    private var confidentLanguageByApp: [String: SpokenLanguage] = [:]
 
     private func transcribePendingAudio() {
         guard let audio = pendingAudio else {
@@ -562,7 +571,10 @@ final class DictationCoordinator {
         releaseUptimeNs = releasedAt
         let cpuBefore = ResourceUsage.cpuSeconds
         let engine = speechEngine
-        let setting = settings.language, hindiScript = settings.hindiScript, languageModels = settings.languageModels
+        let receiver = (settings.pasteInto == .currentApp ? NSWorkspace.shared.frontmostApplication : dictationApp)?.bundleIdentifier
+        let appRule = receiver.flatMap { settings.appLanguages[$0] }
+        let setting = settings.language(forApp: receiver), hindiScript = settings.hindiScript, languageModels = settings.languageModels
+        let remembered = receiver.flatMap { confidentLanguageByApp[$0] }
         let prompts = Dictionary(uniqueKeysWithValues: SpokenLanguage.allCases.map { spoken in
             (spoken, speechPrompt(for: spoken, model: LanguageRouting.transcriptionModel(for: spoken, models: languageModels)))
         })
@@ -574,14 +586,26 @@ final class DictationCoordinator {
                     var detected: SpokenLanguage?
                     var probabilities: [SpokenLanguage: Double]?
                     var detectionSeconds = 0.0
+                    var source = appRule != nil ? "app rule" : "fixed"
+                    var confidentDetection: SpokenLanguage?
                     let detector = LanguageRouting.detectorModel
                     if setting == .auto, STTModelManager.quickStatus(for: detector) == .installed {
                         let (raw, seconds) = try engine.detectLanguage(audio, model: detector, url: STTModelManager.url(for: detector),
-                                                                       candidates: SpokenLanguage.allCases.map(\.rawValue))
-                        let parsed = Dictionary(uniqueKeysWithValues: raw.compactMap { key, value in SpokenLanguage(rawValue: key).map { ($0, value) } })
-                        probabilities = parsed
-                        detected = LanguageRouting.pick(parsed)
+                                                                       candidates: LanguageRouting.detectionCandidates)
+                        let detection = LanguageRouting.interpret(raw)
+                        probabilities = detection.probabilities
                         detectionSeconds = seconds
+                        if detection.confident {
+                            detected = detection.language
+                            confidentDetection = detection.language
+                            source = "detected"
+                        } else if let remembered {
+                            detected = remembered
+                            source = "unsure, used this app's last language"
+                        } else {
+                            detected = detection.language
+                            source = "unsure, best guess"
+                        }
                     }
                     let output = OutputLanguage.resolve(setting: setting, detected: detected, hindiScript: hindiScript)
                     let model = LanguageRouting.transcriptionModel(for: output.spoken, models: languageModels)
@@ -592,11 +616,15 @@ final class DictationCoordinator {
                     }
                     let result = try engine.transcribe(audio, model: model, url: url, language: output.spoken.rawValue,
                                                        prompt: prompts[output.spoken] ?? nil)
-                    return .success((result, LanguageOutcome(output: output, probabilities: probabilities, detectionSeconds: detectionSeconds)))
+                    return .success((result, LanguageOutcome(output: output, probabilities: probabilities, detectionSeconds: detectionSeconds,
+                                                             source: source, confidentDetection: confidentDetection)))
                 } catch {
                     return .failure(error)
                 }
             }.value
+            if case .success(let (_, language)) = outcome, let receiver, let confident = language.confidentDetection {
+                self?.confidentLanguageByApp[receiver] = confident
+            }
             self?.finishTranscription(outcome, speechSeconds: speechSeconds, releasedAt: releasedAt, cpuBefore: cpuBefore)
         }
     }
@@ -623,7 +651,8 @@ final class DictationCoordinator {
                 SpokenLanguage.allCases.map { String(format: "%@ %.2f", $0.rawValue, p[$0] ?? 0) }.joined(separator: ", ")
             }
             Log.speech.notice("""
-                language \(language.output.rawValue, privacy: .public) (\(probabilityText.map { "detected: \($0), \(Int(language.detectionSeconds * 1000)) ms" } ?? "fixed", privacy: .public))
+                language \(language.output.rawValue, privacy: .public) (\(language.source, privacy: .public)\
+                \(probabilityText.map { ": \($0) (hi includes Urdu), \(Int(language.detectionSeconds * 1000)) ms" } ?? "", privacy: .public))
                 """)
             lastOutputLanguage = language.output
             onLanguageResolved?(language.output)

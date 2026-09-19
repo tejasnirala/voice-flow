@@ -616,6 +616,29 @@ Paris"), poems, TypeScript code and translations into English were all rejected.
 12.4% Prompt, 13.4% Writing, i.e. Writing slightly worse) and ~30% of rewrites fall back, because the guards' grammar-word
 lists are English, which makes them stricter on German.
 
+### 9.6 Short dictations: owner report (2026-09-20) and fix
+
+Owner report: Hindi/Hinglish dictation in WhatsApp came out in English. Log: four 2–3 s dictations with detection
+en 0.23 / 0.13 / 0.06 / 0.04 and hi 0.00: the three candidates held almost no probability, i.e. Whisper was guessing another
+language, and the largest of three tiny numbers (English) won, so medium.en transcribed Hindi speech.
+
+On 2.5 s slices of the owner's recordings (large-v3-turbo detector), Whisper's top guess for Hindi was often **Urdu**
+(0.52–0.69), sometimes Vietnamese or Indonesian; full-length clips were 24/24 and 50/50.
+
+| Strategy (2.5 s slices) | Hindi, from the middle (24) | Hindi, from the start¹ (24) | English (50) |
+|---|---|---|---|
+| Before (argmax of en/de/hi) | 20 | 7 | 49 |
+| **Urdu counted as Hindi (adopted)** | **21** | 8 | **49** |
+| + tie-break by transcription confidence (hi vs en) | 21 | 10 | **44** (rejected) |
+
+¹ Many sentences start with English words ("Update के लिए…", "Docker compose up…"), so their first 2.5 s is genuinely English.
+
+Detection can't be made reliable on 2 s of casual speech, so the app also uses what it knows:
+- **Per-app language** (`appLanguages`, menu Mode ▸ For <App>, window Apps): e.g. WhatsApp → Hinglish. No detection there.
+- **When detection is unsure** (en + de + hi + ur < 0.5), the last language confidently detected **in the same app** this
+  session is used; otherwise the best guess. In-app check with short clips: 3/3 Hindi → Hindi, English → English; an unsure
+  2.5 s English clip after Hindi in the same app followed the app's last language (the known trade-off, per app only).
+
 ### 9.5 Accepted thresholds (owner approval pending)
 
 Hindi/Hinglish on the owner's recordings: WER 5.7% Devanagari / 3.5% Hinglish, terms 96.2%, 0 invented phrases. The Devanagari

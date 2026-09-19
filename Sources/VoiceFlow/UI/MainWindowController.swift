@@ -400,22 +400,34 @@ struct AppsView: View {
                 Spacer()
                 Button("Add App…", action: addApp)
             }
-            if state.settings.appModes.isEmpty {
-                Text("None yet. Add an app to pick its mode.").foregroundStyle(.secondary)
+            Text("Mode and language per app. \"Automatic\" uses the built-in default mode; \"Same as everywhere\" uses your language setting (\(state.settings.language.displayName)).")
+                .font(.callout).foregroundStyle(.secondary)
+            if ownerApps.isEmpty {
+                Text("None yet. Add an app to pick its mode or language (e.g. WhatsApp → Hinglish).").foregroundStyle(.secondary)
             }
-            ForEach(state.settings.appModes.keys.sorted(), id: \.self) { bundleID in
+            ForEach(ownerApps, id: \.self) { bundleID in
                 HStack(spacing: 10) {
                     AppIconName(bundleID: bundleID)
                     Spacer()
-                    Picker("", selection: Binding(get: { state.settings.appModes[bundleID] ?? .clean },
-                                                  set: { mode in state.update { $0.appModes[bundleID] = mode } })) {
-                        ForEach(TextMode.allCases, id: \.self) { Text($0.displayName).tag($0) }
+                    Picker("", selection: Binding<TextMode?>(get: { state.settings.appModes[bundleID] },
+                                                           set: { mode in state.update { $0.appModes[bundleID] = mode } })) {
+                        Text("Automatic").tag(TextMode?.none)
+                        ForEach(TextMode.allCases, id: \.self) { Text($0.displayName).tag(TextMode?.some($0)) }
                     }
                     .labelsHidden()
-                    .frame(width: 130)
-                    Button { state.update { $0.appModes[bundleID] = nil } } label: { Image(systemName: "minus.circle") }
+                    .frame(width: 120)
+                    Picker("", selection: Binding<DictationLanguage?>(get: { state.settings.appLanguages[bundleID] },
+                                                                    set: { value in state.update { $0.appLanguages[bundleID] = value } })) {
+                        Text("Same as everywhere").tag(DictationLanguage?.none)
+                        ForEach(DictationLanguage.allCases.filter { $0 != .auto }, id: \.self) { Text($0.displayName).tag(DictationLanguage?.some($0)) }
+                    }
+                    .labelsHidden()
+                    .frame(width: 170)
+                    Button {
+                        state.update { $0.appModes[bundleID] = nil; $0.appLanguages[bundleID] = nil }
+                    } label: { Image(systemName: "minus.circle") }
                         .buttonStyle(.borderless)
-                        .help("Back to automatic")
+                        .help("Remove this app's choices")
                 }
             }
         }
@@ -432,9 +444,15 @@ struct AppsView: View {
         }
     }
 
+    /// Apps with an owner mode or language (kept in the list while either is set).
+    private var ownerApps: [String] {
+        Array(Set(state.settings.appModes.keys).union(state.settings.appLanguages.keys))
+            .sorted { AppIconName.name(for: $0) < AppIconName.name(for: $1) }
+    }
+
     private var builtInInstalled: [(String, TextMode)] {
         AppModePolicy.builtIn
-            .filter { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0.key) != nil && state.settings.appModes[$0.key] == nil }
+            .filter { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0.key) != nil && !ownerApps.contains($0.key) }
             .sorted { AppIconName.name(for: $0.key) < AppIconName.name(for: $1.key) }
             .map { ($0.key, $0.value) }
     }
@@ -445,7 +463,8 @@ struct AppsView: View {
         panel.directoryURL = URL(fileURLWithPath: "/Applications")
         panel.prompt = "Add"
         guard panel.runModal() == .OK, let url = panel.url, let bundleID = Bundle(url: url)?.bundleIdentifier else { return }
-        state.update { $0.appModes[bundleID] = AppModePolicy.builtInMode(for: bundleID) ?? $0.textMode }
+        // Added apps start on automatic mode and the global language; pick either in the row.
+        state.update { if $0.appModes[bundleID] == nil && $0.appLanguages[bundleID] == nil { $0.appModes[bundleID] = AppModePolicy.builtInMode(for: bundleID) ?? $0.textMode } }
     }
 }
 

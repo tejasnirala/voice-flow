@@ -261,6 +261,20 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 item.isEnabled = !(mode.requiresModel && modelReason != nil)
                 appMenu.addItem(item)
             }
+            appMenu.addItem(.separator())
+            appMenu.addItem(disabled("Language in \(target.name ?? "this app"):"))
+            let autoLanguage = NSMenuItem(title: "Same as everywhere (\(settings.language.displayName))", action: #selector(selectAppLanguage(_:)), keyEquivalent: "")
+            autoLanguage.target = self
+            autoLanguage.representedObject = [bundleID, ""]
+            autoLanguage.state = settings.appLanguages[bundleID] == nil ? .on : .off
+            appMenu.addItem(autoLanguage)
+            for language in DictationLanguage.allCases where language != .auto {
+                let item = NSMenuItem(title: language.displayName, action: #selector(selectAppLanguage(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = [bundleID, language.rawValue]
+                item.state = settings.appLanguages[bundleID] == language ? .on : .off
+                appMenu.addItem(item)
+            }
             appItem.submenu = appMenu
             modes.addItem(appItem)
         }
@@ -367,6 +381,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func selectHindiScript(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String, let script = HindiScript(rawValue: raw), settings.hindiScript != script else { return }
         settings.hindiScript = script
+        persist()
+    }
+
+    @objc private func selectAppLanguage(_ sender: NSMenuItem) {
+        guard let pair = sender.representedObject as? [String], pair.count == 2 else { return }
+        settings.appLanguages[pair[0]] = DictationLanguage(rawValue: pair[1])   // "" → nil: same as everywhere
         persist()
     }
 

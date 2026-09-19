@@ -388,6 +388,9 @@ settings-heavy UI"); accepted as the owner's decision, built so it costs nothing
 - **Routing** (`LanguageRouting`): English → medium.en q8_0 (unchanged, the model that passed the English gate);
   Hindi/Hinglish → large-v3-turbo q8_0; German → large-v3 q5_0. Each with a vocabulary prompt in that language
   (`Resources/vocabulary-*.txt`) plus the owner's dictionary terms.
+- **Per app:** `appLanguages[bundleID]` overrides `language` (e.g. WhatsApp → Hinglish); detection is skipped there.
+- **Detection result:** candidates en/de/hi/ur, Urdu folded into Hindi; if the candidates hold < 0.5 probability the result
+  is "unsure" and the last confident language in that app (in memory, this session) is used (ACCURACY §9.6).
 - **Auto:** the helper loads the detector (turbo) and medium.en at recording start; the detector also transcribes Hindi, so only
   German needs an extra model, loaded when German is detected. Detection runs on the first ≤30 s of speech
   (`whisper_lang_auto_detect`) restricted to en/de/hi.

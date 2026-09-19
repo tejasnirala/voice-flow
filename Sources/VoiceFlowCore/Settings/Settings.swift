@@ -76,6 +76,8 @@ public struct Settings: Codable, Equatable, Sendable {
     public var language: DictationLanguage
     /// Script for Hindi when Auto detects it.
     public var hindiScript: HindiScript
+    /// The owner's per-app languages by bundle ID (e.g. WhatsApp → Hinglish); apps without one use `language`.
+    public var appLanguages: [String: DictationLanguage]
     /// Shortcut that cycles the language (default ⌃⇧L).
     public var languageHotkey: Hotkey
     /// Model used for German (`STTModel.id`).
@@ -102,12 +104,14 @@ public struct Settings: Codable, Equatable, Sendable {
                 textMode: TextMode = .clean, modeByApp: Bool = true, appModes: [String: TextMode] = [:],
                 showIndicator: Bool = true, indicatorPosition: IndicatorPosition? = nil,
                 language: DictationLanguage = .auto, hindiScript: HindiScript = .devanagari,
+                appLanguages: [String: DictationLanguage] = [:],
                 languageHotkey: Hotkey = .controlShiftL, germanModelID: String = STTModel.largeV3Q5.id,
                 hindiModelID: String = STTModel.largeV3TurboQ8.id) {
         self.germanModelID = germanModelID
         self.hindiModelID = hindiModelID
         self.language = language
         self.hindiScript = hindiScript
+        self.appLanguages = appLanguages
         self.languageHotkey = languageHotkey
 
         self.showIndicator = showIndicator
@@ -129,6 +133,11 @@ public struct Settings: Codable, Equatable, Sendable {
     /// The configured model, or the default if the configured id isn't in the catalog.
     public var germanModel: STTModel { STTModel.model(id: germanModelID) ?? .largeV3Q5 }
     public var hindiModel: STTModel { STTModel.model(id: hindiModelID) ?? .largeV3TurboQ8 }
+
+    /// The language setting for an app: its own if the owner set one, otherwise the global setting.
+    public func language(forApp bundleID: String?) -> DictationLanguage {
+        bundleID.flatMap { appLanguages[$0] } ?? language
+    }
 
     /// Models for the current language setting, for status and loading.
     public var languageModels: [SpokenLanguage: STTModel] { [.en: sttModel, .de: germanModel, .hi: hindiModel] }
@@ -162,6 +171,8 @@ public struct Settings: Codable, Equatable, Sendable {
         showIndicator = (try? c.decodeIfPresent(Bool.self, forKey: .showIndicator)) ?? d.showIndicator
         language = (try? c.decodeIfPresent(DictationLanguage.self, forKey: .language)) ?? d.language
         hindiScript = (try? c.decodeIfPresent(HindiScript.self, forKey: .hindiScript)) ?? d.hindiScript
+        appLanguages = ((try? c.decodeIfPresent([String: String].self, forKey: .appLanguages)) ?? [:])
+            .compactMapValues(DictationLanguage.init(rawValue:))
         languageHotkey = (try? c.decodeIfPresent(Hotkey.self, forKey: .languageHotkey)) ?? d.languageHotkey
         func multilingualID(_ key: CodingKeys, default fallback: String) -> String {
             let id = (try? c.decodeIfPresent(String.self, forKey: key)) ?? fallback
