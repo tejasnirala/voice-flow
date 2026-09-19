@@ -47,6 +47,31 @@ public enum DeveloperCorrections {
                                            "single", "not", "at", "hash", "pound", "dollar", "exclamation", "fat"]
     static let domainSuffixes: Set<String> = ["com", "io", "dev", "org", "net", "app", "ai", "co", "sh", "cloud", "tech"]
 
+    /// Hindi/Hinglish verbs that follow "call" when an identifier is being called ("getUserById call करो").
+    static let hindiCallVerbs: Set<String> = ["करो", "कर", "करना", "करके", "करें", "करते", "हो", "होता", "होती", "होगा", "किया",
+                                              "karo", "kar", "karna", "karke", "karen", "karte", "ho", "hota", "hoti", "hoga", "kiya"]
+
+    /// Hindi and Hinglish only: "get user by id call करो" → "getUserById call करो" (2–4 words starting with a common verb,
+    /// directly followed by "call" and a Hindi verb). English uses the "… function" rule instead.
+    public static func applyHindiCallIdentifiers(_ tokens: [String]) -> [String] {
+        var t = tokens
+        var i = 0
+        while i < t.count {
+            if identifierVerbs.contains(core(t, i)), i == 0 || !identifierVerbs.contains(core(t, i - 1)) {
+                for n in stride(from: 4, through: 2, by: -1) where clean(t, i, n) && core(t, i + n) == "call"
+                    && hindiCallVerbs.contains(core(t, i + n + 1)) {
+                    let ws = (0..<n).map { core(t, i + $0) }
+                    guard ws.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isLetter) && $0.unicodeScalars.allSatisfy(\.isASCII) }),
+                          ws.dropFirst().allSatisfy({ !identifierStops.contains($0) }) else { continue }
+                    t.replaceSubrange(i..<i + n, with: wrap(t, i, n, camel(ws)))
+                    break
+                }
+            }
+            i += 1
+        }
+        return t
+    }
+
     // MARK: Entry point
 
     /// Applies the corrections to whitespace tokens (punctuation attached). `explicitCaseCues` honors "camel case get user

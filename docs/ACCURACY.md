@@ -622,7 +622,10 @@ Hindi/Hinglish on the owner's recordings: WER 5.7% Devanagari / 3.5% Hinglish, t
 figure is above the 5% English threshold mainly because script and loanword spelling differences count as errors; the Hinglish
 figure is well inside it. German: no owner recordings, so no gate — treated as best effort and flagged in the UI docs.
 
-**Known limits:** identifiers spoken as words inside Hindi ("get user by id call करो") are not camel-cased (the Developer rules
-need English context words); German technical-term accuracy is uncertain; Hinglish spelling follows the built-in lexicon plus
+**Identifiers in Hindi (added 2026-09-20):** in Developer mode, 2–4 words starting with a common verb and followed directly
+by "call" plus a Hindi verb become camelCase ("get user by id call करो" → "getUserById call करो"). On the owner's 24 Hindi
+transcripts it changed exactly that sentence, in both scripts, to the reference; nothing else changed.
+
+**Known limits:** German technical-term accuracy is uncertain; Hinglish spelling follows the built-in lexicon plus
 letter rules, so it won't match every personal spelling habit.
 

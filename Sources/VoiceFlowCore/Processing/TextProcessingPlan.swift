@@ -9,10 +9,13 @@ public enum TextProcessingPlan {
     public static func prepare(_ transcript: String, mode: TextMode, dictionary: UserDictionary = .empty,
                                language: OutputLanguage = .english) -> String {
         switch mode {
-        case .raw: transcript
-        case .clean, .prompt, .writing: dictionary.apply(to: RuleBasedCleanup.clean(transcript, language: language))
-        case .developer: dictionary.apply(to: DeveloperFormatter.format(RuleBasedCleanup.clean(transcript, language: language)))
-        case .code: dictionary.apply(to: CodeFormatter.format(RuleBasedCleanup.clean(transcript, sentenceCase: false, language: language)))
+        case .raw: return transcript
+        case .clean, .prompt, .writing: return dictionary.apply(to: RuleBasedCleanup.clean(transcript, language: language))
+        case .developer:
+            var text = DeveloperFormatter.format(RuleBasedCleanup.clean(transcript, language: language))
+            if language == .hindiDevanagari || language == .hinglish { text = DeveloperFormatter.formatHindiIdentifiers(text) }
+            return dictionary.apply(to: text)
+        case .code: return dictionary.apply(to: CodeFormatter.format(RuleBasedCleanup.clean(transcript, sentenceCase: false, language: language)))
         }
     }
 

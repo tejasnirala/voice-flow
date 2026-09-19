@@ -30,4 +30,17 @@ import Testing
                 == "इस function में Redis में cache कर दो। Next.js use करो।")
         #expect(HindiTransliteration.devanagariPunctuation("Use Next.js. Done.") == "Use Next.js. Done.")
     }
+
+    @Test(arguments: [
+        ("इस function में get user by id call करो और result को Redis में cache कर दो।", OutputLanguage.hindiDevanagari,
+         "इस function में getUserById call करो और result को Redis में cache कर दो।"),
+        ("Is function mein fetch orders call karo.", OutputLanguage.hinglish, "Is function mein fetchOrders call karo."),
+        // Not an identifier call: no verb start, or "call" isn't followed by a Hindi verb.
+        ("मुझे client call करो।", OutputLanguage.hindiDevanagari, "मुझे client call करो।"),
+        ("Main shaam ko call karunga.", OutputLanguage.hinglish, "Main shaam ko call karunga."),
+        ("get user by id call me back", OutputLanguage.english, "Get user by id call me back."),
+    ])
+    func hindiIdentifierCalls(input: String, language: OutputLanguage, expected: String) {
+        #expect(TextProcessingPlan.prepare(input, mode: .developer, language: language) == expected)
+    }
 }

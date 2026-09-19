@@ -46,6 +46,14 @@ public enum DeveloperFormatter {
         }.joined(separator: "\n")
     }
 
+    /// Hindi/Hinglish identifier rule, line by line (see `DeveloperCorrections.applyHindiCallIdentifiers`).
+    public static func formatHindiIdentifiers(_ text: String) -> String {
+        text.split(separator: "\n", omittingEmptySubsequences: false).map { line in
+            DeveloperCorrections.applyHindiCallIdentifiers(line.split(separator: " ", omittingEmptySubsequences: false).map(String.init))
+                .joined(separator: " ")
+        }.joined(separator: "\n")
+    }
+
     static func formatLine(_ text: String) -> String {
         var tokens = text.split(whereSeparator: \.isWhitespace).map(String.init)
         tokens = applySpokenNames(tokens)

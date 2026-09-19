@@ -340,7 +340,11 @@ synthetic voices only); Hindi keeps English words in Latin; benchmark models kep
       (WER 5.7% Devanagari / 3.5% Hinglish, terms 96.2%, 0.65 s; also the detector → one model fewer in Auto);
       **German = large-v3 q5_0 + German prompt** (synthetic only); detection = turbo (24/24 on owner Hindi, margin ≥ 0.84)
 - [x] Docs: ACCURACY §9, PERFORMANCE §5.7, ARCHITECTURE §3.9, README, DEVELOPMENT
-- [ ] **Owner:** live test (dictate Hindi/Hinglish/German, ⌃⇧L switching, Auto in real apps) and approve Phase 14
+- [x] Owner real use in English with Auto (2026-09-19/20): all dictations detected English (0.91–1.00), detection 570–710 ms
+- [x] Hindi identifier calls camel-cased in Developer mode ("get user by id call करो" → getUserById); owner transcripts: 1 intended
+      change per script, nothing else
+- [ ] **Owner:** live test Hindi/Hinglish/German and ⌃⇧L (English with Auto already verified in use); `scripts/install.sh` picks up
+      the identifier fix; approve Phase 14
 
 ## Phases 6–13
 Per SPEC.md. Notes so far:
