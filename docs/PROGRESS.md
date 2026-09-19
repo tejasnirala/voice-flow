@@ -346,6 +346,8 @@ synthetic voices only); Hindi keeps English words in Latin; benchmark models kep
 - [x] Owner report (2026-09-20): short Hindi in WhatsApp came out English. Cause: Whisper labels 2–3 s Hindi as Urdu (or other
       languages); fix: Urdu counted as Hindi, per-app language, unsure detections use the app's last confident language
       (ACCURACY §9.6); tie-break by transcription confidence rejected (flipped 5/50 short English clips)
+- [x] Owner follow-up (2026-09-20): a 6.8 s code-mixed Hinglish message over AirPods was detected English (en 0.72), so detection
+      can't separate English from English-heavy Hinglish; set WhatsApp → Hinglish (per-app language) → owner confirmed working
 - [ ] **Owner:** live test Hindi/Hinglish/German and ⌃⇧L (English with Auto already verified in use); `scripts/install.sh` picks up
       the identifier fix; approve Phase 14
 

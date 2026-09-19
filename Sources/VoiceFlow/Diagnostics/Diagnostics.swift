@@ -18,6 +18,7 @@ enum Diagnostics {
             "On-device rewrite model: \(OnDeviceRewriter.unavailableReason ?? "available")",
             "Permissions: microphone \(PermissionManager.microphone), accessibility \(PermissionManager.isAccessibilityTrusted ? "allowed" : "not allowed"), input monitoring \(ModifierKeyMonitor.hasPermission ? "allowed" : "not allowed")",
             "Settings: trigger \(settings.dictationTrigger.rawValue), mode \(settings.textMode.rawValue), mode by app \(settings.modeByApp), per-app rules \(settings.appModes.count), smart rewrite \(settings.processingMode.rawValue), paste into \(settings.pasteInto.rawValue), max \(Int(settings.maxRecordingSeconds)) s, unload after \(Int(settings.sttUnloadAfterSeconds)) s",
+            "Language: \(settings.language.rawValue), Hindi script \(settings.hindiScript.rawValue), per-app languages \(settings.appLanguages.count), shortcut \(settings.languageHotkey.displayName)",
             "Open at login: \(LoginItem.isEnabled)",
             "App memory: \(Int(ResourceUsage.footprintMB)) MB",
             "",

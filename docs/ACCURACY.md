@@ -639,6 +639,10 @@ Detection can't be made reliable on 2 s of casual speech, so the app also uses w
   session is used; otherwise the best guess. In-app check with short clips: 3/3 Hindi → Hindi, English → English; an unsure
   2.5 s English clip after Hindi in the same app followed the app's last language (the known trade-off, per app only).
 
+**Follow-up (same day):** a 6.8 s Hinglish message recorded over AirPods was detected as English with confidence (en 0.72,
+hi 0.18). Code-mixed Hinglish full of English words is acoustically English to the detector, so no detection threshold can
+separate them; the per-app language (WhatsApp → Hinglish) resolved it, confirmed by the owner.
+
 ### 9.5 Accepted thresholds (owner approval pending)
 
 Hindi/Hinglish on the owner's recordings: WER 5.7% Devanagari / 3.5% Hinglish, terms 96.2%, 0 invented phrases. The Devanagari
