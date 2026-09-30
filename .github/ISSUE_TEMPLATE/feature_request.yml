@@ -1,0 +1,27 @@
+name: Feature request
+description: Suggest an improvement
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The problem in your own words, not a proposed solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+    validations:
+      required: true
+  - type: checkboxes
+    id: rules
+    attributes:
+      label: Project rules
+      description: VoiceFlow is local-only and accuracy-first (see CONTRIBUTING.md).
+      options:
+        - label: This works without network access, accounts or telemetry
+          required: true
+        - label: This doesn't require storing audio or transcripts
+          required: true

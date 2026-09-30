@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security or privacy problem
+    url: https://github.com/tejasnirala/voice-flow/security/advisories/new
+    about: Report privately instead of opening a public issue.
+  - name: Documentation
+    url: https://github.com/tejasnirala/voice-flow/tree/main/docs
+    about: Architecture, accuracy and performance measurements, development guide.

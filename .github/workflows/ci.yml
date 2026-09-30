@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  core:
+    name: Build VoiceFlowCore
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swift version
+        run: swift --version
+      - name: Fetch native runtime (whisper.cpp, checksum verified)
+        run: scripts/fetch-deps.sh
+      - name: Build VoiceFlowCore
+        # The app and helper targets need the macOS 27 SDK (installAudioTap, FoundationModels), which hosted runners may
+        # not have yet; VoiceFlowCore holds the pure logic and builds anywhere. Run scripts/test.sh locally for the
+        # full suite (165 tests).
+        run: swift build --target VoiceFlowCore
+
+  scripts:
+    name: Check shell scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax-check every script
+        run: for f in scripts/*.sh scripts/bench/*.sh; do bash -n "$f"; done
+      - name: shellcheck
+        run: shellcheck -S warning scripts/*.sh scripts/bench/*.sh || true

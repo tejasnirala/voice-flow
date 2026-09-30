@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Fetches prebuilt native runtimes into Vendor/ (gitignored), verifying SHA-256.
-# Build-time only. Pinned versions are recorded in docs/dependencies.md.
+# Build-time only. Pinned versions and the rationale are recorded in docs/ARCHITECTURE.md §6.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
