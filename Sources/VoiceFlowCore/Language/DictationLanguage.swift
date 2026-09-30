@@ -97,6 +97,32 @@ public enum LanguageRouting {
         models[spoken] ?? .mediumEnQ8
     }
 
+    /// German's model is optional: it is only required when German is chosen explicitly (globally or for an app). When it
+    /// isn't installed and German is detected, the detector (multilingual) transcribes instead — less accurate for German
+    /// (11.3% vs 8.8% WER on the synthetic set, docs/ACCURACY.md §9.2) but it keeps working with no extra download.
+    public static func fallbackModel(for spoken: SpokenLanguage) -> STTModel? {
+        spoken == .de ? detectorModel : nil
+    }
+
+    /// Models whose absence should be reported for this setting (German only when it's actually selected).
+    public static func requiredModels(setting: DictationLanguage, appLanguages: [String: DictationLanguage],
+                                      models: [SpokenLanguage: STTModel]) -> [STTModel] {
+        var required = Set<String>()
+        var result: [STTModel] = []
+        func add(_ model: STTModel) { if required.insert(model.id).inserted { result.append(model) } }
+        for language in [setting] + Array(appLanguages.values) {
+            switch language {
+            case .english: add(models[.en] ?? .mediumEnQ8)
+            case .german: add(models[.de] ?? .largeV3Q5)
+            case .hindi, .hinglish: add(models[.hi] ?? .largeV3TurboQ8)
+            case .auto:
+                add(detectorModel)
+                add(models[.en] ?? .mediumEnQ8)
+            }
+        }
+        return result
+    }
+
     /// Models to load when recording starts. Auto loads the detector (which also transcribes Hindi) and the English
     /// model; German's model is loaded only if German is detected.
     public static func modelsToPrepare(setting: DictationLanguage, models: [SpokenLanguage: STTModel]) -> [STTModel] {

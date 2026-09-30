@@ -271,8 +271,8 @@ final class DictationCoordinator {
     private(set) var modelNeedingInstall: STTModel?
 
     private func refreshModelStatus() {
-        var needed = LanguageRouting.modelsToPrepare(setting: settings.language, models: settings.languageModels)
-        if settings.language == .auto { needed.append(settings.germanModel) }
+        let needed = LanguageRouting.requiredModels(setting: settings.language, appLanguages: settings.appLanguages,
+                                                    models: settings.languageModels)
         modelStatus = .installed
         modelNeedingInstall = nil
         for model in needed {
@@ -608,11 +608,18 @@ final class DictationCoordinator {
                         }
                     }
                     let output = OutputLanguage.resolve(setting: setting, detected: detected, hindiScript: hindiScript)
-                    let model = LanguageRouting.transcriptionModel(for: output.spoken, models: languageModels)
-                    let url = STTModelManager.url(for: model)
+                    var model = LanguageRouting.transcriptionModel(for: output.spoken, models: languageModels)
+                    var url = STTModelManager.url(for: model)
                     if !engine.isLoaded(url) {
                         let status = STTModelManager.quickStatus(for: model)
-                        guard status == .installed else { throw ModelUnavailable(status: status, model: model) }
+                        if status != .installed, let fallback = LanguageRouting.fallbackModel(for: output.spoken),
+                           STTModelManager.quickStatus(for: fallback) == .installed {
+                            Log.speech.notice("\(model.id, privacy: .public) not installed; using \(fallback.id, privacy: .public) for \(output.spoken.rawValue, privacy: .public)")
+                            model = fallback
+                            url = STTModelManager.url(for: model)
+                        } else {
+                            guard status == .installed else { throw ModelUnavailable(status: status, model: model) }
+                        }
                     }
                     let result = try engine.transcribe(audio, model: model, url: url, language: output.spoken.rawValue,
                                                        prompt: prompts[output.spoken] ?? nil)

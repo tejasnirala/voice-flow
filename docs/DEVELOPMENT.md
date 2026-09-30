@@ -94,7 +94,8 @@ $B modes report benchmarks-output/cleanup-corpus.json benchmarks/corpus/mode-tra
 # Developer intelligence (Phase 9): corrections, Code mode and over-correction traps
 $B modes intel benchmarks/corpus/developer-intel.json
 
-# Languages (Phase 14)
+# Languages (Phase 14). Models per language and re-installing German: see README "Languages".
+#   German (2.2 GB): scripts/fetch-models.sh whisper large-v3-q5_0 && scripts/fetch-models.sh whisper-coreml large-v3
 scripts/bench/make-audio-multilingual.sh                    # synthetic German/Hindi clips
 scripts/bench/record.sh macbook-mic --hindi                 # owner Hindi recordings (scored in both scripts)
 scripts/bench/stt-multilingual.sh synthetic                 # shortlist + detection (APPLE=1 adds Apple SpeechTranscriber)

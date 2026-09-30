@@ -348,7 +348,9 @@ synthetic voices only); Hindi keeps English words in Latin; benchmark models kep
       (ACCURACY §9.6); tie-break by transcription confidence rejected (flipped 5/50 short English clips)
 - [x] Owner follow-up (2026-09-20): a 6.8 s code-mixed Hinglish message over AirPods was detected English (en 0.72), so detection
       can't separate English from English-heavy Hinglish; set WhatsApp → Hinglish (per-app language) → owner confirmed working
-- [ ] **Owner:** live test Hindi/Hinglish/German and ⌃⇧L (English with Auto already verified in use); `scripts/install.sh` picks up
+- [x] German model made optional (2026-09-30): required only when German is chosen globally or per app; otherwise detected
+      German falls back to large-v3-turbo. Owner deleted benchmark models (11 GB → 5.5 GB) and the German model (→ 3.3 GB)
+- [ ] **Owner:** live test Hindi/Hinglish and ⌃⇧L (English with Auto already verified in use); `scripts/install.sh` picks up
       the identifier fix; approve Phase 14
 
 ## Phases 6–13
@@ -401,6 +403,11 @@ Per SPEC.md. Notes so far:
 _Overwrite at the end of every session._
 
 - **Last session (2026-09-17):** Phases 0–10 complete (owner approved). Phases 0–11 complete. Phase 12 complete and installed. Phase 13 audit complete; awaiting approval.
+- **Models kept on disk (2026-09-30, owner asked to delete the rest):** English `ggml-medium.en-q8_0.bin` + encoder (1.4 GB),
+  Hindi/detection `ggml-large-v3-turbo-q8_0.bin` + encoder (2.0 GB). **German was deleted** (`ggml-large-v3-q5_0.bin` +
+  `ggml-large-v3-encoder.mlmodelc`, 2.2 GB): reinstall with
+  `scripts/fetch-models.sh whisper large-v3-q5_0 && scripts/fetch-models.sh whisper-coreml large-v3` (table in README →
+  Languages). Without it German still works via large-v3-turbo (11.3% vs 8.8% WER); nothing else changes.
 - **Models on this machine** (`~/Library/Application Support/VoiceFlow/models/`): **in use:** whisper medium.en-q8_0 +
   ggml-medium.en-encoder.mlmodelc. Benchmark-only (deletable on request): whisper tiny.en, base.en, small.en, large-v3-turbo,
   large-v3-turbo-q8_0 (STT alternate), distil-large-v3; parakeet tdt-0.6b-v3-q8_0.

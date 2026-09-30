@@ -72,4 +72,19 @@ import Testing
         let decoded = try JSONDecoder().decode(Settings.self, from: Data(#"{"appLanguages": {"a": "hindi", "b": "klingon"}}"#.utf8))
         #expect(decoded.appLanguages == ["a": .hindi])
     }
+
+    @Test func germanModelIsOptionalUnlessGermanIsChosen() {
+        let models = Settings.default.languageModels
+        // Auto or English/Hindi never requires the German model.
+        #expect(!LanguageRouting.requiredModels(setting: .auto, appLanguages: [:], models: models).contains(.largeV3Q5))
+        #expect(LanguageRouting.requiredModels(setting: .auto, appLanguages: [:], models: models).map(\.id)
+                == ["large-v3-turbo-q8_0", "medium.en-q8_0"])
+        #expect(LanguageRouting.requiredModels(setting: .hinglish, appLanguages: [:], models: models) == [.largeV3TurboQ8])
+        // Choosing German, globally or for one app, requires it.
+        #expect(LanguageRouting.requiredModels(setting: .german, appLanguages: [:], models: models) == [.largeV3Q5])
+        #expect(LanguageRouting.requiredModels(setting: .auto, appLanguages: ["x": .german], models: models).contains(.largeV3Q5))
+        // Detected German without its model falls back to the multilingual detector.
+        #expect(LanguageRouting.fallbackModel(for: .de) == LanguageRouting.detectorModel)
+        #expect(LanguageRouting.fallbackModel(for: .en) == nil && LanguageRouting.fallbackModel(for: .hi) == nil)
+    }
 }

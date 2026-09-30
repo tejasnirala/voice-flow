@@ -50,7 +50,20 @@ Set a language per app (Mode ▸ For <App>, or the window's Apps page), e.g. Wha
 hard to detect, and an app rule makes them certain (and 0.5 s faster).
 Hindi keeps English words in Latin ("इस function में getUserById call करो"); Hinglish is produced from the Devanagari
 transcript by rules. Prompt, Writing and Smart Rewrite work in English and German (Apple's on-device model has no Hindi).
-Languages other than English need `scripts/install.sh --with-languages` (~4.2 GB of models).
+Languages other than English need their models (`scripts/install.sh --with-languages`, ~4.2 GB).
+
+**Models per language** (`~/Library/Application Support/VoiceFlow/models/whisper/`, installed by `scripts/fetch-models.sh`,
+SHA-256 verified; nothing is downloaded while dictating):
+
+| Language | Model files | Size | Install |
+|---|---|---|---|
+| English | `ggml-medium.en-q8_0.bin` + `ggml-medium.en-encoder.mlmodelc` | 1.4 GB | `scripts/fetch-models.sh whisper medium.en-q8_0 && scripts/fetch-models.sh whisper-coreml medium.en` |
+| Hindi, Hinglish **and language detection** | `ggml-large-v3-turbo-q8_0.bin` + `ggml-large-v3-turbo-encoder.mlmodelc` | 2.0 GB | `scripts/fetch-models.sh whisper large-v3-turbo-q8_0 && scripts/fetch-models.sh whisper-coreml large-v3-turbo` |
+| German (optional) | `ggml-large-v3-q5_0.bin` + `ggml-large-v3-encoder.mlmodelc` | 2.2 GB | `scripts/fetch-models.sh whisper large-v3-q5_0 && scripts/fetch-models.sh whisper-coreml large-v3` |
+
+**German without that model:** VoiceFlow still transcribes German with the Hindi/detection model (large-v3-turbo), which is
+less accurate on German (11.3% vs 8.8% word error on the synthetic set). Install the two files above to get the better one;
+no settings change is needed, and the first dictation afterwards spends ~15–20 s compiling it for the Neural Engine.
 
 ## Install (this Mac)
 ```sh
