@@ -52,6 +52,9 @@ scripts/install.sh --with-models      # fetches the runtime + English model (che
 `scripts/install.sh` alone updates an existing install; `scripts/install.sh --with-languages` adds German, Hindi and
 Hinglish; `scripts/uninstall.sh [--purge]` removes it.
 
+**New to this?** [docs/SETUP.md](docs/SETUP.md) is a step-by-step guide with every command, from cloning to your first
+dictation, including the signing identity, the three permissions and a troubleshooting table.
+
 On first use macOS asks for **Microphone**, **Input Monitoring** (for the ⌥ trigger) and **Accessibility** (to paste).
 The window's Home page shows what is still missing and fixes it with one click.
 
@@ -147,7 +150,7 @@ Full results: [docs/ACCURACY.md](docs/ACCURACY.md), [docs/PERFORMANCE.md](docs/P
 ```sh
 scripts/fetch-deps.sh                          # whisper.cpp xcframework → Vendor/ (checksum verified)
 scripts/build-app.sh && open build/VoiceFlow.app
-scripts/test.sh                                # 165 tests (plain `swift test` fails with Command Line Tools only)
+scripts/test.sh                                # 170 tests (plain `swift test` fails with Command Line Tools only)
 ```
 
 SwiftPM only, no Xcode project, no Swift package dependencies. See [CONTRIBUTING.md](CONTRIBUTING.md) and
@@ -155,6 +158,7 @@ SwiftPM only, no Xcode project, no Swift package dependencies. See [CONTRIBUTING
 
 | Doc | Contents |
 |---|---|
+| [docs/SETUP.md](docs/SETUP.md) | Step-by-step install guide for a new Mac, with troubleshooting |
 | [docs/SPEC.md](docs/SPEC.md) | Requirements this project is built against |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Stack, alternatives considered, model decisions, privacy |
 | [docs/ACCURACY.md](docs/ACCURACY.md) | Corpora, metrics, thresholds, every accuracy result |

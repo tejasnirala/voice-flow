@@ -22,6 +22,8 @@ scripts/test.sh                                         # unit tests (plain `swi
 ```
 
 `scripts/install.sh` installs to `~/Applications`; `scripts/uninstall.sh [--purge]` removes it.
+[docs/SETUP.md](docs/SETUP.md) walks through the whole thing step by step, including the local signing identity that keeps
+macOS from re-asking for permissions after every rebuild.
 
 ## Project rules
 

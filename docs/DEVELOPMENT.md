@@ -116,6 +116,7 @@ The corpus lives in `benchmarks/corpus/developer-speech.json`. Each entry has `s
 explained in `docs/ACCURACY.md`.
 
 ## Stable code signing (before Phase 3)
+(Also written up for newcomers in [SETUP.md](SETUP.md) §3.)
 macOS ties Microphone and Accessibility grants to the code signature. Ad-hoc signatures change on every
 build, so macOS asks again. Create a self-signed identity once:
 1. Keychain Access → Certificate Assistant → **Create a Certificate…**
